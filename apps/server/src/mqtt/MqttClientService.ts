@@ -18,6 +18,10 @@ import {
   type MappedMeterIngestResult
 } from "../services/mqttMeterIngest.js";
 import { tapProductionObservation } from "../services/mqttObservationCatalogService.js";
+import {
+  decideReviewedPowerObservation,
+  type PersistedLivePowerObservation
+} from "./reviewedPowerObservationOrdering.js";
 import { matchesMqttTopicFilter } from "./topicFilter.js";
 import { getDatabase } from "../db/index.js";
 import {
@@ -970,6 +974,11 @@ export class MqttClientService {
         quality = excluded.quality,
         raw_payload = excluded.raw_payload
     `);
+    const readPersistedLivePowerObservation = this.database.prepare(`
+      SELECT value, unit, timestamp
+      FROM live_metric_values
+      WHERE metric_scope = ? AND metric_key = ?
+    `);
     const upsertLegacyLiveValue = this.database.prepare(`
       INSERT INTO live_metric_values (
         metric_scope,
@@ -1024,6 +1033,41 @@ export class MqttClientService {
               "Accepted meter reading is not representable in generic live metrics"
             );
             return;
+          }
+          if (mapped.measurementKind === "power-gauge") {
+            const candidateTimestamp = mapped.sourceTimestamp ?? receivedAt;
+            const prior = readPersistedLivePowerObservation.get(
+              mapping.metric_scope,
+              mapping.metric_key
+            ) as PersistedLivePowerObservation | undefined;
+            const decision = decideReviewedPowerObservation(
+              { timestamp: candidateTimestamp, unit: mapped.liveUnit, value: normalizedValue },
+              prior
+            );
+            if (decision !== "update") {
+              if (decision === "late" || decision === "conflict") {
+                this.logger.warn(
+                  {
+                    candidateTimestamp,
+                    candidateUnit: mapped.liveUnit,
+                    candidateValue: normalizedValue,
+                    code: decision === "late"
+                      ? "REVIEWED_POWER_LATE_OBSERVATION"
+                      : "REVIEWED_POWER_EQUAL_INSTANT_CONFLICT",
+                    metricKey: mapping.metric_key,
+                    metricScope: mapping.metric_scope,
+                    persistedTimestamp: prior?.timestamp ?? null,
+                    persistedUnit: prior?.unit ?? null,
+                    persistedValue: prior?.value ?? null,
+                    topic
+                  },
+                  decision === "late"
+                    ? "Ignored late reviewed power observation"
+                    : "Ignored conflicting reviewed power observation"
+                );
+              }
+              return;
+            }
           }
           upsertLiveValue.run(
             mapping.metric_scope,

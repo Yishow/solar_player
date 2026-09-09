@@ -152,6 +152,7 @@ export type MappedMeterIngestResult = MeterIngestResult & {
   /** Unit of `liveValueDecimal`; energy normalizes to kWh, power keeps its reviewed unit. */
   liveUnit: string;
   liveValueDecimal: string | null;
+  measurementKind: MeterSourceDefinition["measurementKind"] | null;
   selectorVersion: number | null;
   sourceTimestampPath: string | null;
 };
@@ -168,6 +169,7 @@ function rejectedMapping(
     liveValueDecimal: null,
     liveValueKwh: null,
     liveUpdated: false,
+    measurementKind: null,
     normalizedValueKwh: null,
     readingId: null,
     reason,
@@ -199,6 +201,7 @@ function ingestLivePowerReading(
     liveValueDecimal: null,
     liveValueKwh: null,
     liveUpdated: false,
+    measurementKind: definition.measurementKind,
     normalizedValueKwh: null,
     readingId: null,
     selectorVersion,
@@ -294,6 +297,7 @@ export function ingestMappedMeterReading(
     handled: true,
     liveUnit,
     liveValueDecimal: result.liveValueKwh,
+    measurementKind: definition.measurementKind,
     selectorVersion: result.selectorVersion ?? selector.selectorVersion ?? null,
     sourceTimestampPath: result.sourceTimestampPath ?? timestampEvidence.path
   };

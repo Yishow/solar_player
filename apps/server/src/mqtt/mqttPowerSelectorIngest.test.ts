@@ -1,97 +1,15 @@
 import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
 import test from "node:test";
-import type Database from "better-sqlite3";
 import type { MeterSourceDefinition } from "@solar-display/shared";
-import type { MqttClient } from "mqtt";
-import { applyGuidedMapping, previewGuidedMapping } from "../services/guidedMqttMappingService.js";
-import { getDatabase } from "../routes/display-pages-asset-governance.test-support.js";
-import { MqttClientService } from "./MqttClientService.js";
-
-const silentLogger = { error: () => undefined, info: () => undefined, warn: () => undefined };
-
-class FakeMqttClient extends EventEmitter {
-  connected = true;
-  subscriptions: string[][] = [];
-
-  subscribe(topics: string[], callback: (error?: Error | null) => void) {
-    this.subscriptions.push([...topics]);
-    queueMicrotask(() => callback(null));
-    return this;
-  }
-
-  unsubscribe(_topics: string[], callback: (error?: Error | null) => void) {
-    queueMicrotask(() => callback(null));
-    return this;
-  }
-
-  publish(_topic: string, _payload: string, _options: unknown, callback?: (error?: Error | null) => void) {
-    queueMicrotask(() => callback?.(null));
-    return this;
-  }
-
-  end(_force: boolean, _options: Record<string, never>, callback: () => void) {
-    callback();
-    return this;
-  }
-}
-
-const powerSource: MeterSourceDefinition = {
-  channelId: "kn-main-power", meterId: "kn-main-power", metricKey: "consumptionPower", metricScope: "kn",
-  enabled: true, reviewStatus: "reviewed", measurementKind: "power-gauge", energyFlowRole: "consumption",
-  inputUnit: "kW", scaleDecimal: "1", sourceRevision: 1, epochId: "one", expectedCadenceSeconds: 60,
-  sourceTimestampTimeZone: null, timestampPolicy: "allow-receive-time-estimate"
-};
-const powerTopic = "factory/kn/power";
-
-function reviewMapping(
-  database: Database.Database,
-  source: MeterSourceDefinition,
-  topic: string,
-  selector: { path: string[]; tagEquals?: string },
-  idempotencyKey: string
-) {
-  const draft = {
-    channelId: source.channelId, energyFlowRole: source.energyFlowRole, measurementKind: source.measurementKind,
-    metricScope: source.metricScope, selector, source, timestampPolicy: source.timestampPolicy, topic
-  };
-  const preview = previewGuidedMapping(database, draft);
-  return applyGuidedMapping(database, {
-    canonicalDraft: preview.canonicalDraft, idempotencyKey, meterId: source.meterId,
-    previewToken: preview.previewToken, source
-  });
-}
-
-async function withRuntime(run: (emit: (topic: string, payload: unknown) => Promise<void>) => Promise<void>) {
-  const client = new FakeMqttClient();
-  const service = new MqttClientService({
-    connectFn: () => {
-      queueMicrotask(() => client.emit("connect"));
-      return client as unknown as MqttClient;
-    },
-    database: getDatabase(),
-    logger: silentLogger
-  });
-  try {
-    await service.connect();
-    await run(async (topic, payload) => {
-      client.emit("message", topic, Buffer.from(JSON.stringify(payload)), { dup: false, qos: 0, retain: false });
-      await new Promise((resolve) => setImmediate(resolve));
-    });
-  } finally {
-    await service.disconnect();
-  }
-}
-
-function readLive(metricScope: string, metricKey: string) {
-  return getDatabase().prepare(`
-    SELECT value, unit, timestamp, quality FROM live_metric_values WHERE metric_scope = ? AND metric_key = ?
-  `).get(metricScope, metricKey) as { quality: string | null; timestamp: string; unit: string; value: number } | undefined;
-}
-
-function countRows(table: string) {
-  return (getDatabase().prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
-}
+import {
+  countRows,
+  getDatabase,
+  powerSource,
+  powerTopic,
+  readLive,
+  reviewMapping,
+  withRuntime
+} from "./mqttPowerIngest.test-support.js";
 
 test("R2 a reviewed power mapping resolves its tag from an array on the production packet path", async () => {
   const database = getDatabase();
@@ -156,6 +74,27 @@ test("R2 a legacy scalar mapping without a reviewed source keeps the compatibili
   });
 });
 
+test("R2 a legacy tagged array value_path mapping keeps indexed compatibility", async () => {
+  const database = getDatabase();
+  database.prepare(`
+    UPDATE topic_mappings
+    SET topic = ?, value_path = ?, selector_json = NULL
+    WHERE metric_scope = 'cl' AND metric_key = 'factoryCircuit.stampingPower'
+  `).run("factory/power/tagged-array", "1.value");
+
+  await withRuntime(async (emit) => {
+    await emit("factory/power/tagged-array", [
+      { tag: "P2", value: 99 },
+      { tag: "P1", value: 42 }
+    ]);
+    const live = readLive("cl", "factoryCircuit.stampingPower");
+    assert.ok(live, "unreviewed legacy array mappings must keep working");
+    assert.equal(live.value, 42, "the legacy value_path must still select the configured array record");
+    assert.equal(live.unit, "kW");
+    assert.equal(countRows("meter_readings_accepted"), 0);
+  });
+});
+
 test("R2 a reviewed scalar power mapping is honoured by the shared selector instead of the legacy parser", async () => {
   const database = getDatabase();
   const scalarSource = { ...powerSource, channelId: "kn-aux-power", meterId: "kn-aux-power", metricKey: "auxiliaryPower" };
@@ -179,13 +118,60 @@ test("R2 reviewed energy sources keep writing accepted history through the E1 ga
     measurementKind: "cumulative-energy", inputUnit: "kWh", scaleDecimal: "1", timestampPolicy: "source-required"
   };
   reviewMapping(database, energySource, "factory/kn/main", { path: ["value"] }, "energy-regression");
+  const events: Array<{ late: boolean; sourceTimestamp: string | null }> = [];
+  const errors: unknown[] = [];
+  const warnings: unknown[] = [];
   await withRuntime(async (emit) => {
-    await emit("factory/kn/main", { sourceTimestamp: "2026-09-08T01:00:00Z", value: 1000.5 });
+    await emit("factory/kn/main", { sourceTimestamp: "2026-09-08T01:00:00Z", value: 1000.5 }, { dup: false, qos: 1, retain: false });
+    await emit("factory/kn/main", { sourceTimestamp: "2026-09-08T01:05:00Z", value: 1002.5 }, { dup: false, qos: 1, retain: false });
+    await emit("factory/kn/main", { sourceTimestamp: "2026-09-08T01:05:00Z", value: 1002.5 }, { dup: true, qos: 1, retain: false });
+    await emit("factory/kn/main", { sourceTimestamp: "2026-09-08T01:02:00Z", value: 1001.5 }, { dup: false, qos: 1, retain: false });
     const accepted = database.prepare(`
-      SELECT normalized_value_kwh FROM meter_readings_accepted WHERE metric_scope = ? AND channel_id = ?
+      SELECT normalized_value_kwh, source_timestamp, timestamp_quality, measurement_kind
+      FROM meter_readings_accepted WHERE metric_scope = ? AND channel_id = ?
+      ORDER BY source_timestamp
     `).all(energySource.metricScope, energySource.channelId) as Array<{ normalized_value_kwh: string }>;
-    assert.equal(accepted.length, 1, "energy must still be admitted into accepted history");
-    assert.equal(accepted[0]!.normalized_value_kwh, "1000.5");
-    assert.equal(readLive(energySource.metricScope, energySource.metricKey)?.unit, "kWh");
+    assert.deepEqual(accepted, [
+      { normalized_value_kwh: "1000.5", source_timestamp: "2026-09-08T01:00:00Z", timestamp_quality: "source", measurement_kind: "cumulative-energy" },
+      { normalized_value_kwh: "1001.5", source_timestamp: "2026-09-08T01:02:00Z", timestamp_quality: "source", measurement_kind: "cumulative-energy" },
+      { normalized_value_kwh: "1002.5", source_timestamp: "2026-09-08T01:05:00Z", timestamp_quality: "source", measurement_kind: "cumulative-energy" }
+    ], "exact replay is deduplicated while the late observation remains in accepted history");
+    assert.deepEqual(events, [
+      { late: false, sourceTimestamp: "2026-09-08T01:00:00Z" },
+      { late: false, sourceTimestamp: "2026-09-08T01:05:00Z" },
+      { late: true, sourceTimestamp: "2026-09-08T01:02:00Z" }
+    ]);
+    assert.deepEqual(readLive(energySource.metricScope, energySource.metricKey), {
+      quality: "source",
+      raw_payload: JSON.stringify({ sourceTimestamp: "2026-09-08T01:05:00Z", value: 1002.5 }),
+      timestamp: "2026-09-08T01:05:00Z",
+      unit: "kWh",
+      value: 1002.5
+    }, "a late cumulative-energy observation must not rewind live state");
+    assert.deepEqual(
+      database.prepare(`
+        SELECT live_value_kwh, last_source_timestamp
+        FROM meter_live_state
+        WHERE metric_scope = ? AND meter_id = ? AND channel_id = ? AND source_revision = ? AND epoch_id = ?
+      `).get(
+        energySource.metricScope,
+        energySource.meterId,
+        energySource.channelId,
+        energySource.sourceRevision,
+        energySource.epochId
+      ),
+      { live_value_kwh: "1002.5", last_source_timestamp: "2026-09-08T01:05:00Z" },
+      "the E1 baseline must not rewind when a late cumulative-energy observation is saved"
+    );
+    assert.equal(countRows("meter_readings_quarantine"), 0);
+  }, {
+    logger: {
+      error: (payload) => errors.push(payload),
+      info: () => undefined,
+      warn: (payload) => warnings.push(payload)
+    },
+    meterReadingEventSink: (event) => events.push({ late: event.late, sourceTimestamp: event.sourceTimestamp })
   });
+  assert.deepEqual(errors, [], "the exact replay must be handled as an E1 duplicate, not as a generic callback failure");
+  assert.deepEqual(warnings, [], "the exact replay must not fall through to a failed duplicate insert");
 });
