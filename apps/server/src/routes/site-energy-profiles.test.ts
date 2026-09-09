@@ -267,3 +267,62 @@ test("E6 API reports the unavailable source field and keeps management authoriza
     await app.close();
   }
 });
+
+test("U2-R5 the source-impact read reports resolvable dependencies and structural expectations separately", async () => {
+  const database = getDatabase();
+  const app = await buildApp();
+  const impactUrl = "/api/data-hub/source-impact";
+  try {
+    // A destination only the display code registers. `todayGeneration` is chosen because it stays
+    // registered-only after the derived-metric registry bootstraps at app start, unlike destinations
+    // that gain a real derived input there.
+    const registeredOnly = await app.inject({
+      method: "GET", url: `${impactUrl}?metricKey=todayGeneration&metricScope=kn`
+    });
+    assert.equal(registeredOnly.statusCode, 200, registeredOnly.body);
+    const disclosed = registeredOnly.json();
+    assert.equal(typeof disclosed.canMutate, "boolean");
+    assert.equal(typeof disclosed.unknown, "boolean");
+    assert.ok(Array.isArray(disclosed.consumers), "the existing consumers field keeps its name and type");
+    assert.deepEqual(
+      { canMutate: disclosed.canMutate, unknown: disclosed.unknown, consumers: disclosed.consumers },
+      { canMutate: true, unknown: false, consumers: [] },
+      "a registered expectation is not a blocking dependency"
+    );
+    assert.ok(disclosed.registeredExpectations.length > 0, "the expectation is still disclosed");
+    for (const expectation of disclosed.registeredExpectations) {
+      assert.equal(expectation.metricKey, "todayGeneration");
+      assert.ok(["story", "readiness"].includes(expectation.consumerType), expectation.consumerType);
+      assert.ok(typeof expectation.pageId === "string" && expectation.pageId.length > 0);
+    }
+
+    database.prepare(`
+      INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at)
+      VALUES ('overview', 'draft', ?, 2, ?)
+      ON CONFLICT(page_key, stage) DO UPDATE SET config_json = excluded.config_json
+    `).run(JSON.stringify({
+      regions: { dataBindings: { power: { itemId: "power", dataBinding: { metricKey: "todayGeneration", scope: "kn", sourceType: "metric" } } } }
+    }), new Date().toISOString());
+
+    const blocked = (await app.inject({
+      method: "GET", url: `${impactUrl}?metricKey=todayGeneration&metricScope=kn`
+    })).json();
+    assert.equal(blocked.canMutate, false, "a resolvable draft reference still blocks");
+    assert.deepEqual(blocked.consumers.map((row: { kind: string }) => row.kind), ["draft"]);
+    assert.ok(
+      blocked.registeredExpectations.length > 0,
+      "the structural expectations stay in their own set rather than joining the blocking set"
+    );
+
+    const unreferenced = (await app.inject({
+      method: "GET", url: `${impactUrl}?metricKey=unreferencedPlantEnergy&metricScope=kn`
+    })).json();
+    assert.deepEqual(
+      { consumers: unreferenced.consumers, registeredExpectations: unreferenced.registeredExpectations },
+      { consumers: [], registeredExpectations: [] },
+      "both sets are reported as empty arrays rather than omitted"
+    );
+  } finally {
+    await app.close();
+  }
+});

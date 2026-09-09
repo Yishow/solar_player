@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import type { MeterSourceDefinition } from "@solar-display/shared";
 import { isSolarAdapterManagedMetricIdentity } from "../mqtt/SolarSourceAdapter.js";
 import { applyGuidedMapping, previewGuidedMapping } from "./guidedMqttMappingService.js";
+import { readMetricUsage } from "./metricUsageService.js";
 import { saveMeterSource, syncSourceTopicMapping } from "./meterSourceCatalogService.js";
 
 const source: MeterSourceDefinition = {
@@ -647,5 +648,67 @@ test("M2-R16 a rejected destructive apply leaves the other site's configuration 
     { mapping: 1, source: 1 },
     "the other site's source must be untouched by a rejection"
   );
+  db.close();
+});
+
+/**
+ * M2-R16 fixtures for a destination that only the display code's registered expectations
+ * reference. `todayGeneration` carries registered playback story and readiness expectations but no
+ * draft binding, no published live page widget binding and no derived metric input — including
+ * after the derived-metric registry bootstraps at app start. Those expectations cannot be cleared
+ * by any operator action, so they must not block a destructive change the way a resolvable
+ * reference does.
+ */
+const registeredOnlySource: MeterSourceDefinition = {
+  ...source, channelId: "kn-registered", meterId: "kn-registered", metricKey: "todayGeneration"
+};
+const registeredOnlyDestination = registeredOnlySource.metricKey;
+
+function registeredOnlyConsumerTypes(db: Database.Database) {
+  return readMetricUsage(db, { metricKey: registeredOnlyDestination, scope: registeredOnlySource.metricScope })
+    .map((row) => row.consumerType)
+    .sort();
+}
+
+test("M2-R16 disabling a destination only registered expectations reference stays available", () => {
+  const db = database();
+  guidedApply(db, "registered-only-enable", { source: registeredOnlySource });
+  assert.equal(
+    registeredOnlyConsumerTypes(db).includes("widget"),
+    false,
+    "the fixture destination must carry no published live page widget binding"
+  );
+
+  const disabled = guidedApply(db, "registered-only-disable", { source: { ...registeredOnlySource, enabled: false } });
+  assert.equal(disabled.source.enabled, false, "a registered expectation must not block a disable");
+  assert.deepEqual(
+    {
+      mapping: mappingRow(db, registeredOnlySource.metricScope, registeredOnlyDestination)!.enabled,
+      source: sourceRow(db, registeredOnlySource.metricScope, registeredOnlySource.channelId)!.enabled
+    },
+    { mapping: 0, source: 0 },
+    "a permitted disable must leave the source and its mapping consistently disabled"
+  );
+  db.close();
+});
+
+test("M2-R16 moving a destination only registered expectations reference stays available", () => {
+  const db = database();
+  guidedApply(db, "registered-only-move-enable", { source: registeredOnlySource });
+  assert.equal(
+    registeredOnlyConsumerTypes(db).includes("widget"),
+    false,
+    "the fixture destination must carry no published live page widget binding"
+  );
+
+  const moved = { ...registeredOnlySource, metricKey: "retiredPlantEnergy", sourceRevision: 2 };
+  const applied = guidedApply(db, "registered-only-move-apply", { source: moved });
+  assert.equal(applied.source.metricKey, moved.metricKey, "a registered expectation must not block a destination change");
+  assert.equal(
+    mappingRow(db, moved.metricScope, moved.metricKey)!.enabled,
+    1,
+    "the replacement mapping must be created and enabled with the moved source"
+  );
+  assert.equal(sourceRow(db, moved.metricScope, moved.channelId)!.enabled, 1);
   db.close();
 });

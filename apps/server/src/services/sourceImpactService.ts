@@ -4,7 +4,30 @@ import {
   type MeterSourceDefinition,
   type SourceImpactConsumer
 } from "@solar-display/shared";
-import { readMetricUsage } from "./metricUsageService.js";
+import { readMetricUsage, type MetricUsageConsumerType } from "./metricUsageService.js";
+
+/**
+ * The consumer types that describe what the display code expects rather than what an operator
+ * bound. They are listed explicitly, not derived by excluding the binding types, so that a consumer
+ * type added later blocks by default: presuming a new kind of consumer is a real dependency is the
+ * recoverable mistake, silently dropping one from the blocking set is not.
+ */
+const STRUCTURAL_CONSUMER_TYPES = ["story", "readiness"] as const;
+type StructuralConsumerType = (typeof STRUCTURAL_CONSUMER_TYPES)[number];
+
+function isStructuralExpectation(consumerType: MetricUsageConsumerType): consumerType is StructuralConsumerType {
+  return (STRUCTURAL_CONSUMER_TYPES as readonly MetricUsageConsumerType[]).includes(consumerType);
+}
+
+/**
+ * A destination the display code registers for a playback story or a readiness requirement. It is
+ * reported so an operator sees what expects the destination, and never joins the blocking set.
+ */
+export type RegisteredMetricExpectation = {
+  consumerType: StructuralConsumerType;
+  metricKey: string;
+  pageId: string;
+};
 
 function parseDraftBindings(configJson: string, pageId: string): SourceImpactConsumer[] {
   try {
@@ -31,16 +54,24 @@ export function readSourceImpact(
   input: { confirmResolved?: boolean; metricKey: string; metricScope: "cl" | "kn" | "global" | "all" }
 ) {
   try {
-    const live = readMetricUsage(database, {
+    // Metric usage answers two different questions in one list. A widget row is a binding on a
+    // published page, which an operator can edit away. A story or readiness row is the display
+    // code declaring that it expects this destination, and no operator action clears it — so it is
+    // disclosed rather than used to hold the mutation forever.
+    const usage = readMetricUsage(database, {
       metricKey: input.metricKey,
       scope: input.metricScope === "all" ? "all" : input.metricScope
-    }).map((row): SourceImpactConsumer => ({
-      kind: "live",
-      itemId: row.itemId,
-      labelZh: row.labelZh,
-      metricKey: row.metricKey,
-      pageId: row.pageId
-    }));
+    });
+    const live = usage.flatMap((row): SourceImpactConsumer[] => (
+      isStructuralExpectation(row.consumerType)
+        ? []
+        : [{ kind: "live", itemId: row.itemId, labelZh: row.labelZh, metricKey: row.metricKey, pageId: row.pageId }]
+    ));
+    const registeredExpectations = usage.flatMap((row): RegisteredMetricExpectation[] => (
+      isStructuralExpectation(row.consumerType)
+        ? [{ consumerType: row.consumerType, metricKey: row.metricKey, pageId: row.pageId }]
+        : []
+    ));
     const draftRows = database.prepare(
       "SELECT page_key, config_json FROM display_page_stage_configs WHERE stage = 'draft'"
     ).all() as Array<{ config_json: string; page_key: string }>;
@@ -59,10 +90,11 @@ export function readSourceImpact(
         confirmResolved: input.confirmResolved,
         consumers
       }),
-      consumers
+      consumers,
+      registeredExpectations
     };
   } catch {
-    return evaluateSourceMutationImpact({ consumers: [], lookupFailed: true });
+    return { ...evaluateSourceMutationImpact({ consumers: [], lookupFailed: true }), registeredExpectations: [] };
   }
 }
 
