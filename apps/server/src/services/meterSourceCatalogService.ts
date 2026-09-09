@@ -362,8 +362,16 @@ export function syncSourceTopicMapping(
   previousMetricKey?: string
 ) {
   if (previousMetricKey && previousMetricKey !== saved.metricKey) {
-    database.prepare("UPDATE topic_mappings SET enabled = 0 WHERE metric_scope = ? AND metric_key = ?")
-      .run(scope, previousMetricKey);
+    const activeOwner = database.prepare(`
+      SELECT 1 AS present
+      FROM meter_sources
+      WHERE metric_scope = ? AND metric_key = ? AND enabled = 1
+      LIMIT 1
+    `).get(scope, previousMetricKey) as { present: number } | undefined;
+    if (!activeOwner) {
+      database.prepare("UPDATE topic_mappings SET enabled = 0 WHERE metric_scope = ? AND metric_key = ?")
+        .run(scope, previousMetricKey);
+    }
   }
   database.prepare("UPDATE topic_mappings SET enabled = ?, unit = ? WHERE metric_scope = ? AND metric_key = ?")
     .run(saved.enabled ? 1 : 0, saved.inputUnit, scope, saved.metricKey);

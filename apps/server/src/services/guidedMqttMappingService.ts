@@ -77,7 +77,8 @@ export function persistAppliedSelector(
   database: Database.Database,
   draft: MappingPreviewDraft,
   saved: MeterSourceDefinition,
-  topic: string
+  topic: string,
+  previousMetricKey?: string
 ) {
   const selectorJson = JSON.stringify(draft.selector);
   const valuePath = draft.selector.path.join(".");
@@ -95,7 +96,7 @@ export function persistAppliedSelector(
       VALUES (?, ?, ?, ?, ?, ?, 1, 0, 3, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `).run(draft.metricScope, saved.metricKey, topic, saved.inputUnit, valuePath, selectorJson, saved.enabled ? 1 : 0);
   }
-  syncSourceTopicMapping(database, draft.metricScope, saved);
+  syncSourceTopicMapping(database, draft.metricScope, saved, previousMetricKey);
 }
 
 export function applyGuidedMapping(
@@ -149,15 +150,12 @@ export function applyGuidedMapping(
     // Dependencies are re-read here, from the persisted source rather than the request, because a
     // token only proves the draft was reviewed. A consumer added after the preview leaves the
     // mapping and source snapshots identical, so a matching snapshot is not a safety proof.
-    assertDestructiveSourceMutationAllowed(
-      database,
-      getMeterSource(database, draft.source.metricScope, draft.source.channelId),
-      draft.source
-    );
+    const previousSource = getMeterSource(database, draft.source.metricScope, draft.source.channelId);
+    assertDestructiveSourceMutationAllowed(database, previousSource, draft.source);
     const saved = saveMeterSource(database, draft.source, {
       actor: "management", reason: "reviewed-mqtt-mapping-apply", transportChanged
     });
-    persistAppliedSelector(database, draft, saved, draft.topic);
+    persistAppliedSelector(database, draft, saved, draft.topic, previousSource?.metricKey);
     const result = { applied: true as const, channelId: draft.channelId, source: saved };
     database.prepare("INSERT INTO mapping_apply_receipts (idempotency_key, request_json, result_json, created_at) VALUES (?, ?, ?, ?)")
       .run(input.idempotencyKey, requestJson, JSON.stringify(result), new Date().toISOString());

@@ -4,6 +4,7 @@ import test from "node:test";
 import type { MeterSourceDefinition } from "@solar-display/shared";
 import type { MqttClient } from "mqtt";
 import { MqttClientService } from "../mqtt/MqttClientService.js";
+import { activateGuidedMapping } from "../services/guidedMappingActivationService.js";
 import { isMetricDestinationOwnershipConflict } from "../services/metricDestinationOwnershipService.js";
 import { buildApp, getDatabase } from "./display-pages-asset-governance.test-support.js";
 
@@ -26,6 +27,7 @@ class FakeMqttClient extends EventEmitter {
   connected = true;
   subscribeError: Error | null = null;
   subscriptions: string[][] = [];
+  unsubscriptions: string[][] = [];
 
   subscribe(topics: string[], callback: (error?: Error | null) => void) {
     this.subscriptions.push([...topics]);
@@ -33,7 +35,8 @@ class FakeMqttClient extends EventEmitter {
     return this;
   }
 
-  unsubscribe(_topics: string[], callback: (error?: Error | null) => void) {
+  unsubscribe(topics: string[], callback: (error?: Error | null) => void) {
+    this.unsubscriptions.push([...topics]);
     queueMicrotask(() => callback(null));
     return this;
   }
@@ -211,6 +214,392 @@ test("R1 an activated topic delivers a production packet to the selected source 
     assert.ok(client.subscriptions.at(-1)!.includes(draft.topic), "reconnect must restore the activated topic");
   } finally {
     await service.disconnect();
+    await app.close();
+  }
+});
+
+test("R2 rename reconciliation removes the sole-owner old topic from a real runtime", async () => {
+  const database = getDatabase();
+  const app = await buildApp();
+  attachSyntheticBroker(app);
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: silentLogger,
+    managedSourceAdapters: []
+  });
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameOldEnergy", epochId: "rename-old"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameNewEnergy", sourceRevision: 2, epochId: "rename-new"
+  };
+  const oldTopic = "factory/kn/rename-old";
+  const newTopic = "factory/kn/rename-new";
+  try {
+    const initial = await applyReviewedMapping(app, "rename-runtime-old", { source: oldSource, topic: oldTopic });
+    assert.equal(initial.statusCode, 200, initial.body);
+    await service.connect();
+    assert.ok(service.getActiveTopics().includes(oldTopic), "the old topic must be active before rename");
+
+    const renamed = await applyReviewedMapping(app, "rename-runtime-new", { source: newSource, topic: newTopic });
+    assert.equal(renamed.statusCode, 200, renamed.body);
+    const activation = await activateGuidedMapping(service, database, { enabled: true, topic: newTopic });
+    assert.equal(activation.state, "active");
+    assert.equal(service.getActiveTopics().includes(oldTopic), false, "the sole-owner old topic must be removed");
+    assert.ok(service.getActiveTopics().includes(newTopic), "the renamed topic must be active");
+    assert.ok(client.unsubscriptions.some((topics) => topics.includes(oldTopic)));
+  } finally {
+    await service.disconnect();
+    await app.close();
+  }
+});
+
+test("R2 persistence failure rolls back a rename before runtime activation", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameRouteFailureOldEnergy", epochId: "rename-route-failure-old"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameRouteFailureNewEnergy", sourceRevision: 2, epochId: "rename-route-failure-new"
+  };
+  const oldTopic = "factory/kn/rename-route-failure-old";
+  const newTopic = "factory/kn/rename-route-failure-new";
+  try {
+    assert.equal((await applyReviewedMapping(app, "rename-route-failure-old", { source: oldSource, topic: oldTopic })).statusCode, 200);
+    const request = await reviewedApplyPayload(app, "rename-route-failure-new", { source: newSource, topic: newTopic });
+    const before = {
+      audit: countRows("meter_source_audit"),
+      receipts: countRows("mapping_apply_receipts"),
+      runtimeRequests: broker.requests.length,
+      sources: countRows("meter_sources")
+    };
+    getDatabase().exec(`
+      CREATE TRIGGER reject_route_rename_receipt
+      BEFORE INSERT ON mapping_apply_receipts
+      WHEN NEW.idempotency_key = 'rename-route-failure-new'
+      BEGIN
+        SELECT RAISE(ABORT, 'route rename receipt unavailable');
+      END;
+    `);
+
+    const failed = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(failed.statusCode, 422, failed.body);
+    assert.deepEqual(
+      {
+        audit: countRows("meter_source_audit"),
+        receipts: countRows("mapping_apply_receipts"),
+        runtimeRequests: broker.requests.length,
+        sources: countRows("meter_sources")
+      },
+      before,
+      "a failed rename must roll back all configuration writes and never start runtime activation"
+    );
+    assert.equal(mappingEnabled(oldSource.metricScope, oldSource.metricKey), 1);
+    assert.equal(mappingEnabled(newSource.metricScope, newSource.metricKey), undefined);
+  } finally {
+    await app.close();
+  }
+});
+
+test("R2 same-topic rename keeps the topic active without an unsubscribe round-trip", async () => {
+  const database = getDatabase();
+  const app = await buildApp();
+  attachSyntheticBroker(app);
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: silentLogger,
+    managedSourceAdapters: []
+  });
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameSameOldEnergy", epochId: "rename-same-old"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameSameNewEnergy", sourceRevision: 2, epochId: "rename-same-new"
+  };
+  const topic = "factory/kn/rename-same";
+  try {
+    assert.equal((await applyReviewedMapping(app, "rename-same-old", { source: oldSource, topic })).statusCode, 200);
+    await service.connect();
+    assert.ok(service.getActiveTopics().includes(topic));
+    const unsubscribeCount = client.unsubscriptions.length;
+
+    const renamed = await applyReviewedMapping(app, "rename-same-new", { source: newSource, topic });
+    assert.equal(renamed.statusCode, 200, renamed.body);
+    const activation = await activateGuidedMapping(service, database, { enabled: true, topic });
+    assert.equal(activation.state, "active");
+    assert.ok(service.getActiveTopics().includes(topic));
+    assert.equal(client.unsubscriptions.length, unsubscribeCount, "same-topic rename must not tear down the live topic");
+  } finally {
+    await service.disconnect();
+    await app.close();
+  }
+});
+
+test("R2 rename keeps an old topic required by another enabled mapping", async () => {
+  const database = getDatabase();
+  const app = await buildApp();
+  attachSyntheticBroker(app);
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: silentLogger,
+    managedSourceAdapters: []
+  });
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameSharedOldEnergy", epochId: "rename-shared-old"
+  };
+  const remainingOwner: MeterSourceDefinition = {
+    ...source, channelId: "kn-shared-owner", meterId: "kn-shared-owner",
+    metricKey: "renameSharedOwnerEnergy", epochId: "rename-shared-owner"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameSharedNewEnergy", sourceRevision: 2, epochId: "rename-shared-new"
+  };
+  const oldTopic = "factory/kn/rename-shared";
+  const newTopic = "factory/kn/rename-shared-new";
+  try {
+    assert.equal((await applyReviewedMapping(app, "rename-shared-old", { source: oldSource, topic: oldTopic })).statusCode, 200);
+    assert.equal((await applyReviewedMapping(app, "rename-shared-owner", {
+      channelId: remainingOwner.channelId, source: remainingOwner, topic: oldTopic
+    })).statusCode, 200);
+    await service.connect();
+    assert.ok(service.getActiveTopics().includes(oldTopic));
+
+    const renamed = await applyReviewedMapping(app, "rename-shared-new", { source: newSource, topic: newTopic });
+    assert.equal(renamed.statusCode, 200, renamed.body);
+    const activation = await activateGuidedMapping(service, database, { enabled: true, topic: newTopic });
+    assert.equal(activation.state, "active");
+    assert.ok(service.getActiveTopics().includes(oldTopic), "the remaining mapping owner must keep the old topic active");
+    assert.ok(service.getActiveTopics().includes(newTopic));
+    assert.equal(client.unsubscriptions.some((topics) => topics.includes(oldTopic)), false);
+  } finally {
+    await service.disconnect();
+    await app.close();
+  }
+});
+
+test("R2 rename keeps an old topic required by a managed runtime owner", async () => {
+  const database = getDatabase();
+  const app = await buildApp();
+  attachSyntheticBroker(app);
+  const client = new FakeMqttClient();
+  const oldTopic = "factory/kn/rename-managed";
+  const newTopic = "factory/kn/rename-managed-new";
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: silentLogger,
+    managedSourceAdapters: [{ subscriptionFilters: [oldTopic], handleMessage: () => undefined }]
+  });
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameManagedOldEnergy", epochId: "rename-managed-old"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameManagedNewEnergy", sourceRevision: 2, epochId: "rename-managed-new"
+  };
+  try {
+    assert.equal((await applyReviewedMapping(app, "rename-managed-old", { source: oldSource, topic: oldTopic })).statusCode, 200);
+    await service.connect();
+    assert.ok(service.getActiveTopics().includes(oldTopic));
+
+    const renamed = await applyReviewedMapping(app, "rename-managed-new", { source: newSource, topic: newTopic });
+    assert.equal(renamed.statusCode, 200, renamed.body);
+    const activation = await activateGuidedMapping(service, database, { enabled: true, topic: newTopic });
+    assert.equal(activation.state, "active");
+    assert.ok(service.getActiveTopics().includes(oldTopic), "the managed owner must keep the old topic active");
+    assert.ok(service.getActiveTopics().includes(newTopic));
+    assert.equal(client.unsubscriptions.some((topics) => topics.includes(oldTopic)), false);
+  } finally {
+    await service.disconnect();
+    await app.close();
+  }
+});
+
+test("R2 real runtime broker refusal keeps the committed rename retryable and converges on retry", async () => {
+  const database = getDatabase();
+  const app = await buildApp();
+  attachSyntheticBroker(app);
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: silentLogger,
+    managedSourceAdapters: []
+  });
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameRealFailureOldEnergy", epochId: "rename-real-failure-old"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameRealFailureNewEnergy", sourceRevision: 2, epochId: "rename-real-failure-new"
+  };
+  const oldTopic = "factory/kn/rename-real-failure-old";
+  const newTopic = "factory/kn/rename-real-failure-new";
+  try {
+    assert.equal((await applyReviewedMapping(app, "rename-real-failure-old", { source: oldSource, topic: oldTopic })).statusCode, 200);
+    await service.connect();
+    assert.ok(service.getActiveTopics().includes(oldTopic));
+    assert.equal((await applyReviewedMapping(app, "rename-real-failure-new", { source: newSource, topic: newTopic })).statusCode, 200);
+    client.subscribeError = new Error("Subscribe refused");
+
+    const refused = await activateGuidedMapping(service, database, { enabled: true, topic: newTopic });
+    assert.equal(refused.state, "failed");
+    assert.equal(refused.retryable, true);
+    assert.equal(refused.reason, "BROKER_SUBSCRIBE_REFUSED");
+    assert.equal(mappingEnabled(oldSource.metricScope, oldSource.metricKey), 0, "broker failure must not revive the retired mapping");
+    assert.equal(mappingEnabled(newSource.metricScope, newSource.metricKey), 1);
+
+    client.subscribeError = null;
+    const retried = await activateGuidedMapping(service, database, { enabled: true, topic: newTopic });
+    assert.equal(retried.state, "active");
+    assert.equal(service.getActiveTopics().includes(oldTopic), false);
+    assert.ok(service.getActiveTopics().includes(newTopic));
+  } finally {
+    await service.disconnect();
+    await app.close();
+  }
+});
+
+test("R2 disconnected real runtime keeps the committed rename pending and reconnects from current ownership", async () => {
+  const database = getDatabase();
+  const app = await buildApp();
+  attachSyntheticBroker(app);
+  const client = new FakeMqttClient();
+  const service = new MqttClientService({
+    connectFn: () => {
+      queueMicrotask(() => client.emit("connect"));
+      return client as unknown as MqttClient;
+    },
+    database,
+    logger: silentLogger,
+    managedSourceAdapters: []
+  });
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameRealOfflineOldEnergy", epochId: "rename-real-offline-old"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameRealOfflineNewEnergy", sourceRevision: 2, epochId: "rename-real-offline-new"
+  };
+  const oldTopic = "factory/kn/rename-real-offline-old";
+  const newTopic = "factory/kn/rename-real-offline-new";
+  try {
+    assert.equal((await applyReviewedMapping(app, "rename-real-offline-old", { source: oldSource, topic: oldTopic })).statusCode, 200);
+    await service.connect();
+    assert.ok(service.getActiveTopics().includes(oldTopic));
+    assert.equal((await applyReviewedMapping(app, "rename-real-offline-new", { source: newSource, topic: newTopic })).statusCode, 200);
+    await service.disconnect();
+
+    const pending = await activateGuidedMapping(service, database, { enabled: true, topic: newTopic });
+    assert.equal(pending.state, "pending");
+    assert.equal(pending.retryable, true);
+    assert.equal(pending.reason, "RUNTIME_NOT_CONNECTED");
+    assert.equal(mappingEnabled(oldSource.metricScope, oldSource.metricKey), 0);
+    assert.equal(mappingEnabled(newSource.metricScope, newSource.metricKey), 1);
+
+    await service.connect();
+    assert.equal(service.getActiveTopics().includes(oldTopic), false);
+    assert.ok(service.getActiveTopics().includes(newTopic));
+  } finally {
+    await service.disconnect();
+    await app.close();
+  }
+});
+
+test("R2 broker refusal keeps a committed rename retryable and replay does not revive the old mapping", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameRetryOldEnergy", epochId: "rename-retry-old"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameRetryNewEnergy", sourceRevision: 2, epochId: "rename-retry-new"
+  };
+  const oldTopic = "factory/kn/rename-retry-old";
+  const newTopic = "factory/kn/rename-retry-new";
+  try {
+    assert.equal((await applyReviewedMapping(app, "rename-retry-old", { source: oldSource, topic: oldTopic })).statusCode, 200);
+    const request = await reviewedApplyPayload(app, "rename-retry-new", { source: newSource, topic: newTopic });
+    broker.refuse = new Error("Subscribe refused");
+    const refused = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(refused.statusCode, 200, refused.body);
+    assert.equal(refused.json().activation.state, "failed");
+    assert.equal(refused.json().activation.retryable, true);
+    assert.equal(refused.json().reception.observed, false, "broker ACK state must not be reported as reception");
+    assert.equal(mappingEnabled(oldSource.metricScope, oldSource.metricKey), 0, "SQL retirement remains committed after broker failure");
+    assert.equal(mappingEnabled(newSource.metricScope, newSource.metricKey), 1);
+
+    broker.refuse = null;
+    const retried = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(retried.statusCode, 200, retried.body);
+    assert.equal(retried.json().activation.state, "active");
+    assert.equal(mappingEnabled(oldSource.metricScope, oldSource.metricKey), 0, "receipt replay must not revive the retired mapping");
+    assert.equal(mappingEnabled(newSource.metricScope, newSource.metricKey), 1);
+    assert.equal(broker.requests.at(-1)!.includes(oldTopic), false);
+    assert.equal(
+      (getDatabase().prepare("SELECT COUNT(*) AS count FROM mapping_apply_receipts WHERE idempotency_key = ?")
+        .get("rename-retry-new") as { count: number }).count,
+      1
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("R2 disconnected rename stays pending and a replay reconciles from current ownership", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  const oldSource: MeterSourceDefinition = {
+    ...source, metricKey: "renameOfflineOldEnergy", epochId: "rename-offline-old"
+  };
+  const newSource: MeterSourceDefinition = {
+    ...oldSource, metricKey: "renameOfflineNewEnergy", sourceRevision: 2, epochId: "rename-offline-new"
+  };
+  const oldTopic = "factory/kn/rename-offline-old";
+  const newTopic = "factory/kn/rename-offline-new";
+  try {
+    assert.equal((await applyReviewedMapping(app, "rename-offline-old", { source: oldSource, topic: oldTopic })).statusCode, 200);
+    const request = await reviewedApplyPayload(app, "rename-offline-new", { source: newSource, topic: newTopic });
+    const connectedSubscribe = app.mqttClientService.subscribe;
+    broker.connected = false;
+    app.mqttClientService.subscribe = async (topics: string[]) => { broker.requests.push([...topics]); };
+    const pending = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(pending.statusCode, 200, pending.body);
+    assert.equal(pending.json().activation.state, "pending");
+    assert.equal(pending.json().activation.retryable, true);
+    assert.equal(pending.json().activation.reason, "RUNTIME_NOT_CONNECTED");
+    assert.equal(pending.json().reception.observed, false);
+    assert.equal(mappingEnabled(oldSource.metricScope, oldSource.metricKey), 0);
+    assert.equal(mappingEnabled(newSource.metricScope, newSource.metricKey), 1);
+
+    broker.connected = true;
+    app.mqttClientService.subscribe = connectedSubscribe;
+    const retried = await app.inject({ method: "POST", payload: request, url: applyUrl });
+    assert.equal(retried.statusCode, 200, retried.body);
+    assert.equal(retried.json().activation.state, "active");
+    assert.equal(mappingEnabled(oldSource.metricScope, oldSource.metricKey), 0);
+    assert.equal(broker.requests.at(-1)!.includes(oldTopic), false);
+    assert.equal(broker.requests.at(-1)!.includes(newTopic), true);
+  } finally {
     await app.close();
   }
 });

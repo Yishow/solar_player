@@ -82,6 +82,64 @@ test("source CRUD enforces management access, scope, validation and retained his
   } finally { await app.close(); database.close(); }
 });
 
+test("direct source rename preserves a former mapping now owned by another active source", async () => {
+  const database = migratedDatabase();
+  const app = await managementApp(database);
+  const url = "/api/data-hub/sites/cl/meter-sources";
+  const headers = { "x-solar-management-token": "secret" };
+  const former = {
+    ...source,
+    channelId: "former",
+    meterId: "cl-former",
+    metricKey: "directFormerEnergy",
+    epochId: "former-one"
+  };
+  const laterOwner = {
+    ...source,
+    channelId: "later",
+    meterId: "cl-later",
+    metricKey: former.metricKey,
+    epochId: "later-one"
+  };
+  try {
+    assert.equal((await app.inject({ method: "POST", url, headers, payload: { source: former, reason: "create former" } })).statusCode, 201);
+    database.prepare("INSERT INTO topic_mappings (metric_scope, metric_key, topic, unit, enabled) VALUES ('cl', ?, 'factory/cl/former', 'kWh', 1)")
+      .run(former.metricKey);
+    assert.equal((await app.inject({
+      method: "DELETE",
+      url: `${url}/${former.channelId}`,
+      headers,
+      payload: { expectedRevision: 1, reason: "retire former" }
+    })).statusCode, 200);
+    assert.equal((await app.inject({ method: "POST", url, headers, payload: { source: laterOwner, reason: "take former destination" } })).statusCode, 201);
+
+    const renamed = await app.inject({
+      method: "PUT",
+      url: `${url}/${former.channelId}`,
+      headers,
+      payload: {
+        source: { ...former, enabled: false, metricKey: "directFormerRenamedEnergy", sourceRevision: 2 },
+        reason: "rename retired source"
+      }
+    });
+    assert.equal(renamed.statusCode, 200, renamed.body);
+    assert.equal(
+      (database.prepare("SELECT enabled FROM topic_mappings WHERE metric_scope = 'cl' AND metric_key = ?")
+        .get(former.metricKey) as { enabled: number }).enabled,
+      1,
+      "the shared helper must not disable a mapping currently owned by another direct source"
+    );
+    assert.equal(
+      (database.prepare("SELECT enabled FROM meter_sources WHERE metric_scope = 'cl' AND channel_id = ? ORDER BY source_revision DESC LIMIT 1")
+        .get(laterOwner.channelId) as { enabled: number }).enabled,
+      1
+    );
+  } finally {
+    await app.close();
+    database.close();
+  }
+});
+
 function migratedDatabase() {
   const database = new Database(":memory:");
   for (const file of readdirSync("src/db/migrations").filter(f => f.endsWith(".sql")).sort()) {

@@ -253,6 +253,186 @@ function sourceRow(db: Database.Database, metricScope: string, channelId: string
     .get(metricScope, channelId) as { enabled: number; source_revision: number } | undefined;
 }
 
+function sourceLineageRows(db: Database.Database, metricScope: string, channelId: string) {
+  return db.prepare("SELECT metric_key, enabled, source_revision FROM meter_sources WHERE metric_scope = ? AND channel_id = ? ORDER BY source_revision")
+    .all(metricScope, channelId) as Array<{ metric_key: string; enabled: number; source_revision: number }>;
+}
+
+test("M2-R17 a guided rename retires the superseded mapping", () => {
+  const db = database();
+  const firstSource = { ...source, metricKey: "guidedRenameOld" };
+  guidedApply(db, "rename-old", { source: firstSource, topic: "factory/kn/rename-old" });
+
+  const renamedSource = { ...firstSource, metricKey: "guidedRenameNew", sourceRevision: 2 };
+  guidedApply(db, "rename-new", { source: renamedSource, topic: "factory/kn/rename-new" });
+
+  assert.deepEqual(
+    {
+      sourceLineage: sourceLineageRows(db, renamedSource.metricScope, renamedSource.channelId),
+      oldMapping: mappingRow(db, renamedSource.metricScope, firstSource.metricKey)!.enabled,
+      newMapping: mappingRow(db, renamedSource.metricScope, renamedSource.metricKey)!.enabled
+    },
+    {
+      sourceLineage: [
+        { metric_key: firstSource.metricKey, enabled: 0, source_revision: 1 },
+        { metric_key: renamedSource.metricKey, enabled: 1, source_revision: 2 }
+      ],
+      oldMapping: 0,
+      newMapping: 1
+    },
+    "a guided destination rename must retire the old mapping with the new source commit"
+  );
+  db.close();
+});
+
+test("M2-R17 retirement stays scoped and protects a later active owner", () => {
+  const db = database();
+  const clSource = {
+    ...source, metricScope: "cl" as const, channelId: "cl-same-key", meterId: "cl-same-key", metricKey: "scopedRenameOld", epochId: "cl-one"
+  };
+  const knSource = {
+    ...source, channelId: "kn-same-key", meterId: "kn-same-key", metricKey: "scopedRenameOld", epochId: "kn-one"
+  };
+  guidedApply(db, "scoped-cl", { source: clSource, topic: "factory/cl/same-key" });
+  guidedApply(db, "scoped-kn", { source: knSource, topic: "factory/kn/same-key" });
+  guidedApply(db, "scoped-kn-rename", {
+    source: { ...knSource, metricKey: "scopedRenameNew", sourceRevision: 2 },
+    topic: "factory/kn/renamed"
+  });
+
+  assert.deepEqual(
+    {
+      clSource: sourceRow(db, "cl", clSource.channelId),
+      clMapping: mappingRow(db, "cl", clSource.metricKey)!.enabled,
+      knMapping: mappingRow(db, "kn", knSource.metricKey)!.enabled,
+      knNewMapping: mappingRow(db, "kn", "scopedRenameNew")!.enabled
+    },
+    {
+      clSource: { enabled: 1, source_revision: 1 },
+      clMapping: 1,
+      knMapping: 0,
+      knNewMapping: 1
+    },
+    "same-named destinations must remain isolated by metric scope"
+  );
+
+  const former = {
+    ...source, channelId: "kn-former-owner", meterId: "kn-former-owner", metricKey: "reassignedOld", epochId: "former-one"
+  };
+  guidedApply(db, "former-enable", { source: former, topic: "factory/kn/reassigned" });
+  guidedApply(db, "former-disable", { source: { ...former, enabled: false }, topic: "factory/kn/reassigned" });
+  const laterOwner = {
+    ...source, channelId: "kn-later-owner", meterId: "kn-later-owner", metricKey: former.metricKey, epochId: "later-one"
+  };
+  guidedApply(db, "later-owner-enable", { source: laterOwner, topic: "factory/kn/reassigned" });
+  guidedApply(db, "former-rename", {
+    source: { ...former, metricKey: "reassignedNew", sourceRevision: 2 },
+    topic: "factory/kn/reassigned-new"
+  });
+
+  assert.deepEqual(
+    {
+      laterSource: sourceRow(db, laterOwner.metricScope, laterOwner.channelId),
+      reassignedMapping: mappingRow(db, laterOwner.metricScope, former.metricKey)!.enabled,
+      formerNewMapping: mappingRow(db, former.metricScope, "reassignedNew")!.enabled
+    },
+    {
+      laterSource: { enabled: 1, source_revision: 1 },
+      reassignedMapping: 1,
+      formerNewMapping: 1
+    },
+    "a historical source must not retire a mapping now owned by another active source"
+  );
+  db.close();
+});
+
+test("M2-R17 rename persistence rolls back at every guided write boundary", () => {
+  const failures = [
+    {
+      name: "source",
+      trigger: "CREATE TRIGGER reject_rename_source BEFORE INSERT ON meter_sources WHEN NEW.metric_key = 'guidedRollbackNew' BEGIN SELECT RAISE(ABORT, 'rename source unavailable'); END",
+      error: /rename source unavailable/
+    },
+    {
+      name: "source audit",
+      trigger: "CREATE TRIGGER reject_rename_audit BEFORE INSERT ON meter_source_audit BEGIN SELECT RAISE(ABORT, 'rename audit unavailable'); END",
+      error: /rename audit unavailable/
+    },
+    {
+      name: "new mapping",
+      trigger: "CREATE TRIGGER reject_rename_mapping_insert BEFORE INSERT ON topic_mappings BEGIN SELECT RAISE(ABORT, 'rename mapping unavailable'); END",
+      error: /rename mapping unavailable/
+    },
+    {
+      name: "old mapping retirement",
+      trigger: "CREATE TRIGGER reject_rename_mapping_update BEFORE UPDATE OF enabled ON topic_mappings WHEN OLD.metric_key = 'guidedRollbackOld' BEGIN SELECT RAISE(ABORT, 'rename retirement unavailable'); END",
+      error: /rename retirement unavailable/
+    },
+    {
+      name: "apply receipt",
+      trigger: "CREATE TRIGGER reject_rename_receipt BEFORE INSERT ON mapping_apply_receipts BEGIN SELECT RAISE(ABORT, 'rename receipt unavailable'); END",
+      error: /rename receipt unavailable/
+    }
+  ] as const;
+
+  for (const failure of failures) {
+    const db = database();
+    const firstSource = { ...source, metricKey: "guidedRollbackOld" };
+    guidedApply(db, `rollback-old-${failure.name}`, { source: firstSource, topic: "factory/kn/rollback-old" });
+    const renamedSource = { ...firstSource, metricKey: "guidedRollbackNew", sourceRevision: 2 };
+    const before = committedWrites(db);
+    db.exec(failure.trigger);
+
+    assert.throws(
+      () => guidedApply(db, `rollback-new-${failure.name}`, { source: renamedSource, topic: "factory/kn/rollback-new" }),
+      failure.error,
+      failure.name
+    );
+    assert.deepEqual(committedWrites(db), before, `${failure.name} must roll back source, mappings, audit and receipt`);
+    assert.equal(mappingRow(db, renamedSource.metricScope, renamedSource.metricKey), undefined, failure.name);
+    db.close();
+  }
+});
+
+test("M2-R17 replay does not retire a later owner of the old destination", () => {
+  const db = database();
+  const firstSource = { ...source, channelId: "kn-replay-old", meterId: "kn-replay-old", metricKey: "replayOld", epochId: "replay-one" };
+  guidedApply(db, "replay-old", { source: firstSource, topic: "factory/kn/replay-old" });
+  const renamedSource = { ...firstSource, metricKey: "replayNew", sourceRevision: 2 };
+  const nextDraft = {
+    ...draft, source: renamedSource, channelId: renamedSource.channelId, metricScope: renamedSource.metricScope,
+    measurementKind: renamedSource.measurementKind, energyFlowRole: renamedSource.energyFlowRole,
+    timestampPolicy: renamedSource.timestampPolicy, topic: "factory/kn/replay-new"
+  };
+  const preview = previewGuidedMapping(db, nextDraft);
+  const request = {
+    ...preview, idempotencyKey: "replay-rename", meterId: renamedSource.meterId,
+    source: renamedSource, topic: nextDraft.topic
+  };
+  const committed = applyGuidedMapping(db, request);
+
+  const laterOwner = {
+    ...source, channelId: "kn-replay-later", meterId: "kn-replay-later", metricKey: firstSource.metricKey, epochId: "later-replay-one"
+  };
+  guidedApply(db, "replay-later-owner", { source: laterOwner, topic: "factory/kn/replay-later" });
+  const beforeReplay = committedWrites(db);
+  assert.deepEqual(applyGuidedMapping(db, request), committed);
+  assert.deepEqual(committedWrites(db), beforeReplay, "a committed replay must not write again");
+  assert.deepEqual(
+    {
+      laterSource: sourceRow(db, laterOwner.metricScope, laterOwner.channelId),
+      oldMapping: mappingRow(db, laterOwner.metricScope, firstSource.metricKey)!.enabled,
+      newMapping: mappingRow(db, renamedSource.metricScope, renamedSource.metricKey)!.enabled
+    },
+    {
+      laterSource: { enabled: 1, source_revision: 1 },
+      oldMapping: 1,
+      newMapping: 1
+    }
+  );
+  db.close();
+});
+
 test("M2-R15 a guided re-enable commits the source and its mapping together", () => {
   const db = database();
   guidedApply(db, "initial-enable");
