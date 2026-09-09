@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import type { FastifyPluginAsync } from "fastify";
 import { validateMeterSourceWrite, type MeterSourceDefinition } from "@solar-display/shared";
-import { readSourceImpact } from "../services/sourceImpactService.js";
+import { assertDestructiveSourceMutationAllowed } from "../services/sourceImpactService.js";
 import { getDatabase } from "../db/index.js";
 import { getMeterSource, listMeterSources, saveMeterSource, syncSourceTopicMapping } from "../services/meterSourceCatalogService.js";
 
@@ -53,12 +53,7 @@ const meterSourcesRoute: FastifyPluginAsync<{ database?: Database.Database }> = 
           if (method === "POST" && getMeterSource(database, scope, draft!.channelId as string)) {
             throw Object.assign(new Error(), { code: "E1_SOURCE_EXISTS", statusCode: 409 });
           }
-          if (previous && ((!draft!.enabled && previous.enabled) || draft!.metricKey !== previous.metricKey)) {
-            const impact = readSourceImpact(database, { metricKey: previous.metricKey, metricScope: scope });
-            if (!impact.canMutate) throw Object.assign(new Error(), {
-              code: impact.unknown ? "E1_SOURCE_IMPACT_UNKNOWN" : "E1_SOURCE_IN_USE", statusCode: 409
-            });
-          }
+          assertDestructiveSourceMutationAllowed(database, previous, draft as Record<string, unknown> & MeterSourceDefinition);
           const saved = saveMeterSource(database, draft as Record<string, unknown> & MeterSourceDefinition, {
             actor: "management", reason: body.reason!.trim()
           });

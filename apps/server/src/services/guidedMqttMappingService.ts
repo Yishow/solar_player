@@ -4,8 +4,9 @@ import {
   isEnergyFlowRole, isMeterMeasurementKind, parseDecimalString, validateMeterSourceWrite,
   type MappingPreviewDraft, type MeterSourceDefinition
 } from "@solar-display/shared";
-import { saveMeterSource, syncSourceTopicMapping } from "./meterSourceCatalogService.js";
+import { getMeterSource, saveMeterSource, syncSourceTopicMapping } from "./meterSourceCatalogService.js";
 import { assertUnownedMetricDestination } from "./metricDestinationOwnershipService.js";
+import { assertDestructiveSourceMutationAllowed } from "./sourceImpactService.js";
 import { canonicalJson } from "./authoringCanonicalJson.js";
 
 const TOKEN_TTL_MS = 10 * 60 * 1000;
@@ -145,6 +146,14 @@ export function applyGuidedMapping(
     let previousSelector: unknown = null;
     try { previousSelector = mapping?.selector_json ? JSON.parse(mapping.selector_json) : null; } catch { /* Invalid legacy selectors require a new revision. */ }
     const transportChanged = Boolean(mapping && (mapping.topic !== draft.topic || canonicalJson(previousSelector) !== canonicalJson(draft.selector)));
+    // Dependencies are re-read here, from the persisted source rather than the request, because a
+    // token only proves the draft was reviewed. A consumer added after the preview leaves the
+    // mapping and source snapshots identical, so a matching snapshot is not a safety proof.
+    assertDestructiveSourceMutationAllowed(
+      database,
+      getMeterSource(database, draft.source.metricScope, draft.source.channelId),
+      draft.source
+    );
     const saved = saveMeterSource(database, draft.source, {
       actor: "management", reason: "reviewed-mqtt-mapping-apply", transportChanged
     });

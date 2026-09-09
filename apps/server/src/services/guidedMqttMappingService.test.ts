@@ -25,7 +25,15 @@ function database() {
     db.exec(readFileSync(`src/db/migrations/${file}`, "utf8"));
   }
   db.exec("ALTER TABLE topic_mappings ADD COLUMN metric_scope TEXT");
-  for (const file of ["044_mapping_apply_receipts.sql", "015_calculation_settings.sql", "037_derived_metric_registry.sql", "038_derived_metric_site_scopes.sql"]) {
+  // The page, registry and profile tables belong to the fixture because the destructive
+  // guard reads the same dependency surface as source management. Without them every
+  // impact lookup fails closed and a rejection could not be attributed to a real consumer.
+  for (const file of [
+    "044_mapping_apply_receipts.sql", "015_calculation_settings.sql", "037_derived_metric_registry.sql",
+    "038_derived_metric_site_scopes.sql", "006_display_page_configs.sql", "007_display_page_publishing.sql",
+    "009_display_page_registry.sql", "021_playback_runtime_freshness_policy.sql",
+    "027_default_playback_profile.sql"
+  ]) {
     db.exec(readFileSync(`src/db/migrations/${file}`, "utf8"));
   }
   return db;
@@ -211,6 +219,11 @@ test("M2-R11 an unowned custom destination stays previewable and leaves the othe
 });
 
 /** M2-R15 fixtures: the reviewed source and its mapping must reach the same enabled state in one commit. */
+/**
+ * A destination no registered page or readiness requirement consumes. Enabled-state cases use it
+ * so the dependency guard has nothing to protect and the commit behaviour is what is under test.
+ */
+const unconsumedSource: MeterSourceDefinition = { ...source, metricKey: "unconsumedPlantEnergy" };
 function guidedApply(
   db: Database.Database,
   idempotencyKey: string,
@@ -282,11 +295,11 @@ test("M2-R15 disabling one owner of a shared topic keeps the other owner enabled
   const second: MeterSourceDefinition = {
     ...source, channelId: "kn-second", meterId: "kn-second", metricKey: "selfConsumptionEnergy"
   };
-  guidedApply(db, "shared-first");
+  guidedApply(db, "shared-first", { source: unconsumedSource });
   guidedApply(db, "shared-second", { source: second });
-  guidedApply(db, "shared-first-disable", { source: { ...source, enabled: false } });
+  guidedApply(db, "shared-first-disable", { source: { ...unconsumedSource, enabled: false } });
   assert.deepEqual(
-    { first: mappingRow(db, source.metricScope, source.metricKey)!.enabled, second: mappingRow(db, second.metricScope, second.metricKey)!.enabled },
+    { first: mappingRow(db, unconsumedSource.metricScope, unconsumedSource.metricKey)!.enabled, second: mappingRow(db, second.metricScope, second.metricKey)!.enabled },
     { first: 0, second: 1 },
     "disabling one owner must not disable another mapping on the same topic"
   );
@@ -301,17 +314,17 @@ test("M2-R15 disabling one owner of a shared topic keeps the other owner enabled
 
 test("M2-R15 a mapping write failure during an enabled-state change rolls back both sides", () => {
   const db = database();
-  guidedApply(db, "rollback-initial");
+  guidedApply(db, "rollback-initial", { source: unconsumedSource });
   const auditBefore = (db.prepare("SELECT COUNT(*) AS count FROM meter_source_audit").get() as { count: number }).count;
   const receiptsBefore = (db.prepare("SELECT COUNT(*) AS count FROM mapping_apply_receipts").get() as { count: number }).count;
   db.exec("CREATE TRIGGER reject_mapping_update BEFORE UPDATE ON topic_mappings BEGIN SELECT RAISE(ABORT, 'mapping unavailable'); END");
   assert.throws(
-    () => guidedApply(db, "rollback-disable", { source: { ...source, enabled: false } }),
+    () => guidedApply(db, "rollback-disable", { source: { ...unconsumedSource, enabled: false } }),
     /mapping unavailable/
   );
   db.exec("DROP TRIGGER reject_mapping_update");
   assert.deepEqual(
-    { mapping: mappingRow(db, source.metricScope, source.metricKey)!.enabled, source: sourceRow(db, source.metricScope, source.channelId)!.enabled },
+    { mapping: mappingRow(db, unconsumedSource.metricScope, unconsumedSource.metricKey)!.enabled, source: sourceRow(db, unconsumedSource.metricScope, unconsumedSource.channelId)!.enabled },
     { mapping: 1, source: 1 },
     "a failed enabled-state change must leave neither side changed"
   );
@@ -340,5 +353,299 @@ test("M2-R15 retrying the same re-enable keeps one source mutation and one recei
     1
   );
   assert.equal(sourceRow(db, source.metricScope, source.channelId)!.source_revision, 1);
+  db.close();
+});
+
+/**
+ * M2-R16 fixtures: a destination that no registered page or readiness requirement already
+ * consumes, so the only dependency in these cases is the one the case itself creates.
+ */
+const guardedSource: MeterSourceDefinition = {
+  ...source, channelId: "kn-guarded", meterId: "kn-guarded", metricKey: "guardedPlantEnergy"
+};
+const guardedTopic = "factory/kn/guarded";
+
+function referenceFromDraftPage(db: Database.Database, pageKey: string, metricKey: string) {
+  db.prepare(`
+    INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at)
+    VALUES (?, 'draft', ?, 1, ?)
+    ON CONFLICT(page_key, stage) DO UPDATE SET config_json = excluded.config_json
+  `).run(
+    pageKey,
+    JSON.stringify({ regions: { dataBindings: { power: { itemId: "power", dataBinding: { metricKey, scope: "kn", sourceType: "metric" } } } } }),
+    new Date().toISOString()
+  );
+}
+
+/**
+ * The configuration a rejected destructive apply must leave untouched. Preview tokens are
+ * excluded on purpose: issuing a token is the preview's write, not the apply's.
+ */
+function committedWrites(db: Database.Database) {
+  const rows = (sql: string) => JSON.stringify(db.prepare(sql).all());
+  return {
+    audit: rows("SELECT * FROM meter_source_audit ORDER BY id"),
+    mappings: rows("SELECT * FROM topic_mappings ORDER BY id"),
+    receipts: rows("SELECT * FROM mapping_apply_receipts ORDER BY idempotency_key"),
+    sources: rows("SELECT * FROM meter_sources ORDER BY metric_scope, channel_id, source_revision")
+  };
+}
+
+/** The committed writes plus the page and profile configuration the guard reads but never edits. */
+function protectedState(db: Database.Database) {
+  const rows = (sql: string) => JSON.stringify(db.prepare(sql).all());
+  return {
+    ...committedWrites(db),
+    pages: rows("SELECT page_key, stage, config_json FROM display_page_stage_configs ORDER BY page_key, stage"),
+    profiles: rows("SELECT profile_id, page_id, enabled, display_order FROM playback_profile_pages ORDER BY profile_id, page_id")
+  };
+}
+
+function isDependencyRejection(code: string) {
+  return (error: { code?: string; statusCode?: number }) => error.code === code && error.statusCode === 409;
+}
+
+test("M2-R16 a guided apply cannot disable a source an unresolved draft still references", () => {
+  const db = database();
+  guidedApply(db, "guarded-enable", { source: guardedSource, topic: guardedTopic });
+  referenceFromDraftPage(db, "overview", guardedSource.metricKey);
+  const before = protectedState(db);
+
+  assert.throws(
+    () => guidedApply(db, "guarded-disable", { source: { ...guardedSource, enabled: false }, topic: guardedTopic }),
+    isDependencyRejection("E1_SOURCE_IN_USE")
+  );
+  assert.deepEqual(
+    {
+      mapping: mappingRow(db, guardedSource.metricScope, guardedSource.metricKey)!.enabled,
+      source: sourceRow(db, guardedSource.metricScope, guardedSource.channelId)!.enabled
+    },
+    { mapping: 1, source: 1 },
+    "a rejected disable must leave the source and its mapping enabled"
+  );
+  assert.deepEqual(protectedState(db), before, "a rejected disable must write nothing");
+  db.close();
+});
+
+test("M2-R16 a rename cannot evade the guard while a derived metric uses the original destination", () => {
+  const db = database();
+  guidedApply(db, "rename-enable", { source: guardedSource, topic: guardedTopic });
+  registerDerivedMetric(db, "guardedDerivedTotal", { enabled: true });
+  db.prepare(`
+    INSERT INTO derived_metric_inputs (derived_metric_key, alias, input_kind, metric_key, scope_selector, unit, sort_order)
+    VALUES ('guardedDerivedTotal', 'a', 'metric', ?, 'output-site', 'kWh', 0)
+  `).run(guardedSource.metricKey);
+  const before = protectedState(db);
+
+  const renamed = { ...guardedSource, metricKey: "guardedPlantEnergyRenamed", sourceRevision: 2 };
+  assert.throws(
+    () => guidedApply(db, "rename-apply", { source: renamed, topic: guardedTopic }),
+    isDependencyRejection("E1_SOURCE_IN_USE")
+  );
+  assert.equal(
+    mappingRow(db, renamed.metricScope, renamed.metricKey),
+    undefined,
+    "a rejected rename must not create the replacement mapping"
+  );
+  assert.deepEqual(protectedState(db), before, "a rejected rename must leave the original source untouched");
+  db.close();
+});
+
+test("M2-R16 a dependency introduced after the preview still blocks the first apply", () => {
+  const db = database();
+  guidedApply(db, "post-preview-enable", { source: guardedSource, topic: guardedTopic });
+  const disabling = {
+    ...draft, channelId: guardedSource.channelId, source: { ...guardedSource, enabled: false }, topic: guardedTopic
+  };
+  const preview = previewGuidedMapping(db, disabling);
+  // The consumer appears only after the token was issued: the mapping and source revisions
+  // are unchanged, so a matching snapshot is not evidence that the disable is still safe.
+  referenceFromDraftPage(db, "solar", guardedSource.metricKey);
+  const before = protectedState(db);
+
+  assert.throws(
+    () => applyGuidedMapping(db, {
+      ...preview, idempotencyKey: "post-preview-disable", meterId: guardedSource.meterId,
+      source: disabling.source, topic: guardedTopic
+    }),
+    isDependencyRejection("E1_SOURCE_IN_USE")
+  );
+  assert.deepEqual(protectedState(db), before, "a dependency found at commit time must write nothing");
+  db.close();
+});
+
+test("M2-R16 an unreadable impact lookup rejects the apply instead of reading as no dependency", () => {
+  const db = database();
+  guidedApply(db, "unknown-enable", { source: guardedSource, topic: guardedTopic });
+  // An unreadable dependency surface is not an empty dependency set. The page stage table is
+  // removed because only the impact read consults it: the ownership authorities stay readable,
+  // so the rejection can only come from the dependency guard.
+  db.exec("DROP TABLE display_page_stage_configs");
+  const before = committedWrites(db);
+
+  assert.throws(
+    () => guidedApply(db, "unknown-disable", { source: { ...guardedSource, enabled: false }, topic: guardedTopic }),
+    isDependencyRejection("E1_SOURCE_IMPACT_UNKNOWN")
+  );
+  assert.deepEqual(
+    {
+      mapping: mappingRow(db, guardedSource.metricScope, guardedSource.metricKey)!.enabled,
+      source: sourceRow(db, guardedSource.metricScope, guardedSource.channelId)!.enabled
+    },
+    { mapping: 1, source: 1 }
+  );
+  assert.deepEqual(committedWrites(db), before, "an unknown impact must write nothing");
+  db.close();
+});
+
+test("M2-R16 registering a source is not blocked by dependencies already on its destination", () => {
+  const db = database();
+  referenceFromDraftPage(db, "overview", "newlyBoundPlantEnergy");
+  const fresh: MeterSourceDefinition = {
+    ...source, channelId: "kn-fresh", meterId: "kn-fresh", metricKey: "newlyBoundPlantEnergy"
+  };
+
+  const applied = guidedApply(db, "fresh-register", { source: fresh, topic: "factory/kn/fresh" });
+  assert.equal(applied.source.enabled, true, "a first registration has no previous destination to protect");
+  assert.deepEqual(
+    {
+      mapping: mappingRow(db, fresh.metricScope, fresh.metricKey)!.enabled,
+      source: sourceRow(db, fresh.metricScope, fresh.channelId)!.enabled
+    },
+    { mapping: 1, source: 1 }
+  );
+  db.close();
+});
+
+test("M2-R16 a re-enable and a display-name update stay available while the destination is in use", () => {
+  const db = database();
+  guidedApply(db, "available-enable", { source: guardedSource, topic: guardedTopic });
+  guidedApply(db, "available-disable", { source: { ...guardedSource, enabled: false }, topic: guardedTopic });
+  referenceFromDraftPage(db, "overview", guardedSource.metricKey);
+
+  const reEnabled = guidedApply(db, "available-re-enable", { source: guardedSource, topic: guardedTopic });
+  assert.equal(reEnabled.source.enabled, true, "restoring reception is not a destructive transition");
+  assert.deepEqual(
+    {
+      mapping: mappingRow(db, guardedSource.metricScope, guardedSource.metricKey)!.enabled,
+      source: sourceRow(db, guardedSource.metricScope, guardedSource.channelId)!.enabled
+    },
+    { mapping: 1, source: 1 }
+  );
+
+  const renamed = guidedApply(db, "available-display-name", {
+    source: { ...guardedSource, displayNameZh: "新名稱" }, topic: guardedTopic
+  });
+  assert.equal(renamed.source.displayNameZh, "新名稱");
+  assert.equal(renamed.source.sourceRevision, guardedSource.sourceRevision, "a display name is not a source identity change");
+  assert.deepEqual(
+    {
+      mapping: mappingRow(db, guardedSource.metricScope, guardedSource.metricKey)!.enabled,
+      source: sourceRow(db, guardedSource.metricScope, guardedSource.channelId)!.enabled
+    },
+    { mapping: 1, source: 1 }
+  );
+  db.close();
+});
+
+test("M2-R16 disabling a source with a known empty impact stays available", () => {
+  const db = database();
+  guidedApply(db, "unused-enable", { source: guardedSource, topic: guardedTopic });
+
+  const disabled = guidedApply(db, "unused-disable", { source: { ...guardedSource, enabled: false }, topic: guardedTopic });
+  assert.equal(disabled.source.enabled, false);
+  assert.deepEqual(
+    {
+      mapping: mappingRow(db, guardedSource.metricScope, guardedSource.metricKey)!.enabled,
+      source: sourceRow(db, guardedSource.metricScope, guardedSource.channelId)!.enabled
+    },
+    { mapping: 0, source: 0 },
+    "a permitted disable must leave the source and its mapping consistently disabled"
+  );
+  db.close();
+});
+
+test("M2-R16 an identical committed request stays a replay after new consumers appear", () => {
+  const db = database();
+  guidedApply(db, "replay-enable", { source: guardedSource, topic: guardedTopic });
+  const disabling = {
+    ...draft, channelId: guardedSource.channelId, source: { ...guardedSource, enabled: false }, topic: guardedTopic
+  };
+  const preview = previewGuidedMapping(db, disabling);
+  const request = {
+    ...preview, idempotencyKey: "replay-disable", meterId: guardedSource.meterId,
+    source: disabling.source, topic: guardedTopic
+  };
+  const committed = applyGuidedMapping(db, request);
+  // The replay is not a new destructive mutation, so a consumer added afterwards must not
+  // turn a committed result into a rejection.
+  referenceFromDraftPage(db, "overview", guardedSource.metricKey);
+  const after = committedWrites(db);
+
+  assert.deepEqual(applyGuidedMapping(db, request), committed, "a replayed key must return the committed result");
+  assert.deepEqual(committedWrites(db), after, "a replay must not write again");
+  assert.throws(
+    () => applyGuidedMapping(db, { ...request, source: { ...disabling.source, scaleDecimal: "2" } }),
+    /IDEMPOTENCY_CONFLICT/
+  );
+  db.close();
+});
+
+test("M2-R16 the dependency guard does not displace the existing token and ownership checks", () => {
+  const db = database();
+  guidedApply(db, "precedence-enable", { source: guardedSource, topic: guardedTopic });
+  referenceFromDraftPage(db, "overview", guardedSource.metricKey);
+  const disabling = {
+    ...draft, channelId: guardedSource.channelId, source: { ...guardedSource, enabled: false }, topic: guardedTopic
+  };
+  const before = committedWrites(db);
+
+  const expired = previewGuidedMapping(db, disabling);
+  db.prepare("UPDATE mapping_preview_tokens SET expires_at = '2000-01-01T00:00:00Z' WHERE preview_token = ?")
+    .run(expired.previewToken);
+  assert.throws(
+    () => applyGuidedMapping(db, {
+      ...expired, idempotencyKey: "precedence-expired", meterId: guardedSource.meterId,
+      source: disabling.source, topic: guardedTopic
+    }),
+    /PREVIEW_EXPIRED/
+  );
+
+  const claimed = previewGuidedMapping(db, disabling);
+  registerDerivedMetric(db, guardedSource.metricKey, { enabled: true });
+  assert.throws(
+    () => applyGuidedMapping(db, {
+      ...claimed, idempotencyKey: "precedence-claimed", meterId: guardedSource.meterId,
+      source: disabling.source, topic: guardedTopic
+    }),
+    isDependencyRejection("DERIVED_METRIC_IDENTITY_CONFLICT")
+  );
+  assert.deepEqual(committedWrites(db), before, "neither earlier rejection may write");
+  db.close();
+});
+
+test("M2-R16 a rejected destructive apply leaves the other site's configuration unchanged", () => {
+  const db = database();
+  const clSource: MeterSourceDefinition = {
+    ...source, channelId: "cl-main", meterId: "cl-main", metricScope: "cl", metricKey: "clPlantEnergy"
+  };
+  guidedApply(db, "cross-site-cl", { source: clSource, topic: "factory/cl/main" });
+  guidedApply(db, "cross-site-kn", { source: guardedSource, topic: guardedTopic });
+  referenceFromDraftPage(db, "overview", guardedSource.metricKey);
+  const before = protectedState(db);
+
+  assert.throws(
+    () => guidedApply(db, "cross-site-disable", { source: { ...guardedSource, enabled: false }, topic: guardedTopic }),
+    isDependencyRejection("E1_SOURCE_IN_USE")
+  );
+  assert.deepEqual(protectedState(db), before);
+  assert.deepEqual(
+    {
+      mapping: mappingRow(db, clSource.metricScope, clSource.metricKey)!.enabled,
+      source: sourceRow(db, clSource.metricScope, clSource.channelId)!.enabled
+    },
+    { mapping: 1, source: 1 },
+    "the other site's source must be untouched by a rejection"
+  );
   db.close();
 });

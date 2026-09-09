@@ -4,6 +4,7 @@ import test from "node:test";
 import type { MeterSourceDefinition } from "@solar-display/shared";
 import type { MqttClient } from "mqtt";
 import { MqttClientService } from "../mqtt/MqttClientService.js";
+import { isMetricDestinationOwnershipConflict } from "../services/metricDestinationOwnershipService.js";
 import { buildApp, getDatabase } from "./display-pages-asset-governance.test-support.js";
 
 const source: MeterSourceDefinition = {
@@ -277,6 +278,11 @@ test("M2-R11 apply of a destination claimed after the preview returns 409 with n
 });
 
 /** N2 at the HTTP boundary: a disabled result must not borrow another owner's live subscription. */
+/**
+ * A destination no registered page or readiness requirement consumes. Enabled-state cases use it
+ * so the dependency guard has nothing to protect and the activation behaviour is what is under test.
+ */
+const unconsumedSource: MeterSourceDefinition = { ...source, metricKey: "unconsumedPlantEnergy" };
 const sharedSecondSource: MeterSourceDefinition = {
   ...source, channelId: "kn-second", meterId: "kn-second", metricKey: "selfConsumptionEnergy"
 };
@@ -290,21 +296,21 @@ test("M2-R15 a disabled guided apply never reports itself active on a shared top
   const app = await buildApp();
   const broker = attachSyntheticBroker(app);
   try {
-    assert.equal((await applyReviewedMapping(app, "shared-owner-one")).statusCode, 200);
+    assert.equal((await applyReviewedMapping(app, "shared-owner-one", { source: unconsumedSource })).statusCode, 200);
     const second = await applyReviewedMapping(app, "shared-owner-two", {
       channelId: sharedSecondSource.channelId, source: sharedSecondSource
     });
     assert.equal(second.statusCode, 200, second.body);
 
     const disabled = await applyReviewedMapping(app, "shared-owner-one-disable", {
-      source: { ...source, enabled: false }
+      source: { ...unconsumedSource, enabled: false }
     });
     assert.equal(disabled.statusCode, 200, disabled.body);
     const body = disabled.json();
     assert.equal(body.saved, true);
     assert.notEqual(body.activation.state, "active", "a disabled source must not claim the shared topic's subscription");
     assert.equal(body.reception.observed, false);
-    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 0);
+    assert.equal(mappingEnabled(unconsumedSource.metricScope, unconsumedSource.metricKey), 0);
     assert.equal(mappingEnabled(sharedSecondSource.metricScope, sharedSecondSource.metricKey), 1);
     assert.ok(
       broker.requests.at(-1)!.includes(draft.topic),
@@ -319,23 +325,23 @@ test("M2-R15 a broker refusal on a re-enable keeps the enabled mapping and stays
   const app = await buildApp();
   const broker = attachSyntheticBroker(app);
   try {
-    assert.equal((await applyReviewedMapping(app, "reenable-initial")).statusCode, 200);
-    assert.equal((await applyReviewedMapping(app, "reenable-disable", { source: { ...source, enabled: false } })).statusCode, 200);
-    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 0);
+    assert.equal((await applyReviewedMapping(app, "reenable-initial", { source: unconsumedSource })).statusCode, 200);
+    assert.equal((await applyReviewedMapping(app, "reenable-disable", { source: { ...unconsumedSource, enabled: false } })).statusCode, 200);
+    assert.equal(mappingEnabled(unconsumedSource.metricScope, unconsumedSource.metricKey), 0);
 
     broker.refuse = new Error("Subscribe refused");
-    const request = await reviewedApplyPayload(app, "reenable-after-refusal");
+    const request = await reviewedApplyPayload(app, "reenable-after-refusal", { source: unconsumedSource });
     const refused = await app.inject({ method: "POST", payload: request, url: applyUrl });
     assert.equal(refused.statusCode, 200, refused.body);
     assert.equal(refused.json().activation.state, "failed");
     assert.equal(refused.json().activation.retryable, true);
-    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 1, "a broker refusal must not undo the committed enabled state");
+    assert.equal(mappingEnabled(unconsumedSource.metricScope, unconsumedSource.metricKey), 1, "a broker refusal must not undo the committed enabled state");
 
     broker.refuse = null;
     const retried = await app.inject({ method: "POST", payload: request, url: applyUrl });
     assert.equal(retried.statusCode, 200, retried.body);
     assert.equal(retried.json().activation.state, "active");
-    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 1);
+    assert.equal(mappingEnabled(unconsumedSource.metricScope, unconsumedSource.metricKey), 1);
     assert.equal(
       (getDatabase().prepare("SELECT COUNT(*) AS count FROM mapping_apply_receipts WHERE idempotency_key = ?")
         .get("reenable-after-refusal") as { count: number }).count,
@@ -360,10 +366,10 @@ test("M2-R15 a re-enabled source receives a production packet on its restored su
     logger: silentLogger
   });
   try {
-    assert.equal((await applyReviewedMapping(app, "packet-initial")).statusCode, 200);
-    assert.equal((await applyReviewedMapping(app, "packet-disable", { source: { ...source, enabled: false } })).statusCode, 200);
-    assert.equal(mappingEnabled(source.metricScope, source.metricKey), 0, "the disable step must actually remove the mapping from the enabled set");
-    const reEnabled = await applyReviewedMapping(app, "packet-re-enable");
+    assert.equal((await applyReviewedMapping(app, "packet-initial", { source: unconsumedSource })).statusCode, 200);
+    assert.equal((await applyReviewedMapping(app, "packet-disable", { source: { ...unconsumedSource, enabled: false } })).statusCode, 200);
+    assert.equal(mappingEnabled(unconsumedSource.metricScope, unconsumedSource.metricKey), 0, "the disable step must actually remove the mapping from the enabled set");
+    const reEnabled = await applyReviewedMapping(app, "packet-re-enable", { source: unconsumedSource });
     assert.equal(reEnabled.statusCode, 200, reEnabled.body);
     assert.equal(reEnabled.json().activation.state, "active");
 
@@ -452,6 +458,184 @@ test("M2-R11 preview keeps ordinary draft rejections at 422 while only ownership
     });
     assert.equal(mismatched.statusCode, 422, mismatched.body);
     assert.equal(mismatched.json().error, "PREVIEW_DRAFT_MISMATCH");
+  } finally {
+    await app.close();
+  }
+});
+
+/**
+ * M2-R16 at the HTTP boundary: guided apply must reach the same dependency decision the
+ * source-management route reaches. The fixture uses a destination no registered page or
+ * readiness requirement already consumes, so the only dependency is the one a case creates.
+ */
+const guardedSource: MeterSourceDefinition = {
+  ...source, channelId: "kn-guarded", meterId: "kn-guarded", metricKey: "guardedPlantEnergy"
+};
+
+function referenceFromDraftPage(pageKey: string, metricKey: string) {
+  getDatabase().prepare(`
+    INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at)
+    VALUES (?, 'draft', ?, 1, ?)
+    ON CONFLICT(page_key, stage) DO UPDATE SET config_json = excluded.config_json
+  `).run(
+    pageKey,
+    JSON.stringify({ regions: { dataBindings: { power: { itemId: "power", dataBinding: { metricKey, scope: "kn", sourceType: "metric" } } } } }),
+    new Date().toISOString()
+  );
+}
+
+function publishLivePageBinding(pageKey: string, metricKey: string) {
+  getDatabase().prepare(`
+    INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at)
+    VALUES (?, 'live', ?, 1, ?)
+    ON CONFLICT(page_key, stage) DO UPDATE SET config_json = excluded.config_json
+  `).run(
+    pageKey,
+    JSON.stringify({ regions: { dataBindings: { power: { itemId: "power", dataBinding: { metricKey, scope: "kn", sourceType: "metric" } } } } }),
+    new Date().toISOString()
+  );
+}
+
+function sourceEnabled(metricScope: string, channelId: string) {
+  return (getDatabase().prepare(`
+    SELECT enabled FROM meter_sources WHERE metric_scope = ? AND channel_id = ?
+    ORDER BY source_revision DESC LIMIT 1
+  `).get(metricScope, channelId) as { enabled: number } | undefined)?.enabled;
+}
+
+test("M2-R16 apply of a disable that a draft still references returns 409 with no write or activation", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    const enabled = await applyReviewedMapping(app, "guarded-enable", {
+      channelId: guardedSource.channelId, source: guardedSource
+    });
+    assert.equal(enabled.statusCode, 200, enabled.body);
+    referenceFromDraftPage("overview", guardedSource.metricKey);
+    const auditBefore = countRows("meter_source_audit");
+    const sourcesBefore = countRows("meter_sources");
+    const requestsBefore = broker.requests.length;
+
+    const rejected = await applyReviewedMapping(app, "guarded-disable", {
+      channelId: guardedSource.channelId, source: { ...guardedSource, enabled: false }
+    });
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.equal(rejected.json().error, "E1_SOURCE_IN_USE");
+    assert.equal(rejected.json().success, false);
+    assert.equal(mappingEnabled(guardedSource.metricScope, guardedSource.metricKey), 1);
+    assert.equal(sourceEnabled(guardedSource.metricScope, guardedSource.channelId), 1);
+    assert.equal(countRows("meter_source_audit"), auditBefore);
+    assert.equal(countRows("meter_sources"), sourcesBefore);
+    assert.equal(
+      (getDatabase().prepare("SELECT COUNT(*) AS count FROM mapping_apply_receipts WHERE idempotency_key = ?")
+        .get("guarded-disable") as { count: number }).count,
+      0
+    );
+    assert.equal(broker.requests.length, requestsBefore, "a rejected apply must not reach the runtime owner");
+
+    const impact = await app.inject({
+      method: "GET",
+      url: `/api/data-hub/source-impact?metricKey=${guardedSource.metricKey}&metricScope=${guardedSource.metricScope}`
+    });
+    assert.equal(impact.statusCode, 200, impact.body);
+    assert.equal(impact.json().canMutate, false);
+    assert.deepEqual(
+      impact.json().consumers.map((consumer: { kind: string; pageId: string }) => [consumer.kind, consumer.pageId]),
+      [["draft", "overview"]],
+      "the existing source-impact read must still identify the blocking draft"
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("M2-R16 a rename whose original destination a live page still uses returns 409 without runtime effect", async () => {
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    const enabled = await applyReviewedMapping(app, "rename-enable", {
+      channelId: guardedSource.channelId, source: guardedSource
+    });
+    assert.equal(enabled.statusCode, 200, enabled.body);
+    publishLivePageBinding("overview", guardedSource.metricKey);
+    const auditBefore = countRows("meter_source_audit");
+    const sourcesBefore = countRows("meter_sources");
+    const requestsBefore = broker.requests.length;
+
+    const renamed = { ...guardedSource, metricKey: "guardedPlantEnergyRenamed", sourceRevision: 2 };
+    const rejected = await applyReviewedMapping(app, "rename-apply", {
+      channelId: renamed.channelId, source: renamed
+    });
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.equal(rejected.json().error, "E1_SOURCE_IN_USE");
+    assert.equal(mappingEnabled(renamed.metricScope, renamed.metricKey), undefined, "no replacement mapping may be created");
+    assert.equal(mappingEnabled(guardedSource.metricScope, guardedSource.metricKey), 1);
+    assert.equal(sourceEnabled(guardedSource.metricScope, guardedSource.channelId), 1);
+    assert.equal(countRows("meter_source_audit"), auditBefore);
+    assert.equal(countRows("meter_sources"), sourcesBefore);
+    assert.equal(broker.requests.length, requestsBefore, "a rejected rename must not reconcile any subscription");
+  } finally {
+    await app.close();
+  }
+});
+
+test("M2-R16 a dependency rejection uses the apply failure envelope and stays out of the ownership classification", async () => {
+  // A source still in use is not a contest over a destination someone else owns. Promoting it into
+  // the ownership set would tell a preview client to try another destination instead of resolving
+  // the dependency, and would turn preview into a blocking gate it is not.
+  for (const code of ["E1_SOURCE_IN_USE", "E1_SOURCE_IMPACT_UNKNOWN"]) {
+    assert.equal(isMetricDestinationOwnershipConflict(code), false, code);
+  }
+
+  const app = await buildApp();
+  const broker = attachSyntheticBroker(app);
+  try {
+    assert.equal((await applyReviewedMapping(app, "envelope-enable", {
+      channelId: guardedSource.channelId, source: guardedSource
+    })).statusCode, 200);
+    referenceFromDraftPage("overview", guardedSource.metricKey);
+
+    const disablingDraft = {
+      ...draft, channelId: guardedSource.channelId, source: { ...guardedSource, enabled: false }
+    };
+    const previewed = await app.inject({ method: "POST", payload: disablingDraft, url: previewUrl });
+    assert.equal(previewed.statusCode, 200, "a dependency must not be reclassified as a preview conflict");
+
+    const rejected = await app.inject({
+      method: "POST",
+      payload: {
+        canonicalDraft: previewed.json().canonicalDraft, idempotencyKey: "envelope-disable",
+        meterId: guardedSource.meterId, previewToken: previewed.json().previewToken,
+        source: disablingDraft.source
+      },
+      url: applyUrl
+    });
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.deepEqual(
+      { error: rejected.json().error, success: rejected.json().success },
+      { error: "E1_SOURCE_IN_USE", success: false }
+    );
+    assert.ok(Number.isFinite(Date.parse(rejected.json().timestamp)), "the existing failure envelope carries a timestamp");
+    assert.equal(rejected.json().activation, undefined, "a rejected apply reports no activation");
+    assert.equal(broker.requests.length, 1, "only the accepted apply may reach the runtime owner");
+
+    const malformed = await app.inject({
+      method: "POST", payload: { ...draft, source, topic: "review/isolated/+bad" }, url: previewUrl
+    });
+    assert.equal(malformed.statusCode, 422, malformed.body);
+    assert.equal(malformed.json().error, "SOURCE_REVIEW_REQUIRED");
+
+    const owned = await app.inject({
+      method: "POST",
+      payload: {
+        ...draft, channelId: solarSource.channelId, metricScope: solarSource.metricScope,
+        measurementKind: solarSource.measurementKind, energyFlowRole: solarSource.energyFlowRole,
+        source: solarSource, topic: "review/isolated/managed"
+      },
+      url: previewUrl
+    });
+    assert.equal(owned.statusCode, 409, owned.body);
+    assert.equal(owned.json().error, "MANAGED_SOURCE_METRIC_CONFLICT");
   } finally {
     await app.close();
   }
