@@ -29,24 +29,78 @@ export type RegisteredMetricExpectation = {
   pageId: string;
 };
 
-function parseDraftBindings(configJson: string, pageId: string): SourceImpactConsumer[] {
+type DraftBindingScope = "cl" | "kn" | "global" | "inherit-device" | null;
+
+type ParsedDraftBinding = SourceImpactConsumer & {
+  configuredScope: DraftBindingScope;
+};
+
+type DraftBindingsParseResult =
+  | { kind: "parsed"; bindings: ParsedDraftBinding[] }
+  | { kind: "unreadable" };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasOwn(value: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function parseDraftBindings(configJson: string, pageId: string): DraftBindingsParseResult {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(configJson) as { regions?: Record<string, unknown> };
-    const regions = parsed.regions ?? parsed;
-    const dataBindings = (regions as { dataBindings?: Record<string, { dataBinding?: { metricKey?: string }; itemId?: string }> }).dataBindings;
-    if (!dataBindings || typeof dataBindings !== "object") {
-      return [];
-    }
-    return Object.values(dataBindings).flatMap((item) => {
-      const metricKey = item?.dataBinding?.metricKey;
-      if (!metricKey) {
-        return [];
-      }
-      return [{ kind: "draft" as const, itemId: item.itemId ?? null, metricKey, pageId }];
-    });
+    parsed = JSON.parse(configJson);
   } catch {
-    return [];
+    return { kind: "unreadable" };
   }
+  if (!isRecord(parsed)) return { kind: "unreadable" };
+
+  const regions = hasOwn(parsed, "regions") ? parsed.regions : parsed;
+  if (!isRecord(regions)) return { kind: "unreadable" };
+  if (!hasOwn(regions, "dataBindings")) return { kind: "parsed", bindings: [] };
+
+  const dataBindings = regions.dataBindings;
+  if (!isRecord(dataBindings)) return { kind: "unreadable" };
+
+  const bindings: ParsedDraftBinding[] = [];
+  for (const rawItem of Object.values(dataBindings)) {
+    if (!isRecord(rawItem) || !hasOwn(rawItem, "dataBinding") || !isRecord(rawItem.dataBinding)) {
+      return { kind: "unreadable" };
+    }
+    const dataBinding = rawItem.dataBinding;
+    const metricKey = dataBinding.metricKey;
+    if (typeof metricKey !== "string" || metricKey.trim().length === 0) {
+      return { kind: "unreadable" };
+    }
+
+    let configuredScope: DraftBindingScope = null;
+    if (hasOwn(dataBinding, "scope")) {
+      if (
+        dataBinding.scope !== "cl"
+        && dataBinding.scope !== "kn"
+        && dataBinding.scope !== "global"
+        && dataBinding.scope !== "inherit-device"
+      ) {
+        return { kind: "unreadable" };
+      }
+      configuredScope = dataBinding.scope;
+    }
+    bindings.push({
+      kind: "draft",
+      itemId: typeof rawItem.itemId === "string" ? rawItem.itemId : null,
+      metricKey,
+      pageId,
+      configuredScope
+    });
+  }
+  return { kind: "parsed", bindings };
+}
+
+function draftMatchesScope(configuredScope: DraftBindingScope, requestedScope: "cl" | "kn" | "global" | "all") {
+  if (requestedScope === "all") return true;
+  if (requestedScope === "global") return configuredScope === "global";
+  return configuredScope === requestedScope || configuredScope === "inherit-device" || configuredScope === null;
 }
 
 export function readSourceImpact(
@@ -54,6 +108,14 @@ export function readSourceImpact(
   input: { confirmResolved?: boolean; metricKey: string; metricScope: "cl" | "kn" | "global" | "all" }
 ) {
   try {
+    const draftRows = database.prepare(
+      "SELECT page_key, config_json FROM display_page_stage_configs WHERE stage = 'draft'"
+    ).all() as Array<{ config_json: string; page_key: string }>;
+    const parsedDrafts = draftRows.map((row) => parseDraftBindings(row.config_json, row.page_key));
+    if (parsedDrafts.some((result) => result.kind === "unreadable")) {
+      return { ...evaluateSourceMutationImpact({ consumers: [], lookupFailed: true }), registeredExpectations: [] };
+    }
+
     // Metric usage answers two different questions in one list. A widget row is a binding on a
     // published page, which an operator can edit away. A story or readiness row is the display
     // code declaring that it expects this destination, and no operator action clears it — so it is
@@ -72,11 +134,13 @@ export function readSourceImpact(
         ? [{ consumerType: row.consumerType, metricKey: row.metricKey, pageId: row.pageId }]
         : []
     ));
-    const draftRows = database.prepare(
-      "SELECT page_key, config_json FROM display_page_stage_configs WHERE stage = 'draft'"
-    ).all() as Array<{ config_json: string; page_key: string }>;
-    const drafts = draftRows.flatMap((row) => parseDraftBindings(row.config_json, row.page_key))
-      .filter((row) => row.metricKey === input.metricKey);
+    const drafts = parsedDrafts.flatMap((result) => (
+      result.kind === "parsed"
+        ? result.bindings
+          .filter((row) => row.metricKey === input.metricKey && draftMatchesScope(row.configuredScope, input.metricScope))
+          .map(({ configuredScope: _configuredScope, ...consumer }) => consumer)
+        : []
+    ));
     const derivedRows = database.prepare(
       "SELECT derived_metric_key FROM derived_metric_inputs WHERE metric_key = ?"
     ).all(input.metricKey) as Array<{ derived_metric_key: string }>;
