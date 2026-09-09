@@ -1,33 +1,31 @@
 # Repo 慣例與驗證入口
 
-> 讀者：任何在本 repo 工作的 agent（Claude、Codex 等）。所有條目查證於 2026-07-03；發現與現況不符時，先信程式碼，再按 `docs/ops/maintenance.md` 修本檔。
+> 本檔記錄 repo 特有的穩定慣例與驗證入口。指令以 root 與各 package 的 `package.json`、`scripts/verify.mjs` 為準；發現不符時，先核對程式碼，再按 `docs/ops/maintenance.md` 更新本檔。
 
-## 指令（root package.json 實際存在的全部入口）
+## 指令（以現行 package scripts 為準）
 
 | 指令 | 作用 |
 |---|---|
-| `pnpm dev` | `scripts/dev.mjs` 起完整開發環境 |
-| `pnpm dev:fix` | rebuild better-sqlite3 後再 dev（原生模組壞掉時用） |
-| `pnpm dev:web` / `pnpm dev:server` | shared watch + 單邊 dev |
-| `pnpm build` | shared → web → server 依序 build（另有 `build:shared`、`build:web`、`build:server`） |
-| `pnpm test` | 開發迴圈：完整 server suite + web suite（不含 build、deploy） |
-| `pnpm verify` | **交付 gate**：序列執行 build → server → web → deploy → server-runner（`scripts/verify.mjs`） |
-| `pnpm db:migrate` / `pnpm db:seed` | SQLite migration / seed |
-| `pnpm run fhd:witness -- --base-url <url>` | 擷取五個 playback 頁 1920x1080 witness（`fhd:witness:dry-run` 可先演練） |
-| `pnpm run verify:device-scoped-playback` | Phase 1 50-Client 驗收 run（固定 50 clients／600 秒／5 reconnects，需要 playwright + Chromium；不在 `pnpm test` 內） |
-| `pnpm run test:offline-playback-browser` | 離線播放的瀏覽器測試入口（不在 `pnpm test` 內） |
+| `pnpm dev` / `pnpm dev:fix` | 啟動完整開發環境；原生模組壞掉時先 rebuild better-sqlite3。 |
+| `pnpm dev:web` / `pnpm dev:server` | shared watch 加單邊 web 或 server 開發環境。 |
+| `pnpm build` | 依序建置 shared、web、server；也可用 `build:shared`、`build:web`、`build:server`。 |
+| `pnpm test` | 開發迴圈：依序執行 server 與 web package tests。 |
+| `pnpm verify` | 程式交付前的最終 repo gate；實際內容與順序以 `scripts/verify.mjs` 為準。 |
+| `pnpm db:migrate` / `pnpm db:seed` | 執行 SQLite migration 或 seed。 |
+| `pnpm run fhd:witness -- --base-url <url>` | 擷取 playback／editor 的 1920x1080 witness；route mapping 依 `scripts/fhd-witness-config.mjs`，可先用 `fhd:witness:dry-run`。 |
+| `pnpm run browser:smoke` | 執行瀏覽器 smoke。 |
+| `pnpm run verify:device-scoped-playback` | 執行 opt-in 的 device-scoped playback acceptance run。 |
+| `pnpm run test:offline-playback-browser` | 執行離線播放瀏覽器測試。 |
 
-repo 目前沒有 lint、coverage script 或 CI policy；`browser:smoke` 是可用的瀏覽器 smoke 入口，但不在 `pnpm verify` 內。驗證能力以當下的 root scripts 與 package scripts 為準。
+## 測試入口：focused 與交付 gate
 
-## 測試入口：`test` vs `verify`
-
-- **focused / 開發**：`pnpm test` 或套件級
-  - server：`pnpm --filter @solar-display/server test`（= `node ./scripts/run-tests.mjs`）。Node filesystem walk 明確列出 `apps/server/src/**/*.test.ts`（含頂層），lexical sort 後以 `tsx --test --test-concurrency=1` 執行。可傳 explicit targets：`pnpm --filter @solar-display/server test src/config.test.ts`。
-  - web：`pnpm --filter @solar-display/web test`（`scripts/run-tests.mjs` 包 tsx --test）。
-- **交付 gate**：`pnpm verify` 印出固定 stage labels：`build`、`server`、`web`、`deploy`、`server-runner`。任一 stage 非零即停止並保留該 label，後續 stage 不會掩蓋失敗。
-- shared：`packages/shared` 沒有獨立 test script。改 shared → 至少跑 `pnpm run build` + 受影響 app 的測試。
-- deploy：`scripts/deploy.test.mjs` 已納入 `pnpm verify` 的 deploy stage；單獨跑：`node --test scripts/deploy.test.mjs`。
-- server runner 自我測試：`node --test apps/server/scripts/run-tests.test.mjs`（亦在 verify 的 server-runner stage）。
+- 先跑受影響 package 的 focused test；需要時再跑該 package build。
+  - shared：`pnpm --filter @solar-display/shared test`
+  - server：`pnpm --filter @solar-display/server test [test-file ...]`
+  - web：`pnpm --filter @solar-display/web test [test-file ...]`
+- 程式交付前跑 `pnpm verify`。它是本機 repo gate；通過不等於 runtime、browser、MQTT／PLC／LAN、deployment、FHD 或人工 acceptance 已完成。
+- deploy 相關變更可單獨跑 `node --test scripts/deploy.test.mjs`；測試 runner 或 verify script 變更時，另跑其對應的 `*.test.mjs`。
+- 文件或制度檔變更以 read-back、`git diff --check` 與必要的文件檢查為主，不因純文件變更跑產品 `pnpm verify`。
 - 測試命名 `*.test.ts`，放在被測程式旁邊（如 `apps/server/src/routes/images.test.ts`）。
 
 ## 命名、檔案風格、imports

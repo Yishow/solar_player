@@ -2,28 +2,8 @@
 
 # Spectra Instructions
 
-This project uses Spectra for Spec-Driven Development(SDD). Specs live in `openspec/specs/`, change proposals in `openspec/changes/`.
-
-## Use `/spectra-*` skills when:
-
-- A discussion needs structure before coding → `/spectra-discuss`
-- User wants to plan, propose, or design a change → `/spectra-propose`
-- Tasks are ready to implement → `/spectra-apply`
-- There's an in-progress change to continue → `/spectra-ingest`
-- User asks about specs or how something works → `/spectra-ask`
-- Implementation is done → `/spectra-archive`
-- Commit only files related to a specific change → `/spectra-commit`
-
-## Workflow
-
-discuss? → propose → apply ⇄ ingest → archive
-
-- `discuss` is optional — skip if requirements are clear
-- Requirements change mid-work? Plan mode → `ingest` → resume `apply`
-
-## Parked Changes
-
-Changes can be parked（暫存）— temporarily moved out of `openspec/changes/`. Parked changes won't appear in `spectra list` but can be found with `spectra list --parked`. To restore: `spectra unpark <name>`. The `/spectra-apply` and `/spectra-ingest` skills handle parked changes automatically.
+Specs live in `openspec/specs/`; named changes live in `openspec/changes/`.
+Use `docs/ops/workflow.md` to choose direct work or Spectra. For Spectra work, use `/spectra-*` skills; resume with `apply`, use `ingest` only when requirements change. Command routing and closeout rules live in the workflow document.
 
 <!-- SPECTRA:END -->
 
@@ -41,16 +21,16 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 
 | 情境 | 讀 |
 |---|---|
-| 從需求到交付、`.scratch` / Spectra 分工、archive 與 commit 順序 | `docs/ops/workflow.md` |
+| 任務分流、連續交付、完成狀態與 commit | `docs/ops/workflow.md` |
 | 指令、測試、程式慣例、安全、API 與部署邊界 | `docs/ops/conventions.md` |
 | Playback、display editor 或任何 FHD surface | `docs/ops/fhd-closeout.md` |
 | Claude Code 模型調度、派工或失敗升級 | `docs/ops/dispatch.md`，派工 prompt 另讀 `docs/ops/delegation.md` |
-| 完成判準、何時詢問使用者、方向錯誤訊號 | `docs/ops/judgment.md` |
+| 授權不明、風險或方向錯誤訊號 | `docs/ops/judgment.md` |
 | 修改制度檔、追查制度歷史或已知債務 | `docs/ops/maintenance.md`，必要時再讀 `docs/ops/diagnosis.md`、`docs/ops/letter.md` |
 
 ## 硬規則
 
-1. **有界交付**：行為變更依 `docs/ops/workflow.md` 使用一個有界 named Spectra change；純問答、研究、review、診斷與無行為影響的制度小修不建立 change。每階段結束須回報目前狀態、下一步與原因；使用者回覆「繼續」即接續執行。Archive 後仍須取得使用者確認才 commit。
-2. **真實驗證**：依 `docs/ops/conventions.md` 的現行 scripts 跑受影響測試；交付 gate 是 `pnpm verify`。必須看過實際輸出，不從舊文件或不存在的 gate 推測成功。
-3. **Playback／FHD 邊界**：五個 playback 頁依 `docs/reference-match/fhd-workflow-entrypoints.md` 使用 visual canonicals、fresh witness batch、evidence bundle 與 launch witness gates 才算完成；驗收矩陣與模板是 `docs/fhd-witness/playback-closeout-matrix.md`、`docs/fhd-witness/evidence-template.md`，AI 執行 `pnpm run fhd:witness` 與 editor capability 差距整理，人工 acceptance 仍由使用者決定。展示設定必須由 `/display-pages/editor` 表達，不做 page-local hardcode、management-surface drift，亦不為視覺 polish 擴張到 route shell、API 或資料架構。
-4. **事實與決策權**：程式碼、root scripts 與實際設定高於文件；只做任務直接要求的最小改動。產品意圖、intentional difference、FHD 品質與 deployment／launch acceptance 由使用者決定。
+1. **有界交付**：依 workflow 分流；恢復既有契約的局部修正可直接做，新功能、契約變更、資料遷移與跨模組設計使用 named Spectra change。已授權實作連續完成 review、修正與驗證；只有使用者明確要求才 commit，且精準選檔。
+2. **真實驗證**：依 conventions 跑受影響檢查；程式交付前以最終版本跑 `pnpm verify`，純文件修改跑相關文件檢查。必須看過實際輸出，明列未驗證事項。
+3. **Playback／FHD 邊界**：依 `docs/ops/fhd-closeout.md` 與 `docs/reference-match/fhd-workflow-entrypoints.md` 使用 visual canonicals、fresh witness batch、evidence bundle 與 launch witness gates。AI 跑 `pnpm run fhd:witness`、整理 editor capability 差距；驗收依 `docs/fhd-witness/playback-closeout-matrix.md` 與 `docs/fhd-witness/evidence-template.md`。展示設定由 `/display-pages/editor` 表達，不做 page-local hardcode 或 management-surface drift；人工 acceptance 由使用者決定。
+4. **事實與決策權**：現行程式碼、scripts 與設定用來確認實際行為，預期行為依規格與使用者要求；兩者不符須釐清。只做授權範圍；產品意圖、intentional difference、FHD 品質與 deployment／launch acceptance 由使用者決定。

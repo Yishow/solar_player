@@ -22,7 +22,7 @@
 ## Witness workflow（驗收的唯一有效形式）
 
 - 入口文件：`docs/reference-match/fhd-workflow-entrypoints.md`（vocabulary：witness batch、evidence bundle、visual canonicals、launch witness gates）；`docs/fhd-witness/playback-closeout-matrix.md` 與 `docs/fhd-witness/evidence-template.md`。
-- 執行：root 跑 `pnpm run fhd:witness -- --base-url <url>`，只對五個 playback routes 擷取 1920x1080 screenshot/evidence。
+- 執行：root 跑 `pnpm run fhd:witness -- --base-url <url>`，依 `scripts/fhd-witness-config.mjs` 的 playback routes 與 editor preview states 擷取 1920x1080 screenshot/evidence。
 - 這個 workflow **沒有 pixel threshold gate**：AI 負責 capture、gap notes、Spectra hygiene；intentional difference 與 launch acceptance 由使用者人工判定。
 - 「完成」的證據 = 按 evidence-template 填好的 evidence bundle。只有截圖沒有 gap notes，或只有「跑過 witness」一句話，都不算完成。
 - evidence bundle 一律用 `docs/fhd-witness/evidence-template.md` 這一份模板；repo 內其他相似模板（如 `docs/reference-match/fhd-evidence-bundle-template.md`）以本條為準，不要用。

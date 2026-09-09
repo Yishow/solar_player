@@ -1,104 +1,49 @@
 # Repo 發展工作流
 
-> 目標：使用者可以從任一步開始；agent 每完成一步都提示下一步，直到驗證、歸檔與交付完成。
+> 依契約與風險選流程；已授權的工作連續做到可交付，階段更新不代表停下等待確認。
 
-## 預設流程
+## 任務分流
 
-```text
-/grill-me（需求已清楚可跳過）
-        ↓
-spectra-propose
-        ↓
-spectra-apply
-        ↓
-review + repo verification
-        ↓
-必要人工 acceptance
-        ↓
-spectra-archive
-        ↓
-使用者確認後精準 commit
-```
+| 任務 | 流程 |
+|---|---|
+| 只要求問答、研究、review、診斷 | 唯讀分析並回報，不建立 change；不因發現問題自行開始修正 |
+| 只要求提案 | Spectra 提案建立 named change artifacts；一般建議直接回報，不開始實作 |
+| 純文件／制度維護 | 直接修改 → review → 相關文件檢查 |
+| 局部程式修正（恢復或維持既有契約） | 說明契約依據與範圍 → 實作 → review／修正 → 驗證 |
+| 新功能、契約變更、資料遷移、跨模組設計 | named Spectra change → 實作 → review／修正 → 驗證 → 必要人工驗收 → archive |
 
-- Claude Code 使用 `/spectra-*`；Codex 使用 `$spectra-*`。本檔用不帶前綴的 `spectra-*` 表示兩者。
-- `/grill-me`、`/to-spec`、`/to-tickets` 是 Claude Code 的可選入口；其他工具若沒有同名 skill，使用可用的需求澄清／規格／拆票能力或直接產出同等結果，不把缺少命令視為 blocker。
-- 已有完全對應的 named change，直接從 `spectra-apply <change>` 開始。
-- requirement 在 apply 中途改變，先 `spectra-ingest <change>`，再回到 apply。
-- 回覆「繼續」代表接受 agent 剛提示的下一步；不需要重新輸入整個指令。
+- 局部修正須有既有規格、測試或已確認需求作依據；不能只以行數少判定。涉及安全邊界、資料完整性或部署行為的高風險修正仍走 Spectra。
+- 已有完全對應的 change，直接續作該 change，不另開或改走局部修正以略過未完成 tasks；不把無關需求併入。
+- 無法唯一判定目標或預期行為時，先釐清；只有依賴答案的工作暫停。詢問邊界見 `docs/ops/judgment.md`。
 
-## 每一步都要提示下一步
+## 連續執行與驗證
 
-每個 workflow skill 或階段結束時，agent 必須回報：
+1. 讀相關規格、程式、測試與 git 狀態，說明必要假設，保護既有 WIP。
+2. 在授權範圍實作；bug fix 補能重現缺陷的回歸驗證，開發期間跑受影響測試。
+3. 主代理 review 最後 diff，核對 repo 慣例與需求／規格；修完範圍內 findings，再依 `docs/ops/conventions.md` 驗證最終版本。程式交付 gate 是 `pnpm verify`；純文件修改使用相關文件檢查。
+4. 涉及 Playback／FHD 時依 `docs/ops/fhd-closeout.md` 產生 fresh witness、gap notes 與 evidence bundle；人工 acceptance 由使用者決定。
+5. Spectra tasks、驗證與必要人工 acceptance 全部完成後，接續歸檔該 change；不把待驗收 tasks 勾成完成。
 
-1. **完成了什麼**
-2. **目前狀態**：可繼續／待使用者決定／blocked
-3. **下一步**：一個精確指令或動作
-4. **為什麼是這一步**
+- 使用者要求實作或修正時，上述步驟自動接續，不逐階段等待「繼續」。只要求分析、提案或 review 時，完成該產物即回報，不推定已授權實作。
+- 過程簡述重要發現與下一步；結束回報變更範圍、驗證結果、限制與下一步。需要使用者決策或外部條件時，說明具體缺口。
+- 「繼續」承接已說明的下一步與既有授權；不擴大範圍，也不代替人工驗收。
 
-範例：
+## Spectra 與大型需求
 
-```text
-完成：需求邊界已由 /grill-me 確認。
-下一步：$spectra-propose add-device-pairing
-原因：需求已明確且可收斂為單一 change。
-回覆「繼續」即可直接執行。
-```
+- Codex 使用 `$spectra-*`，Claude Code 使用 `/spectra-*`；以下省略前綴。
+- 需求未清楚可用 `spectra-discuss`；建立 change 用 `spectra-propose`，實作與單純續作用 `spectra-apply`，需求中途改變才用 `spectra-ingest` 更新 artifacts 後續作。
+- 查規格用 `spectra-ask`；達到歸檔條件用 `spectra-archive`；已獲提交授權時可用 `spectra-commit` 精準選取 change 檔案。
+- 找不到預期 change 時查 `spectra list --parked`；`spectra-apply`／`spectra-ingest` 可處理還原，也可用 `spectra unpark <name>`。
+- `.scratch` 只供大型、模糊或跨多個 changes 的產品意圖與拆票；一般修正不建立。`/grill-me`、`/to-spec`、`/to-tickets` 是可選工具，缺少時可用等效方式。
+- Spectra 實作進度只記於 `openspec/changes/<change>/tasks.md`；`.scratch` 不複製 checkbox，也不授權 coding。
 
-提示規則：
+## 完成狀態與提交
 
-- `/grill-me` 完成後：
-  - 單一有界需求 → 提示 `spectra-propose <change>`。
-  - 大型或跨多個 changes → 提示 `/to-spec`。
-- `/to-spec` 完成後 → 提示 `/to-tickets`。
-- `/to-tickets` 完成後 → 提示為第一個 frontier ticket 建立 `spectra-propose <change>`。
-- `spectra-propose` 完成後 → 提示 `spectra-apply <change>`。
-- apply 尚有 tasks → 提示繼續同一個 change，不另開 change。
-- apply tasks 完成後 → 提示執行 Standards／Spec review 與 repo verification。
-- review 有 findings → 提示修正並重跑受影響驗證。
-- review 與自動驗證完成後：
-  - 需要 FHD、deployment 或 launch acceptance → 提示使用者驗收。
-  - 不需人工 acceptance，或已驗收 → 提示 `spectra-archive <change>`。
-- archive 完成後 → 顯示精準 commit 範圍，提示使用者是否提交；取得確認後才精準 staging 與 commit。
-- blocked 時不要假裝有可執行下一步；只提示解除 blocker 所需的單一輸入或外部動作。
+| 狀態 | 證據與後續 |
+|---|---|
+| 實作與驗證完成 | 授權範圍已實作、review findings 已處理、必要自動檢查通過；直接修正可在此交付 |
+| 待人工驗收／外部驗證 | 明列已完成的工程驗證與缺少的 witness／決策；不得宣稱已驗收或 launch-ready |
+| 已歸檔 | Spectra tasks、驗證、必要人工 acceptance 均完成，且已 archive；不代表已 commit |
 
-## 主線之外的 Spectra 指令
-
-主線流程之外還有三個隨時可用的指令，它們不推進 change 狀態，不取代上面的完成門檻：
-
-- `spectra-discuss <topic>`：需求需要先收斂結構時使用；需求已清楚可直接跳到 `spectra-propose`。
-- `spectra-ask <question>`：查詢 `openspec/specs/` 與 `openspec/changes/` 並回答問題，不改動任何檔案。
-- `spectra-commit <change>`：只 stage 與 commit 該 change 相關檔案；仍受完成門檻 6 的使用者確認約束。
-
-## Parked changes（暫存）
-
-change 可以被 park——暫時移出 `openspec/changes/`。
-
-- parked change 不會出現在 `spectra list`，要用 `spectra list --parked` 才看得到。
-- 還原：`spectra unpark <change>`。
-- `spectra-apply` 與 `spectra-ingest` 會自行處理 parked change，不需先手動 unpark。
-
-## 何時才使用 `.scratch`
-
-一般功能、功能修改與 bug fix 不先建立 `.scratch`；直接走 Spectra。
-
-只有大型、模糊或跨多個 changes 的產品工作才使用：
-
-```text
-/grill-me → /to-spec → /to-tickets → 每個 frontier ticket 各自進入 Spectra
-```
-
-- `.scratch/<feature>/spec.md` 保存跨 change 的產品意圖。
-- `.scratch/<feature>/issues/` 保存 tracer-bullet tickets 與 blocking edges。
-- `.scratch` 不直接授權 coding，也不複製 Spectra task checkbox。
-- `openspec/changes/<change>/tasks.md` 是實作進度唯一來源。
-
-## 不能省略的完成門檻
-
-1. **Implement**：優先 red → green → refactor，只做 change 直接要求的最小改動。
-2. **Review**：Standards 與 Spec findings 修完，並重跑受影響驗證。
-3. **Verify**：依 `docs/ops/conventions.md` 跑 tests／build／`pnpm verify`；Playback 五頁另依 `docs/ops/fhd-closeout.md` 產生 fresh witness。
-4. **Human acceptance**：FHD、intentional difference、deployment、launch acceptance 必須由使用者判定。
-5. **Archive**：tasks、驗證與必要人工 acceptance 全部完成後才執行；未 archive 不算 change 完成。
-6. **Commit**：archive 後另行取得使用者確認，精準選檔；不用 generic auto-commit 或 `git add .`。
-
-純問答、研究、review、診斷不建立 change；純制度維護、typo 或無行為影響的小修可依 `docs/ops/maintenance.md` 直接處理。
+- 有檔案變更時留下 checkpoint：變更範圍、驗證結果與未完成事項；需要回復依據時保留 diff 或備份。問答與唯讀分析不需 checkpoint。
+- 只有使用者明確要求才 stage／commit，且只包含本次確認範圍，禁止 `git add .`。既有明確授權可沿用；範圍改變須重新確認。Spectra change 先 archive 再 commit；直接修正不需補建 change。
