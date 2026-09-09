@@ -35,6 +35,7 @@ const managementFooterOrder = [
   "/settings/images",
   "/settings/circuits",
   "/device-status",
+  "/device-fleet",
   "/trends",
   "/history",
   "/brand",

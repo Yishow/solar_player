@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
+  DeviceGroup,
   PlaybackProfileDraft,
   PlaybackProfilePreview,
   PlaybackProfileSummary,
   PlaybackProfileVersion
 } from "@solar-display/shared";
+import type { DeviceFleetRow } from "../DeviceFleet/viewModel";
 import {
   archivePlaybackProfile,
   createPlaybackProfile,
@@ -24,7 +26,11 @@ import {
   isProfileDraftDirty,
   validateProfileDraftForPublish
 } from "./viewModel";
-import { PlaybackProfilePreviewPanel } from "./PlaybackProfilePreviewPanel";
+import { ProfileDraftSettingsSection } from "./ProfileDraftSettingsSection";
+import { ProfileListSidebar } from "./ProfileListSidebar";
+import { ProfilePagesSection } from "./ProfilePagesSection";
+import { ProfileVersionHistorySection } from "./ProfileVersionHistorySection";
+
 export type PlaybackProfilesLoaderData = {
   loadError: string;
   profiles: PlaybackProfileSummary[];
@@ -44,9 +50,13 @@ const defaultProfileApi = {
 };
 
 export function PlaybackProfilesContent({
+  devices = [],
+  groups = [],
   loaderData,
   profileApi = defaultProfileApi
 }: {
+  devices?: DeviceFleetRow[];
+  groups?: DeviceGroup[];
   loaderData: PlaybackProfilesLoaderData;
   profileApi?: typeof defaultProfileApi;
 }) {
@@ -117,7 +127,7 @@ export function PlaybackProfilesContent({
   }, [selectedId]);
 
   const validation = useMemo(
-    () => draft ? validateProfileDraftForPublish(draft) : null,
+    () => (draft ? validateProfileDraftForPublish(draft) : null),
     [draft]
   );
   const dirty = useMemo(
@@ -142,83 +152,160 @@ export function PlaybackProfilesContent({
     }
   };
 
+  const handleCreateProfile = () => {
+    const name = window.prompt("新 Playback Profile 名稱");
+    if (!name?.trim()) return;
+    void mutate(async () => {
+      const created = await profileApi.createPlaybackProfile(name.trim());
+      await refreshProfiles(created.id);
+    });
+  };
+
+  const handleRenameProfile = () => {
+    if (!selected) return;
+    const name = window.prompt("Profile 名稱", selected.name);
+    if (!name?.trim()) return;
+    void mutate(async () => {
+      await profileApi.renamePlaybackProfile(selected.id, name.trim());
+      await refreshProfiles(selected.id);
+    });
+  };
+
+  const handleArchiveProfile = () => {
+    if (!selected || selected.isDefault) return;
+    if (!window.confirm(`確定封存「${selected.name}」？`)) return;
+    void mutate(async () => {
+      await profileApi.archivePlaybackProfile(selected.id);
+      await refreshProfiles();
+    });
+  };
+
+  const handleSaveDraft = () => {
+    if (!selected || !draft) return;
+    void mutate(async () => {
+      const saved = await profileApi.savePlaybackProfileDraft(selected.id, {
+        expectedRevision: draft.revision,
+        pages: draft.pages,
+        settings: draft.settings
+      });
+      setDraft(saved);
+      setPersistedDraft(saved);
+      setPreview(null);
+      setMessage("Draft 已儲存。");
+    });
+  };
+
+  const handlePreview = () => {
+    if (!selected) return;
+    void mutate(async () => {
+      setPreview(await profileApi.previewPlaybackProfile(selected.id));
+    });
+  };
+
+  const handlePublish = () => {
+    if (!selected || !draft) return;
+    const nextVersion = (versions.at(-1)?.versionNumber ?? 0) + 1;
+    if (!window.confirm(buildProfilePublishConfirmation(selected.name, nextVersion))) return;
+    void mutate(async () => {
+      await profileApi.publishPlaybackProfile(selected.id, draft.revision);
+      await refreshSelected(selected.id);
+      setMessage(`Version ${nextVersion} 已發布。`);
+    });
+  };
+
+  const handleRollback = (version: PlaybackProfileVersion) => {
+    if (!selected) return;
+    if (!window.confirm(`確定以 Version ${version.versionNumber} 建立新的 rollback Version？`)) return;
+    void mutate(async () => {
+      await profileApi.rollbackPlaybackProfile(selected.id, version.id);
+      await refreshSelected(selected.id);
+    });
+  };
+
   return (
     <main className="playback-profiles-page">
       <header className="playback-profiles-page__header">
         <div>
-          <small>PROFILE GOVERNANCE</small>
-          <h1>播放策略版本治理</h1>
-          <p>先編輯 Draft、同時預覽 CL／KN，再建立不可變更的版本。</p>
+          <p className="playback-profiles-page__kicker">PLAYBACK POLICY GOVERNANCE</p>
+          <h1>播放策略<em>版本治理</em></h1>
+          <p className="playback-profiles-page__desc">
+            維護 Draft 草稿、預覽 CL／KN 廠區現場畫面，並受控發布不可變版本或隨時秒級 Rollback。
+          </p>
         </div>
         <button
+          className="device-fleet-btn-primary"
           disabled={pending}
-          onClick={() => {
-            const name = window.prompt("新 Playback Profile 名稱");
-            if (!name?.trim()) return;
-            void mutate(async () => {
-              const profile = await profileApi.createPlaybackProfile(name.trim());
-              await refreshProfiles(profile.id);
-            });
-          }}
+          onClick={handleCreateProfile}
+          type="button"
         >
-          新增 Profile
+          ＋ 新增 Profile
         </button>
       </header>
 
       {message && <p className="playback-profiles-message" role="status">{message}</p>}
 
       <div className="playback-profiles-layout">
-        <aside aria-label="Playback Profiles">
-          {profiles.map((profile) => (
-            <button
-              className={profile.id === selectedId ? "is-selected" : ""}
-              disabled={pending || Boolean(profile.archivedAt)}
-              key={profile.id}
-              onClick={() => setSelectedId(profile.id)}
-            >
-              <strong>{profile.name}</strong>
-              <small>
-                {profile.isDefault ? "Default" : "Reusable"}
-                {profile.archivedAt ? " · 已封存" : ""}
-              </small>
-            </button>
-          ))}
-        </aside>
+        <ProfileListSidebar
+          groups={groups}
+          onCreateProfile={handleCreateProfile}
+          onSelectProfile={setSelectedId}
+          pending={pending}
+          profiles={profiles}
+          selectedId={selectedId}
+        />
 
         <section className="playback-profiles-workspace">
           {!selected || !draft ? (
-            <p>載入 Profile Draft…</p>
+            <div className="playback-profiles-empty-state">
+              <p>載入 Profile Draft 中…</p>
+            </div>
           ) : (
             <>
               <div className="playback-profiles-toolbar">
-                <div>
+                <div className="playback-profiles-toolbar__info">
                   <h2>{selected.name}</h2>
-                  <small>Draft revision {draft.revision}</small>
+                  {groups.length > 0 && (
+                    <div className="playback-profiles-impact">
+                      {groups.filter((g) => g.playbackProfileId === selectedId).length > 0 ? (
+                        <span
+                          className="playback-profiles-impact-pill"
+                          title={`套用群組：${groups
+                            .filter((g) => g.playbackProfileId === selectedId)
+                            .map((g) => g.name)
+                            .join(", ")}`}
+                        >
+                          ● 套用於{" "}
+                          {groups.filter((g) => g.playbackProfileId === selectedId).length}{" "}
+                          個群組（
+                          {devices.filter((d) => d.playbackProfileId === selectedId).length}{" "}
+                          台機台）
+                        </span>
+                      ) : (
+                        <span className="playback-profiles-impact-pill is-unbound">
+                          ○ 尚未指派給任何群組
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <small className="playback-profiles-toolbar__rev">
+                    Draft revision {draft.revision}
+                  </small>
                 </div>
-                <div>
+                <div className="playback-profiles-toolbar__actions">
                   <button
+                    className="device-fleet-btn-action"
                     disabled={pending}
-                    onClick={() => {
-                      const name = window.prompt("Profile 名稱", selected.name);
-                      if (!name?.trim()) return;
-                      void mutate(async () => {
-                        await profileApi.renamePlaybackProfile(selected.id, name.trim());
-                        await refreshProfiles(selected.id);
-                      });
-                    }}
+                    onClick={handleRenameProfile}
+                    type="button"
                   >
                     重新命名
                   </button>
                   {!selected.isDefault && (
                     <button
+                      className="device-fleet-btn-action is-danger"
                       disabled={pending}
-                      onClick={() => {
-                        if (!window.confirm(`確定封存「${selected.name}」？`)) return;
-                        void mutate(async () => {
-                          await profileApi.archivePlaybackProfile(selected.id);
-                          await refreshProfiles();
-                        });
-                      }}
+                      onClick={handleArchiveProfile}
+                      type="button"
                     >
                       封存
                     </button>
@@ -226,354 +313,27 @@ export function PlaybackProfilesContent({
                 </div>
               </div>
 
-              <section className="playback-profiles-settings">
-                <h3>Draft 行為</h3>
-                <label>
-                  起始頁面
-                  <select
-                    value={draft.settings.startPage}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        startPage: Number(event.target.value)
-                      }
-                    })}
-                  >
-                    {draft.pages.filter((page) => page.enabled).map((page) => (
-                      <option key={page.id} value={page.id}>{page.labelZh}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  亮度
-                  <input
-                    max="100"
-                    min="1"
-                    type="number"
-                    value={draft.settings.brightness}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        brightness: Number(event.target.value)
-                      }
-                    })}
-                  />
-                </label>
-                <label>
-                  <input
-                    checked={draft.settings.autoplay}
-                    type="checkbox"
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: { ...draft.settings, autoplay: event.target.checked }
-                    })}
-                  />
-                  自動播放
-                </label>
-                <label>
-                  <input
-                    checked={draft.settings.loop}
-                    type="checkbox"
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: { ...draft.settings, loop: event.target.checked }
-                    })}
-                  />
-                  循環播放
-                </label>
-                <label>
-                  <input
-                    checked={draft.settings.scheduleEnabled}
-                    type="checkbox"
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        scheduleEnabled: event.target.checked
-                      }
-                    })}
-                  />
-                  啟用排程
-                </label>
-                <label>
-                  開始時間
-                  <input
-                    type="time"
-                    value={draft.settings.scheduleStart ?? ""}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        scheduleStart: event.target.value || null
-                      }
-                    })}
-                  />
-                </label>
-                <label>
-                  結束時間
-                  <input
-                    type="time"
-                    value={draft.settings.scheduleEnd ?? ""}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        scheduleEnd: event.target.value || null
-                      }
-                    })}
-                  />
-                </label>
-                <label>
-                  轉場
-                  <select
-                    value={draft.settings.transitionType}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        transitionType: event.target.value as
-                          PlaybackProfileDraft["settings"]["transitionType"]
-                      }
-                    })}
-                  >
-                    <option value="fade">淡入淡出</option>
-                    <option value="slide">滑動</option>
-                    <option value="none">無</option>
-                  </select>
-                </label>
-                <label>
-                  轉場毫秒
-                  <input
-                    min="0"
-                    type="number"
-                    value={draft.settings.transitionSpeed}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        transitionSpeed: Number(event.target.value)
-                      }
-                    })}
-                  />
-                </label>
-                <label>
-                  待機模式
-                  <select
-                    value={draft.settings.idleMode}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        idleMode: event.target.value as
-                          PlaybackProfileDraft["settings"]["idleMode"]
-                      }
-                    })}
-                  >
-                    <option value="disabled">停用</option>
-                    <option value="return-to-start">回到起始頁</option>
-                  </select>
-                </label>
-                <label>
-                  待機秒數
-                  <input
-                    min="1"
-                    type="number"
-                    value={draft.settings.idleTimeout}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        idleTimeout: Number(event.target.value)
-                      }
-                    })}
-                  />
-                </label>
-                <label>
-                  方向
-                  <select
-                    value={draft.settings.orientation}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      settings: {
-                        ...draft.settings,
-                        orientation: event.target.value as
-                          PlaybackProfileDraft["settings"]["orientation"]
-                      }
-                    })}
-                  >
-                    <option value="landscape">橫向</option>
-                    <option value="portrait">直向</option>
-                  </select>
-                </label>
-                <fieldset>
-                  <legend>重複星期</legend>
-                  {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-                    <label key={day}>
-                      <input
-                        checked={draft.settings.repeatDays.includes(day)}
-                        type="checkbox"
-                        onChange={(event) => setDraft({
-                          ...draft,
-                          settings: {
-                            ...draft.settings,
-                            repeatDays: event.target.checked
-                              ? [...draft.settings.repeatDays, day].sort()
-                              : draft.settings.repeatDays.filter(
-                                  (candidate) => candidate !== day
-                                )
-                          }
-                        })}
-                      />
-                      {["日", "一", "二", "三", "四", "五", "六"][day]}
-                    </label>
-                  ))}
-                </fieldset>
-              </section>
+              <ProfileDraftSettingsSection
+                draft={draft}
+                onDraftChange={setDraft}
+              />
 
-              <section>
-                <h3>頁面順序與時間</h3>
-                <div className="playback-profiles-pages">
-                  {draft.pages.map((page, index) => (
-                    <article key={page.id}>
-                      <label>
-                        <input
-                          checked={page.enabled}
-                          type="checkbox"
-                          onChange={(event) => setDraft({
-                            ...draft,
-                            pages: draft.pages.map((candidate) =>
-                              candidate.id === page.id
-                                ? { ...candidate, enabled: event.target.checked }
-                                : candidate
-                            )
-                          })}
-                        />
-                        {page.labelZh}
-                      </label>
-                      <input
-                        aria-label={`${page.labelZh} 秒數`}
-                        min="1"
-                        type="number"
-                        value={page.durationSeconds}
-                        onChange={(event) => setDraft({
-                          ...draft,
-                          pages: draft.pages.map((candidate) =>
-                            candidate.id === page.id
-                              ? {
-                                  ...candidate,
-                                  durationSeconds: Number(event.target.value)
-                                }
-                              : candidate
-                          )
-                        })}
-                      />
-                      <button
-                        disabled={index === 0}
-                        onClick={() => {
-                          const pages = [...draft.pages];
-                          [pages[index - 1], pages[index]] = [pages[index]!, pages[index - 1]!];
-                          setDraft({
-                            ...draft,
-                            pages: pages.map((candidate, order) => ({
-                              ...candidate,
-                              displayOrder: order + 1
-                            }))
-                          });
-                        }}
-                      >
-                        上移
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              </section>
+              <ProfilePagesSection
+                draft={draft}
+                onDraftChange={setDraft}
+              />
 
-              <div className="playback-profiles-actions">
-                <button
-                  disabled={pending}
-                  onClick={() => void mutate(async () => {
-                    const saved = await profileApi.savePlaybackProfileDraft(selected.id, {
-                      expectedRevision: draft.revision,
-                      pages: draft.pages,
-                      settings: draft.settings
-                    });
-                    setDraft(saved);
-                    setPersistedDraft(saved);
-                    setPreview(null);
-                    setMessage("Draft 已儲存。");
-                  })}
-                >
-                  儲存 Draft
-                </button>
-                <button
-                  disabled={pending || dirty}
-                  title={dirty ? "請先儲存 Draft 再預覽。" : ""}
-                  onClick={() => void mutate(async () => {
-                    setPreview(await profileApi.previewPlaybackProfile(selected.id));
-                  })}
-                >
-                  預覽 CL／KN
-                </button>
-                <button
-                  disabled={pending || dirty || validation !== null}
-                  title={dirty ? "請先儲存 Draft 再發布。" : validation ?? ""}
-                  onClick={() => {
-                    const nextVersion = (versions.at(-1)?.versionNumber ?? 0) + 1;
-                    if (!window.confirm(
-                      buildProfilePublishConfirmation(selected.name, nextVersion)
-                    )) return;
-                    void mutate(async () => {
-                      await profileApi.publishPlaybackProfile(selected.id, draft.revision);
-                      await refreshSelected(selected.id);
-                      setMessage(`Version ${nextVersion} 已發布。`);
-                    });
-                  }}
-                >
-                  發布 Version
-                </button>
-              </div>
-              {dirty && (
-                <p className="playback-profiles-validation">
-                  尚有未儲存變更；請先儲存 Draft，再執行預覽或發布。
-                </p>
-              )}
-              {validation && <p className="playback-profiles-validation">{validation}</p>}
-
-              {preview && <PlaybackProfilePreviewPanel preview={preview} />}
-
-              <section>
-                <h3>版本歷史</h3>
-                <div className="playback-profiles-versions">
-                  {versions.length === 0 && <p>尚未發布版本。</p>}
-                  {[...versions].reverse().map((version) => (
-                    <article key={version.id}>
-                      <div>
-                        <strong>Version {version.versionNumber}</strong>
-                        <small>{version.createdBy} · {version.createdAt}</small>
-                      </div>
-                      <button
-                        disabled={pending}
-                        onClick={() => {
-                          if (!window.confirm(
-                            `確定以 Version ${version.versionNumber} 建立新的 rollback Version？`
-                          )) return;
-                          void mutate(async () => {
-                            await profileApi.rollbackPlaybackProfile(
-                              selected.id,
-                              version.id
-                            );
-                            await refreshSelected(selected.id);
-                          });
-                        }}
-                      >
-                        Rollback
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              </section>
+              <ProfileVersionHistorySection
+                dirty={dirty}
+                onPreview={handlePreview}
+                onPublish={handlePublish}
+                onRollback={handleRollback}
+                onSaveDraft={handleSaveDraft}
+                pending={pending}
+                preview={preview}
+                validation={validation}
+                versions={versions}
+              />
             </>
           )}
         </section>

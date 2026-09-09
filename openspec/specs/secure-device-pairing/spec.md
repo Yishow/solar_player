@@ -29,65 +29,60 @@ A trusted management caller SHALL be able to issue a Pairing Token for an existi
 
 - **WHEN** a thin kiosk opens the issued `/device-pairing#token=<token>` path
 - **THEN** the URL fragment SHALL NOT be sent in the HTTP request, Server log, or Referer
-- **AND** the landing page SHALL clear the fragment before exchanging the token through the same-origin POST endpoint
+- **AND** the client application SHALL render a dedicated standalone setup page at `/device-pairing`
+- **AND** the landing page SHALL clear the fragment from the browser address bar before exchanging the token through the same-origin POST endpoint
 - **AND** a successful exchange SHALL redirect the Browser to `/overview`
+
+#### Scenario: Open the pairing path without fragment token
+
+- **WHEN** a browser opens `/device-pairing` without a fragment token
+- **THEN** the page SHALL query `/api/device-pairing/status` to determine whether the device is already paired
+- **AND** when already paired, the page SHALL display the paired device identity and a navigation control to `/overview`
+- **AND** when unpaired, the page SHALL display a modern manual token input interface that does not require a management password
+- **AND** submitting a valid token SHALL trigger the exchange and redirect the Browser to `/overview`
+
+#### Scenario: Pairing token exchange fails
+
+- **WHEN** an exchange fails due to an expired, used, or invalid token
+- **THEN** the page SHALL display a localized error message explaining the failure reason
+- **AND** the page SHALL allow the operator to retry or paste a new token without leaving `/device-pairing`
 
 
 <!-- @trace
-source: secure-device-pairing
-updated: 2026-07-30
+source: device-pairing-page
+updated: 2026-09-10
 code:
-  - apps/server/src/services/playbackProfileService.ts
-  - packages/shared/src/deviceIdentity.ts
-  - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
-  - apps/server/src/routes/device-groups.ts
-  - apps/server/src/services/deviceCredentialService.ts
-  - docs/runbooks/pi-thin-kiosk-deploy.md
-  - packages/shared/src/deviceIdentity.contract.ts
-  - .env.example
-  - packages/shared/src/devicePairing.ts
-  - apps/server/src/services/playbackRuntimePolicyService.ts
-  - docs/ops/conventions.md
-  - docs/architecture/default-playback-profile.md
-  - deploy/install-thin-kiosk.sh
+  - apps/web/src/pages/DeviceFleet/PairingDialog.tsx
   - apps/server/src/routes/device-pairing.ts
-  - docs/ops/delegation.md
-  - docs/ops/dispatch.md
-  - apps/server/src/db/seed.ts
-  - .scratch/device-scoped-multisite-playback/spec.md
-  - apps/server/src/services/displayRotationService.ts
-  - apps/server/src/app.ts
-  - AGENTS.md
-  - apps/server/src/db/migrations/029_device_group_management.sql
-  - CLAUDE.md
-  - apps/server/src/routes/devices.ts
-  - docs/agents/issue-tracker.md
-  - deploy/verify-thin-kiosk.sh
-  - scripts/deploy.test.mjs
-  - apps/server/src/db/migrations/030_device_pairing_credentials.sql
-  - packages/shared/src/index.ts
-  - apps/server/src/services/deviceGroupService.ts
-  - docs/ops/maintenance.md
-  - apps/server/src/config.ts
-  - .github/workflows/agent-source-artifact.yml
-  - apps/server/src/db/migrations/028_global_playback_runtime_policy.sql
-  - docs/ops/workflow.md
-  - docs/ops/judgment.md
-  - apps/server/src/testing/defaultPlaybackProfileTestSupport.ts
+  - apps/web/src/pages/PlaybackProfiles/ProfileDraftSettingsSection.tsx
+  - apps/web/src/pages/DeviceFleet/deviceFleetTable.css
+  - apps/web/src/pages/DeviceFleet/DeviceFleetContent.tsx
+  - apps/web/src/components/AppFooterNav.tsx
+  - apps/web/src/pages/DevicePairing/index.tsx
+  - apps/web/src/pages/DeviceFleet/DeviceEditDialog.tsx
+  - apps/web/src/pages/PlaybackProfiles/ProfileListSidebar.tsx
+  - apps/web/src/pages/DeviceFleet/GroupListSection.tsx
+  - apps/web/src/pages/DeviceFleet/DeviceCreateSection.tsx
+  - apps/web/src/pages/DeviceFleet/FleetKpiBar.tsx
+  - apps/web/src/pages/DevicePairing/viewModel.ts
+  - apps/web/src/pages/DeviceFleet/deviceFleetDialog.css
+  - apps/web/src/pages/PlaybackProfiles/playbackProfiles.css
+  - apps/web/src/pages/DeviceFleet/index.tsx
+  - apps/web/src/app/routeMeta.ts
+  - apps/web/src/app/router.tsx
+  - apps/web/src/pages/PlaybackProfiles/PlaybackProfilesContent.tsx
+  - apps/web/src/pages/PlaybackProfiles/ProfileVersionHistorySection.tsx
+  - apps/web/src/pages/DeviceFleet/GroupEditDialog.tsx
+  - apps/web/src/styles/management.css
+  - apps/web/src/pages/DeviceFleet/DeviceTableSection.tsx
+  - apps/web/src/pages/PlaybackProfiles/ProfilePagesSection.tsx
+  - apps/web/src/pages/DeviceFleet/deviceFleet.css
 tests:
-  - apps/server/src/services/displayPageRegistryService.test.ts
-  - apps/server/src/logger.test.ts
-  - apps/server/src/services/playbackRuntimePolicyService.test.ts
-  - apps/server/src/routes/sustainability-story.test.ts
-  - apps/server/src/services/householdEquivalenceService.test.ts
-  - apps/server/src/db/seedPersistence.test.ts
-  - apps/server/src/services/playbackProfileService.test.ts
-  - apps/server/src/routes/defaultPlaybackProfileCompatibility.test.ts
-  - apps/server/src/routes/display-card-data.test.ts
+  - apps/web/src/pages/DevicePairing/viewModel.test.ts
   - apps/server/src/routes/device-pairing.test.ts
-  - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/server/src/db/defaultPlaybackProfileMigration.test.ts
-  - apps/server/src/routes/device-group-management.test.ts
+  - apps/web/src/pages/DeviceFleet/index.test.tsx
+  - apps/web/src/pages/DevicePairing/index.test.tsx
+  - apps/web/src/components/shellFoundation.test.ts
 -->
 
 ---

@@ -137,7 +137,7 @@ function assertCredentialError(
   );
 }
 
-test("management receives a fragment-only pairing path backed by a no-store landing page", async () => {
+test("management receives a fragment-only pairing path targeting the SPA pairing page", async () => {
   const app = await buildApp();
 
   try {
@@ -155,24 +155,10 @@ test("management receives a fragment-only pairing path backed by a no-store land
       `/device-pairing#token=${encodeURIComponent(issue.token)}`
     );
 
-    const landingResponse = await app.inject({
-      headers: { accept: "text/html" },
-      method: "GET",
-      url: "/device-pairing"
-    });
-    assert.equal(landingResponse.statusCode, 200);
-    assert.match(landingResponse.headers["content-type"] ?? "", /^text\/html/u);
-    assert.equal(landingResponse.headers["cache-control"], "no-store");
-    assert.equal(landingResponse.headers["referrer-policy"], "no-referrer");
-    assert.match(
-      landingResponse.headers["content-security-policy"] ?? "",
-      /script-src 'nonce-[^']+';.*frame-ancestors 'none'/u
-    );
-    assert.match(landingResponse.body, /window\.location\.hash/u);
-    assert.match(landingResponse.body, /history\.replaceState/u);
-    assert.match(landingResponse.body, /\/api\/device-pairing\/exchange/u);
-    assert.match(landingResponse.body, /window\.location\.replace\("\/overview"\)/u);
-    assert.equal(landingResponse.body.includes(issue.token), false);
+    const exchangeResponse = await exchangeToken(app, issue.token);
+    assert.equal(exchangeResponse.statusCode, 204);
+    const cookie = readCredentialCookie(exchangeResponse);
+    assert.ok(cookie.value);
   } finally {
     await app.close();
   }

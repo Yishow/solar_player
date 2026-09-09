@@ -548,6 +548,8 @@
 
 /* === Shared Select Dropdown === */
 .mgmt-select,
+.device-fleet-page select,
+.device-fleet-dialog select,
 .cs-page .cs-select,
 .image-mgmt-page .im-select,
 .mqtt-settings-page .mqtt-weather-card__field select {
@@ -571,6 +573,8 @@
 }
 
 .mgmt-select:hover,
+.device-fleet-page select:hover,
+.device-fleet-dialog select:hover,
 .cs-page .cs-select:hover,
 .image-mgmt-page .im-select:hover,
 .mqtt-settings-page .mqtt-weather-card__field select:hover {
@@ -579,6 +583,8 @@
 }
 
 .mgmt-select:focus,
+.device-fleet-page select:focus,
+.device-fleet-dialog select:focus,
 .cs-page .cs-select:focus,
 .image-mgmt-page .im-select:focus,
 .mqtt-settings-page .mqtt-weather-card__field select:focus {
@@ -588,6 +594,8 @@
 }
 
 .mgmt-select:disabled,
+.device-fleet-page select:disabled,
+.device-fleet-dialog select:disabled,
 .cs-page .cs-select:disabled,
 .image-mgmt-page .im-select:disabled,
 .mqtt-settings-page .mqtt-weather-card__field select:disabled {
@@ -789,7 +797,12 @@
 }
 
 /* === Shared Input Fields === */
-.mgmt-input {
+.mgmt-input,
+.device-fleet-page input[type="text"],
+.device-fleet-page input[type="search"],
+.device-fleet-page input:not([type]),
+.device-fleet-dialog input[type="text"],
+.device-fleet-dialog input:not([type]) {
   height: 38px;
   border: 1px solid rgba(93, 119, 69, 0.22);
   border-radius: 8px;
@@ -802,22 +815,36 @@
   transition: all 0.2s ease;
 }
 
-.mgmt-input::placeholder {
+.mgmt-input::placeholder,
+.device-fleet-page input::placeholder,
+.device-fleet-dialog input::placeholder {
   color: #a0a59f;
 }
 
-.mgmt-input:hover:not(:disabled) {
+.mgmt-input:hover:not(:disabled),
+.device-fleet-page input[type="text"]:hover:not(:disabled),
+.device-fleet-page input[type="search"]:hover:not(:disabled),
+.device-fleet-page input:not([type]):hover:not(:disabled),
+.device-fleet-dialog input[type="text"]:hover:not(:disabled),
+.device-fleet-dialog input:not([type]):hover:not(:disabled) {
   border-color: rgba(93, 119, 69, 0.4);
   background-color: #fbfbfa;
 }
 
-.mgmt-input:focus:not(:disabled) {
+.mgmt-input:focus:not(:disabled),
+.device-fleet-page input[type="text"]:focus:not(:disabled),
+.device-fleet-page input[type="search"]:focus:not(:disabled),
+.device-fleet-page input:not([type]):focus:not(:disabled),
+.device-fleet-dialog input[type="text"]:focus:not(:disabled),
+.device-fleet-dialog input:not([type]):focus:not(:disabled) {
   border-color: #5d7745;
   box-shadow: 0 0 0 3px rgba(93, 119, 69, 0.12);
   background-color: #fff;
 }
 
-.mgmt-input:disabled {
+.mgmt-input:disabled,
+.device-fleet-page input:disabled,
+.device-fleet-dialog input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }

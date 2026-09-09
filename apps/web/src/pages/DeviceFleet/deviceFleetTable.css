@@ -1,0 +1,191 @@
+/* Fleet Table & Toolbar Styles */
+.device-fleet-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ops-surface-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+  margin-top: 6px;
+}
+
+.fleet-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.fleet-table th {
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-strong);
+  background: var(--stage-bg);
+  border-bottom: 1px solid var(--ops-surface-border);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fleet-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ops-surface-border);
+  font-size: 13px;
+  vertical-align: middle;
+  color: var(--ink);
+}
+
+.fleet-table tr:last-child td {
+  border-bottom: none;
+}
+
+.fleet-table tr:hover td {
+  background: rgba(82, 91, 66, 0.03);
+}
+
+.fleet-device-identity strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-strong);
+}
+
+.fleet-device-client-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 3px;
+}
+
+.fleet-group-cell strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-strong);
+}
+
+.fleet-site-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 4px;
+  margin-top: 3px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.fleet-site-pill--cl {
+  background: rgba(77, 119, 63, 0.15);
+  color: var(--color-brand-green-800);
+}
+
+.fleet-site-pill--kn {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+}
+
+.fleet-status-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fleet-connection-count {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.fleet-playback-diag strong,
+.fleet-rollout-cell strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-strong);
+}
+
+.fleet-playback-diag small,
+.fleet-rollout-cell small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.fleet-last-seen {
+  cursor: help;
+}
+
+.fleet-relative-time {
+  font-weight: 600;
+  color: var(--color-brand-green-800);
+}
+
+.fleet-exact-time {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.fleet-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 210px;
+}
+
+.fleet-active-filter-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(82, 91, 66, 0.06);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ink-strong);
+  margin-top: 8px;
+}
+
+.fleet-active-filter-tag {
+  font-weight: 700;
+  color: var(--color-brand-green-800);
+}
+
+.fleet-active-filter-clear {
+  background: none;
+  border: none;
+  color: #c14a4a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.fleet-active-filter-clear:hover {
+  text-decoration: underline;
+}
+
+.fleet-empty-card {
+  text-align: center;
+  padding: 36px 20px;
+  border: 1px dashed var(--ops-surface-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  margin-top: 10px;
+}
+
+.fleet-empty-card p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 6px 0 14px;
+}
+
+.fleet-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}

@@ -96,23 +96,34 @@ export function PairingDialog({
             <p>此連結只在本次建立後顯示；關閉視窗即從畫面記憶體清除。</p>
             <code>{issue.pairingPath}</code>
             <small>到期：{issue.expiresAt}</small>
-            <button
-              type="button"
-              data-action="copy-pairing"
-              onClick={() => void copyPairingPath()}
-            >
-              {copied ? "已複製" : "複製連結"}
-            </button>
-            <button
-              type="button"
-              data-action="close-pairing"
-              onClick={() => {
-                setCopied(false);
-                onClose();
-              }}
-            >
-              關閉並清除
-            </button>
+            <div className="device-fleet-dialog__actions">
+              <a
+                className="device-fleet-dialog__link-button"
+                data-action="open-pairing"
+                href={issue.pairingPath}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                在新分頁開啟配對
+              </a>
+              <button
+                type="button"
+                data-action="copy-pairing"
+                onClick={() => void copyPairingPath()}
+              >
+                {copied ? "已複製" : "複製連結"}
+              </button>
+              <button
+                type="button"
+                data-action="close-pairing"
+                onClick={() => {
+                  setCopied(false);
+                  onClose();
+                }}
+              >
+                關閉並清除
+              </button>
+            </div>
           </>
         ) : (
           <div className="device-fleet-dialog__actions">

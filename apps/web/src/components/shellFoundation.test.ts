@@ -446,6 +446,7 @@ test("settings footer keeps overview return plus Data Hub management routes only
     "圖片管理",
     "迴路設定",
     "裝置狀態",
+    "裝置管理",
     "品牌",
     "展示編輯",
     "預覽"

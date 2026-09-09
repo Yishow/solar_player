@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { DeviceGroup } from "@solar-display/shared";
 import {
   createDeviceGroup,
@@ -27,6 +28,9 @@ import {
   type PairingDialogState
 } from "./viewModel";
 import "./deviceFleet.css";
+import "./deviceFleetTable.css";
+import "./deviceFleetDialog.css";
+import "../PlaybackProfiles/playbackProfiles.css";
 
 export function DeviceFleet() {
   const initialRouteModel = readDeviceFleetRouteModel();
@@ -123,11 +127,29 @@ export function DeviceFleet() {
     [filter, model]
   );
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "profiles" ? "profiles" : "devices";
+
+  const handleTabChange = (tab: "devices" | "profiles") => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === "profiles") {
+          next.set("tab", "profiles");
+        } else {
+          next.delete("tab");
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
   return (
     <DeviceFleetContent
       accessDenied={model.accessDenied}
+      activeTab={activeTab}
       filter={filter}
-      profiles={model.profiles}
       model={viewModel}
       mutationError={mutationError}
       mutationPending={mutationPending}
@@ -135,6 +157,8 @@ export function DeviceFleet() {
         setPairingPreparation(null);
         setPairing((current) => closePairingDialog(current));
       }}
+      onTabChange={handleTabChange}
+      profiles={model.profiles}
       onCreateDevice={async (input) => {
         const result = await mutate(() => createFleetDevice(input), ["devices"]);
         return result !== undefined;

@@ -255,8 +255,8 @@ export const routeMetaList: RouteMeta[] = [
   {
     path: "/device-fleet",
     navLabel: "裝置管理",
-    title: "裝置與群組",
-    subtitle: "Device Fleet",
+    title: "裝置管理",
+    subtitle: "Device Management",
     group: "management",
     order: 20,
     shellDensity: "management"

@@ -1,5 +1,4 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
-import { randomBytes } from "node:crypto";
 import {
   authenticateDeviceCredential,
   DeviceCredentialServiceError,
@@ -103,84 +102,7 @@ function readDeviceCredentialCookie(cookieHeader: string | undefined) {
   return value;
 }
 
-function createPairingLandingPage(nonce: string) {
-  return `<!doctype html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Solar Player 裝置配對</title>
-</head>
-<body>
-  <main>
-    <h1>Solar Player 裝置配對</h1>
-    <p id="status">請貼上一次性 Pairing Token。</p>
-    <form id="pairing-form">
-      <label for="pairing-token">Pairing Token</label>
-      <input id="pairing-token" name="token" type="password" autocomplete="off" required>
-      <button type="submit">配對</button>
-    </form>
-  </main>
-  <script nonce="${nonce}">
-    const form = document.querySelector("#pairing-form");
-    const input = document.querySelector("#pairing-token");
-    const status = document.querySelector("#status");
-
-    async function exchange(token) {
-      history.replaceState(null, "", "/device-pairing");
-      status.textContent = "配對中…";
-      form.hidden = true;
-
-      const response = await fetch("/api/device-pairing/exchange", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token })
-      });
-
-      if (response.status === 204) {
-        window.location.replace("/overview");
-        return;
-      }
-
-      let code = "pairing_failed";
-      try {
-        const body = await response.json();
-        if (typeof body.code === "string") code = body.code;
-      } catch {}
-      status.textContent = "配對失敗：" + code;
-      form.hidden = false;
-    }
-
-    const fragment = new URLSearchParams(window.location.hash.slice(1));
-    const fragmentToken = fragment.get("token");
-    if (fragmentToken) void exchange(fragmentToken);
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const token = input.value;
-      input.value = "";
-      void exchange(token);
-    });
-  </script>
-</body>
-</html>`;
-}
-
 const devicePairingRoute: FastifyPluginAsync = async (app) => {
-  app.get("/device-pairing", async (_request, reply) => {
-    const nonce = randomBytes(16).toString("base64");
-    return reply
-      .header("cache-control", "no-store")
-      .header("referrer-policy", "no-referrer")
-      .header("x-content-type-options", "nosniff")
-      .header(
-        "content-security-policy",
-        `default-src 'none'; script-src 'nonce-${nonce}'; connect-src 'self'; style-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`
-      )
-      .type("text/html; charset=utf-8")
-      .send(createPairingLandingPage(nonce));
-  });
-
   app.post<{ Params: { id: string } }>(
     "/api/devices/:id/pairing-tokens",
     async (request, reply) => {

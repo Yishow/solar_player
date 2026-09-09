@@ -748,6 +748,13 @@ test("DeviceFleetContent clears one-time plaintext when the pairing dialog close
     });
     assert.equal(copiedText, "/device-pairing?token=plain-token");
 
+    const openLink = dom.window.document.querySelector<HTMLAnchorElement>(
+      "[data-action=\"open-pairing\"]"
+    )!;
+    assert.ok(openLink);
+    assert.equal(openLink.getAttribute("href"), "/device-pairing?token=plain-token");
+    assert.equal(openLink.target, "_blank");
+
     await act(async () => {
       close.click();
     });
@@ -810,3 +817,159 @@ test("DeviceFleetContent shows access guidance without mutation controls after t
   assert.match(html, /重新驗證/);
   assert.doesNotMatch(html, /新增群組|新增裝置|配對|重新配對|>編輯<|>停用</);
 });
+
+test("DeviceFleetContent switches distinctly between hardware and playback profile governance tabs", async () => {
+  const dom = new JSDOM(
+    "<!doctype html><html><body><div id=\"root\"></div></body></html>",
+    { url: "http://127.0.0.1/", pretendToBeVisual: true }
+  );
+  Object.defineProperty(globalThis, "window", { configurable: true, value: dom.window });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: dom.window.document });
+  Object.defineProperty(globalThis, "HTMLElement", { configurable: true, value: dom.window.HTMLElement });
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+  let root: Root | null = null;
+  try {
+    root = await createTestRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(<DeviceFleetContent {...createProps({ profiles: [defaultPlaybackProfile] })} />);
+    });
+
+    const tabs = [...dom.window.document.querySelectorAll<HTMLButtonElement>(".device-mgmt-tab")];
+    assert.equal(tabs.length, 2);
+    assert.match(tabs[0]!.textContent ?? "", /實體看板與群組/);
+    assert.match(tabs[1]!.textContent ?? "", /播放策略版本/);
+
+    // Initial state shows devices
+    assert.ok(dom.window.document.querySelector(".fleet-table"));
+
+    // Click profiles tab
+    await act(async () => {
+      tabs[1]!.click();
+    });
+
+    assert.ok(dom.window.document.querySelector(".device-mgmt-profiles-panel"));
+    assert.equal(dom.window.document.querySelector(".fleet-table"), null);
+
+    // Click back to devices tab
+    await act(async () => {
+      tabs[0]!.click();
+    });
+
+    assert.ok(dom.window.document.querySelector(".fleet-table"));
+    assert.equal(dom.window.document.querySelector(".device-mgmt-profiles-panel"), null);
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test("DeviceFleetContent interacts with KPI filter cards to filter rows and clear filters", async () => {
+  const dom = new JSDOM(
+    "<!doctype html><html><body><div id=\"root\"></div></body></html>",
+    { url: "http://127.0.0.1/", pretendToBeVisual: true }
+  );
+  Object.defineProperty(globalThis, "window", { configurable: true, value: dom.window });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: dom.window.document });
+  Object.defineProperty(globalThis, "HTMLElement", { configurable: true, value: dom.window.HTMLElement });
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+  let root: Root | null = null;
+
+  try {
+    const rowOnline = { ...row, id: 1, key: 1, operationalState: "online" as const, paired: true };
+    const rowUnpaired = { ...row, id: 2, key: 2, operationalState: "unpaired" as const, paired: false, enabled: true };
+    root = await createTestRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(
+        <DeviceFleetContent
+          {...createProps({
+            model: {
+              groups: [activeKnGroup],
+              rolloutSummary: { applied: 1, failed: 0, offline: 0, total: 2, waiting: 1 },
+              rows: [rowOnline, rowUnpaired],
+              state: "ready" as const,
+              unavailable: []
+            }
+          })}
+        />
+      );
+    });
+
+    const kpiCards = [...dom.window.document.querySelectorAll<HTMLElement>(".fleet-kpi-card")];
+    assert.equal(kpiCards.length, 4);
+
+    // Initial table has 2 rows
+    assert.equal(dom.window.document.querySelectorAll(".fleet-table tbody tr").length, 2);
+
+    // Click "在線正常" card (index 1)
+    await act(async () => {
+      kpiCards[1]!.click();
+    });
+
+    // Should filter to 1 online row and show active filter banner
+    assert.equal(dom.window.document.querySelectorAll(".fleet-table tbody tr").length, 1);
+    assert.ok(dom.window.document.querySelector(".fleet-active-filter-banner"));
+
+    // Click clear button
+    const clearBtn = dom.window.document.querySelector<HTMLButtonElement>(".fleet-active-filter-clear");
+    assert.ok(clearBtn);
+    await act(async () => {
+      clearBtn!.click();
+    });
+
+    // Restores to 2 rows
+    assert.equal(dom.window.document.querySelectorAll(".fleet-table tbody tr").length, 2);
+    assert.equal(dom.window.document.querySelector(".fleet-active-filter-banner"), null);
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test("DeviceFleetContent supports external activeTab and notifies onTabChange", async () => {
+  const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+    url: "http://localhost/"
+  });
+  let root: Root | null = null;
+  const tabChanges: string[] = [];
+
+  try {
+    root = await createTestRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(
+        <DeviceFleetContent
+          {...createProps({
+            activeTab: "profiles",
+            onTabChange: (tab: "devices" | "profiles") => tabChanges.push(tab),
+            profiles: [defaultPlaybackProfile]
+          })}
+        />
+      );
+    });
+
+    // Profile panel should be rendered
+    assert.ok(dom.window.document.querySelector(".playback-profiles-page"));
+    const tabs = [...dom.window.document.querySelectorAll<HTMLButtonElement>(".device-mgmt-tab")];
+    assert.equal(tabs.length, 2);
+    assert.equal(tabs[1]!.getAttribute("aria-selected"), "true");
+
+    // Click devices tab
+    await act(async () => {
+      tabs[0]!.click();
+    });
+
+    assert.deepEqual(tabChanges, ["devices"]);
+  } finally {
+    await act(async () => {
+      root?.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+

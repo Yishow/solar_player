@@ -78,6 +78,7 @@ export function GroupEditDialog({
           <label>
             群組名稱
             <input
+              className="mgmt-input"
               data-field="group-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -87,6 +88,7 @@ export function GroupEditDialog({
           <label>
             廠區
             <select
+              className="mgmt-select"
               data-field="group-site-scope"
               value={siteScope}
               onChange={(event) => setSiteScope(event.target.value as "cl" | "kn")}
@@ -99,6 +101,7 @@ export function GroupEditDialog({
           <label>
             Playback Profile
             <select
+              className="mgmt-select"
               data-field="group-playback-profile"
               value={playbackProfileId}
               onChange={(event) => setPlaybackProfileId(event.target.value)}
@@ -112,13 +115,14 @@ export function GroupEditDialog({
               ))}
             </select>
           </label>
-          <label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
             <input
               data-field="group-enabled"
               type="checkbox"
               checked={enabled}
               onChange={(event) => setEnabled(event.target.checked)}
               disabled={mutationPending}
+              style={{ width: 18, height: 18, accentColor: "var(--green)" }}
             />
             啟用群組
           </label>

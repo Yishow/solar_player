@@ -55,6 +55,13 @@ export const router = createBrowserRouter([
     element: <Navigate to="/overview" replace />
   },
   {
+    path: "device-pairing",
+    lazy: async () => {
+      const { DevicePairing } = await import("../pages/DevicePairing");
+      return { Component: DevicePairing };
+    }
+  },
+  {
     element: <LayoutShellRoute />,
     loader: loadShellBootstrap,
     hydrateFallbackElement: <></>,

@@ -1,0 +1,146 @@
+/* Device Fleet — Modal & Dialog Styles */
+
+.device-fleet-dialog-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(32, 36, 38, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.device-fleet-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(640px, 100%);
+  padding: 28px;
+  background: var(--ops-surface-bg);
+  border: 1px solid var(--workspace-surface-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), var(--shadow-card);
+}
+
+.device-fleet-dialog small {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--green);
+  text-transform: uppercase;
+}
+
+.device-fleet-dialog h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink-strong);
+  margin: 0;
+}
+
+.device-fleet-dialog dl {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: var(--stage-bg);
+  border: 1px solid var(--ops-surface-border);
+  margin: 0;
+}
+
+.device-fleet-dialog dt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.device-fleet-dialog dd {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-strong);
+  margin: 0;
+}
+
+.device-fleet-dialog code {
+  font-family: monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--ops-surface-border);
+  border-radius: 8px;
+}
+
+.device-fleet-dialog__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+  grid-column: 1 / -1;
+  margin-top: 8px;
+}
+
+.device-fleet-dialog__actions button {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-family-zh);
+  cursor: pointer;
+  border: 1px solid var(--workspace-surface-border);
+  background: #fff;
+  color: var(--ink);
+  transition: all 0.15s ease;
+}
+
+.device-fleet-dialog__actions button:hover:not(:disabled) {
+  background: #fbfbfa;
+  border-color: var(--muted);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(55, 50, 38, 0.1);
+}
+
+.device-fleet-dialog__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.device-fleet-dialog__actions button[type="submit"],
+.device-fleet-dialog__actions button[data-action="confirm-pairing"],
+.device-fleet-dialog__actions button[data-action="save-device-edit"],
+.device-fleet-dialog__actions button[data-action="save-group-edit"] {
+  background: linear-gradient(135deg, var(--color-brand-green-600), var(--color-brand-green-700));
+  color: #fff;
+  border: 1px solid var(--color-brand-green-800);
+  box-shadow: 0 2px 6px rgba(77, 119, 63, 0.22);
+}
+
+.device-fleet-dialog__link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--color-brand-green-600), var(--color-brand-green-700));
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: var(--font-family-zh);
+  border: 1px solid var(--color-brand-green-800);
+  box-shadow: 0 2px 6px rgba(77, 119, 63, 0.22);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.device-fleet-dialog__link-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(77, 119, 63, 0.32);
+}
