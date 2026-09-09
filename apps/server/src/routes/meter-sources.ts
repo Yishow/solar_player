@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { validateMeterSourceWrite, type MeterSourceDefinition } from "@solar-display/shared";
 import { assertDestructiveSourceMutationAllowed } from "../services/sourceImpactService.js";
 import { getDatabase } from "../db/index.js";
+import { listEnabledGenericTopics } from "../mqtt/MqttClientService.js";
 import { getMeterSource, listMeterSources, saveMeterSource, syncSourceTopicMapping } from "../services/meterSourceCatalogService.js";
 
 function failure(error: string, fields?: string[]) {
@@ -10,6 +11,31 @@ function failure(error: string, fields?: string[]) {
 }
 
 const meterSourcesRoute: FastifyPluginAsync<{ database?: Database.Database }> = async (app, options) => {
+  let runtimeReconciliationTail = Promise.resolve();
+  const reconcileCommittedSubscriptions = (database: Database.Database, context: {
+    channelId: string;
+    operation: "POST" | "PUT" | "DELETE";
+    scope: "cl" | "kn";
+  }) => {
+    const reconciliation = runtimeReconciliationTail.then(async () => {
+      try {
+        await app.mqttClientService.subscribe(listEnabledGenericTopics(database));
+      } catch {
+        app.log.warn(
+          {
+            channelId: context.channelId,
+            errorCode: "BROKER_SUBSCRIBE_REFUSED",
+            operation: context.operation,
+            scope: context.scope
+          },
+          "MQTT source subscription reconciliation failed"
+        );
+      }
+    });
+    runtimeReconciliationTail = reconciliation.catch(() => undefined);
+    return reconciliation;
+  };
+
   app.addHook("onRequest", async (request, reply) => {
     const allowed = request.method === "GET" || request.method === "HEAD"
       ? app.managementAccess.isTrustedManagementReadRequest(request)
@@ -60,6 +86,11 @@ const meterSourcesRoute: FastifyPluginAsync<{ database?: Database.Database }> = 
           syncSourceTopicMapping(database, scope, saved, previous?.metricKey);
           return saved;
         }).immediate();
+        await reconcileCommittedSubscriptions(database, {
+          channelId: source.channelId,
+          operation: method,
+          scope
+        });
         return reply.code(method === "POST" ? 201 : 200).send({ source });
       } catch (error: unknown) {
         const known = error as { code?: string; fields?: string[]; statusCode?: number };

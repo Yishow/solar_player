@@ -4,6 +4,7 @@ import test from "node:test";
 import Database from "better-sqlite3";
 import Fastify from "fastify";
 import { migrateScopedMetricIdentity } from "../db/scopedMetricMigration.js";
+import type { MqttClientService } from "../mqtt/MqttClientService.js";
 import { createManagementAccessControl } from "../plugins/managementAuth.js";
 import { readMetricUsage } from "../services/metricUsageService.js";
 import { readSourceImpact } from "../services/sourceImpactService.js";
@@ -16,6 +17,10 @@ const source = {
   sourceTimestampTimeZone: null, timestampPolicy: "source-required"
 };
 
+const noopMqttClientService = {
+  subscribe: async (_topics: string[]) => undefined
+} as unknown as MqttClientService;
+
 test("source CRUD enforces management access, scope, validation and retained history", async () => {
   const database = new Database(":memory:");
   for (const file of readdirSync("src/db/migrations").filter(f => f.endsWith(".sql")).sort()) {
@@ -24,6 +29,7 @@ test("source CRUD enforces management access, scope, validation and retained his
   }
   const app = Fastify();
   app.decorate("managementAccess", createManagementAccessControl({ managementAccessToken: "secret", trustedOrigins: [] }));
+  app.decorate("mqttClientService", noopMqttClientService);
   await app.register(meterSourcesRoute, { database });
   const url = "/api/data-hub/sites/cl/meter-sources";
   const headers = { "x-solar-management-token": "secret" };
@@ -88,6 +94,7 @@ function migratedDatabase() {
 async function managementApp(database: Database.Database) {
   const app = Fastify();
   app.decorate("managementAccess", createManagementAccessControl({ managementAccessToken: "secret", trustedOrigins: [] }));
+  app.decorate("mqttClientService", noopMqttClientService);
   await app.register(meterSourcesRoute, { database });
   return app;
 }
