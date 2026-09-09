@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { MeterSourceDefinition } from "@solar-display/shared";
+import type { DerivedMetricDefinition, MeterSourceDefinition } from "@solar-display/shared";
+import { saveDerivedMetricDefinition } from "../services/derivedMetricRegistryService.js";
 import { buildApp, getDatabase } from "./display-pages-asset-governance.test-support.js";
 
 const source: MeterSourceDefinition = {
@@ -36,6 +37,8 @@ const directUrl = "/api/data-hub/sites/cl/meter-sources";
 const guidedPreviewUrl = "/api/data-hub/mqtt-mappings/preview";
 const guidedApplyUrl = "/api/data-hub/mqtt-mappings/apply";
 
+type GuidedPreviewBody = { canonicalDraft: typeof guidedDraft; previewToken: string };
+
 function writeDraft(configJson: string, pageKey = "source-impact-route-draft") {
   getDatabase().prepare(`
     INSERT INTO display_page_stage_configs (page_key, stage, config_json, version, updated_at)
@@ -62,25 +65,72 @@ function runtimeRecorder(app: Awaited<ReturnType<typeof buildApp>>) {
   return { subscribeCalls };
 }
 
+function ensureDerivedInputMapping(scope: "cl" | "kn" | "global", metricKey = source.metricKey) {
+  getDatabase().prepare(`
+    INSERT OR IGNORE INTO topic_mappings (metric_scope, metric_key, topic, unit, enabled)
+    VALUES (?, ?, ?, 'kWh', 1)
+  `).run(scope, metricKey, `source-impact/derived/${scope}`);
+}
+
+function registerDerivedDependency(
+  metricKey: string,
+  inputScope: "cl" | "kn" | "global" | "output-site",
+  siteScopes?: Array<"cl" | "kn">
+) {
+  const scopes = inputScope === "output-site" ? siteScopes ?? ["cl", "kn"] : [inputScope];
+  for (const scope of scopes) ensureDerivedInputMapping(scope, source.metricKey);
+  const definition: DerivedMetricDefinition = {
+    description: "source impact route test definition",
+    enabled: true,
+    expression: "source * 2",
+    fallbackPolicy: "unavailable",
+    inputs: [{ alias: "source", kind: "metric", metricKey: source.metricKey, scope: inputScope, unit: "kWh" }],
+    managed: false,
+    metricKey,
+    name: metricKey,
+    outputScopePolicy: "site",
+    outputUnit: "kWh",
+    precision: 1,
+    revision: 0,
+    ...(siteScopes ? { siteScopes } : {})
+  };
+  saveDerivedMetricDefinition(definition, getDatabase());
+}
+
+async function previewGuided(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  draft: typeof guidedDraft = guidedDraft
+) {
+  const preview = await app.inject({ method: "POST", url: guidedPreviewUrl, payload: draft });
+  assert.equal(preview.statusCode, 200, preview.body);
+  return preview.json() as GuidedPreviewBody;
+}
+
+async function submitGuidedApply(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  idempotencyKey: string,
+  draft: typeof guidedDraft,
+  preview: GuidedPreviewBody
+) {
+  return app.inject({
+    method: "POST",
+    url: guidedApplyUrl,
+    payload: {
+      canonicalDraft: preview.canonicalDraft,
+      idempotencyKey,
+      meterId: draft.source.meterId,
+      previewToken: preview.previewToken,
+      source: draft.source
+    }
+  });
+}
+
 async function applyGuided(
   app: Awaited<ReturnType<typeof buildApp>>,
   idempotencyKey: string,
   draft: typeof guidedDraft = guidedDraft
 ) {
-  const preview = await app.inject({ method: "POST", url: guidedPreviewUrl, payload: draft });
-  assert.equal(preview.statusCode, 200, preview.body);
-  const body = preview.json() as { canonicalDraft: typeof guidedDraft; previewToken: string };
-  const applied = await app.inject({
-    method: "POST",
-    url: guidedApplyUrl,
-    payload: {
-      canonicalDraft: body.canonicalDraft,
-      idempotencyKey,
-      meterId: draft.source.meterId,
-      previewToken: body.previewToken,
-      source: draft.source
-    }
-  });
+  const applied = await submitGuidedApply(app, idempotencyKey, draft, await previewGuided(app, draft));
   assert.equal(applied.statusCode, 200, applied.body);
   return applied;
 }
@@ -188,6 +238,102 @@ test("direct source mutation permits a different explicit scope with the same ke
   }
 });
 
+test("direct source mutation permits a disable when only another scope has a derived dependency", async () => {
+  const app = await buildApp();
+  const runtime = runtimeRecorder(app);
+  try {
+    const created = await app.inject({ method: "POST", url: directUrl, payload: { source, reason: "register" } });
+    assert.equal(created.statusCode, 201, created.body);
+    registerDerivedDependency("custom.directCrossScopeDisable", "kn");
+
+    const removed = await app.inject({
+      method: "DELETE",
+      url: `${directUrl}/${source.channelId}`,
+      payload: { expectedRevision: source.sourceRevision, reason: "retire" }
+    });
+    assert.equal(removed.statusCode, 200, removed.body);
+    assert.equal(removed.json().source.enabled, false);
+    assert.equal(runtime.subscribeCalls.length, 2, "an accepted direct mutation reconciles the committed runtime state");
+  } finally {
+    await app.close();
+  }
+});
+
+test("direct source mutation rejects a disable with a same-scope derived dependency without writes", async () => {
+  const app = await buildApp();
+  const runtime = runtimeRecorder(app);
+  try {
+    const created = await app.inject({ method: "POST", url: directUrl, payload: { source, reason: "register" } });
+    assert.equal(created.statusCode, 201, created.body);
+    registerDerivedDependency("custom.directSameScopeDisable", "cl");
+    const before = committedWrites();
+    const callsBefore = runtime.subscribeCalls.length;
+    const activeBefore = app.mqttClientService.getActiveTopics();
+
+    const rejected = await app.inject({
+      method: "DELETE",
+      url: `${directUrl}/${source.channelId}`,
+      payload: { expectedRevision: source.sourceRevision, reason: "retire" }
+    });
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.equal(rejected.json().error, "E1_SOURCE_IN_USE");
+    assert.deepEqual(committedWrites(), before);
+    assert.equal(runtime.subscribeCalls.length, callsBefore);
+    assert.deepEqual(app.mqttClientService.getActiveTopics(), activeBefore);
+  } finally {
+    await app.close();
+  }
+});
+
+test("direct source mutation permits a rename when only another scope has a derived dependency", async () => {
+  const app = await buildApp();
+  const runtime = runtimeRecorder(app);
+  try {
+    const created = await app.inject({ method: "POST", url: directUrl, payload: { source, reason: "register" } });
+    assert.equal(created.statusCode, 201, created.body);
+    registerDerivedDependency("custom.directCrossScopeRename", "kn");
+    const renamed = { ...source, metricKey: "sourceImpactRouteEnergyRenamed", sourceRevision: 2, epochId: "source-impact-two" };
+
+    const applied = await app.inject({
+      method: "PUT",
+      url: `${directUrl}/${source.channelId}`,
+      payload: { source: renamed, reason: "rename" }
+    });
+    assert.equal(applied.statusCode, 200, applied.body);
+    assert.equal(applied.json().source.metricKey, renamed.metricKey);
+    assert.equal(runtime.subscribeCalls.length, 2, "an accepted direct rename reconciles the committed runtime state");
+  } finally {
+    await app.close();
+  }
+});
+
+test("direct source mutation rejects a rename with a same-scope derived dependency without writes", async () => {
+  const app = await buildApp();
+  const runtime = runtimeRecorder(app);
+  try {
+    const created = await app.inject({ method: "POST", url: directUrl, payload: { source, reason: "register" } });
+    assert.equal(created.statusCode, 201, created.body);
+    registerDerivedDependency("custom.directSameScopeRename", "cl");
+    const renamed = { ...source, metricKey: "sourceImpactRouteEnergyRenamed", sourceRevision: 2, epochId: "source-impact-two" };
+    const before = committedWrites();
+    const callsBefore = runtime.subscribeCalls.length;
+    const activeBefore = app.mqttClientService.getActiveTopics();
+
+    const rejected = await app.inject({
+      method: "PUT",
+      url: `${directUrl}/${source.channelId}`,
+      payload: { source: renamed, reason: "rename" }
+    });
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.equal(rejected.json().error, "E1_SOURCE_IN_USE");
+    assert.deepEqual(committedWrites(), before);
+    assert.equal(runtime.subscribeCalls.length, callsBefore);
+    assert.deepEqual(app.mqttClientService.getActiveTopics(), activeBefore);
+  } finally {
+    await app.close();
+  }
+});
+
 test("guided apply rechecks a draft after preview and rejects corruption without writes or runtime calls", async () => {
   const app = await buildApp();
   const runtime = runtimeRecorder(app);
@@ -258,6 +404,164 @@ test("guided apply permits a different explicit scope with the same key", async 
     assert.equal(applied.statusCode, 200, applied.body);
     assert.equal(applied.json().source.enabled, false);
     assert.equal(runtime.subscribeCalls.length, 2, "accepted guided writes reconcile the runtime state");
+  } finally {
+    await app.close();
+  }
+});
+
+test("guided apply permits a disable when only another scope has a derived dependency", async () => {
+  const app = await buildApp();
+  runtimeRecorder(app);
+  try {
+    await applyGuided(app, "derived-cross-scope-disable-initial");
+    registerDerivedDependency("custom.guidedCrossScopeDisable", "kn");
+    const disablingDraft = { ...guidedDraft, source: { ...source, enabled: false } };
+    const applied = await applyGuided(app, "derived-cross-scope-disable", disablingDraft);
+    assert.equal(applied.json().source.enabled, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("guided apply rejects a disable with a same-scope derived dependency without writes", async () => {
+  const app = await buildApp();
+  const runtime = runtimeRecorder(app);
+  try {
+    await applyGuided(app, "derived-same-scope-disable-initial");
+    registerDerivedDependency("custom.guidedSameScopeDisable", "cl");
+    const disablingDraft = { ...guidedDraft, source: { ...source, enabled: false } };
+    const preview = await previewGuided(app, disablingDraft);
+    const before = committedWrites();
+    const callsBefore = runtime.subscribeCalls.length;
+    const activeBefore = app.mqttClientService.getActiveTopics();
+
+    const rejected = await submitGuidedApply(app, "derived-same-scope-disable", disablingDraft, preview);
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.equal(rejected.json().error, "E1_SOURCE_IN_USE");
+    assert.deepEqual(committedWrites(), before);
+    assert.equal(runtime.subscribeCalls.length, callsBefore);
+    assert.deepEqual(app.mqttClientService.getActiveTopics(), activeBefore);
+  } finally {
+    await app.close();
+  }
+});
+
+test("guided apply permits a rename when only another scope has a derived dependency", async () => {
+  const app = await buildApp();
+  runtimeRecorder(app);
+  try {
+    await applyGuided(app, "derived-cross-scope-rename-initial");
+    registerDerivedDependency("custom.guidedCrossScopeRename", "kn");
+    const renamedSource = {
+      ...source,
+      metricKey: "sourceImpactRouteEnergyGuidedRenamed",
+      sourceRevision: 2,
+      epochId: "source-impact-two"
+    };
+    const applied = await applyGuided(app, "derived-cross-scope-rename", {
+      ...guidedDraft, source: renamedSource
+    });
+    assert.equal(applied.json().source.metricKey, renamedSource.metricKey);
+  } finally {
+    await app.close();
+  }
+});
+
+test("guided apply rejects a rename with a same-scope derived dependency without writes", async () => {
+  const app = await buildApp();
+  const runtime = runtimeRecorder(app);
+  try {
+    await applyGuided(app, "derived-same-scope-rename-initial");
+    registerDerivedDependency("custom.guidedSameScopeRename", "cl");
+    const renamedSource = {
+      ...source,
+      metricKey: "sourceImpactRouteEnergyGuidedRenamed",
+      sourceRevision: 2,
+      epochId: "source-impact-two"
+    };
+    const renamedDraft = { ...guidedDraft, source: renamedSource };
+    const preview = await previewGuided(app, renamedDraft);
+    const before = committedWrites();
+    const callsBefore = runtime.subscribeCalls.length;
+    const activeBefore = app.mqttClientService.getActiveTopics();
+
+    const rejected = await submitGuidedApply(app, "derived-same-scope-rename", renamedDraft, preview);
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.equal(rejected.json().error, "E1_SOURCE_IN_USE");
+    assert.deepEqual(committedWrites(), before);
+    assert.equal(runtime.subscribeCalls.length, callsBefore);
+    assert.deepEqual(app.mqttClientService.getActiveTopics(), activeBefore);
+  } finally {
+    await app.close();
+  }
+});
+
+test("guided first apply rechecks a same-scope derived input added after preview", async () => {
+  const app = await buildApp();
+  const runtime = runtimeRecorder(app);
+  try {
+    await applyGuided(app, "derived-post-preview-initial");
+    const disablingDraft = { ...guidedDraft, source: { ...source, enabled: false } };
+    const preview = await previewGuided(app, disablingDraft);
+    registerDerivedDependency("custom.guidedPostPreviewAdded", "cl");
+    const before = committedWrites();
+    const callsBefore = runtime.subscribeCalls.length;
+    const activeBefore = app.mqttClientService.getActiveTopics();
+
+    const rejected = await submitGuidedApply(app, "derived-post-preview-added", disablingDraft, preview);
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.equal(rejected.json().error, "E1_SOURCE_IN_USE");
+    assert.deepEqual(committedWrites(), before);
+    assert.equal(runtime.subscribeCalls.length, callsBefore);
+    assert.deepEqual(app.mqttClientService.getActiveTopics(), activeBefore);
+  } finally {
+    await app.close();
+  }
+});
+
+test("guided first apply rechecks an output-site dependency after site scopes change", async () => {
+  const app = await buildApp();
+  const runtime = runtimeRecorder(app);
+  try {
+    await applyGuided(app, "derived-post-preview-scope-initial");
+    const dependencyKey = "custom.guidedPostPreviewScopeChange";
+    registerDerivedDependency(dependencyKey, "output-site", ["kn"]);
+    const disablingDraft = { ...guidedDraft, source: { ...source, enabled: false } };
+    const preview = await previewGuided(app, disablingDraft);
+    getDatabase().prepare("UPDATE derived_metric_definitions SET site_scopes_json = ? WHERE metric_key = ?")
+      .run('["cl"]', dependencyKey);
+    const before = committedWrites();
+    const callsBefore = runtime.subscribeCalls.length;
+    const activeBefore = app.mqttClientService.getActiveTopics();
+
+    const rejected = await submitGuidedApply(app, "derived-post-preview-scope-change", disablingDraft, preview);
+    assert.equal(rejected.statusCode, 409, rejected.body);
+    assert.equal(rejected.json().error, "E1_SOURCE_IN_USE");
+    assert.deepEqual(committedWrites(), before);
+    assert.equal(runtime.subscribeCalls.length, callsBefore);
+    assert.deepEqual(app.mqttClientService.getActiveTopics(), activeBefore);
+    assert.equal(
+      (getDatabase().prepare("SELECT site_scopes_json FROM derived_metric_definitions WHERE metric_key = ?")
+        .get(dependencyKey) as { site_scopes_json: string }).site_scopes_json,
+      '["cl"]'
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("guided replay of an unchanged committed request adds no database mutation", async () => {
+  const app = await buildApp();
+  try {
+    const preview = await previewGuided(app);
+    const requestDraft = guidedDraft;
+    const first = await submitGuidedApply(app, "derived-unchanged-replay", requestDraft, preview);
+    assert.equal(first.statusCode, 200, first.body);
+    const afterFirst = committedWrites();
+
+    const replay = await submitGuidedApply(app, "derived-unchanged-replay", requestDraft, preview);
+    assert.equal(replay.statusCode, 200, replay.body);
+    assert.deepEqual(committedWrites(), afterFirst);
   } finally {
     await app.close();
   }

@@ -45,6 +45,22 @@ export type DerivedMetricDefinition = {
   siteScopes?: DerivedMetricSiteScope[];
 };
 
+type DerivedMetricScopeDefinition = Pick<DerivedMetricDefinition, "outputScopePolicy" | "siteScopes">;
+
+export function resolveDerivedMetricOutputScopes(definition: DerivedMetricScopeDefinition): MetricScope[] {
+  if (definition.outputScopePolicy !== "site") return ["global"];
+  return definition.siteScopes ?? ["cl", "kn"];
+}
+
+export function resolveDerivedMetricInputScopes(
+  definition: DerivedMetricScopeDefinition,
+  input: Extract<DerivedMetricInput, { kind: "metric" }>
+): MetricScope[] {
+  return input.scope === "output-site"
+    ? resolveDerivedMetricOutputScopes(definition)
+    : [input.scope];
+}
+
 export type DerivedMetricDependencyIdentity = {
   alias: string;
   kind: DerivedMetricInput["kind"];

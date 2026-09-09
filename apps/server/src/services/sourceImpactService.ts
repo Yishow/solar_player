@@ -1,7 +1,9 @@
 import type Database from "better-sqlite3";
 import {
   evaluateSourceMutationImpact,
+  resolveDerivedMetricInputScopes,
   type MeterSourceDefinition,
+  type MetricScope,
   type SourceImpactConsumer
 } from "@solar-display/shared";
 import { readMetricUsage, type MetricUsageConsumerType } from "./metricUsageService.js";
@@ -33,6 +35,16 @@ type DraftBindingScope = "cl" | "kn" | "global" | "inherit-device" | null;
 
 type ParsedDraftBinding = SourceImpactConsumer & {
   configuredScope: DraftBindingScope;
+};
+
+type DerivedInputImpactRow = {
+  alias: string;
+  derived_metric_key: string;
+  metric_key: string;
+  output_scope_policy: string | null;
+  owner_metric_key: string | null;
+  scope_selector: string | null;
+  site_scopes_json: string | null;
 };
 
 type DraftBindingsParseResult =
@@ -103,6 +115,40 @@ function draftMatchesScope(configuredScope: DraftBindingScope, requestedScope: "
   return configuredScope === requestedScope || configuredScope === "inherit-device" || configuredScope === null;
 }
 
+function parseDerivedSiteScopes(raw: string | null): Array<"cl" | "kn"> | null {
+  if (raw === null) return ["cl", "kn"];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return null;
+  const seen = new Set<string>();
+  const scopes: Array<"cl" | "kn"> = [];
+  for (const scope of parsed) {
+    if (scope !== "cl" && scope !== "kn") return null;
+    if (seen.has(scope)) return null;
+    seen.add(scope);
+    scopes.push(scope);
+  }
+  return scopes;
+}
+
+function resolveDerivedInputImpactScopes(row: DerivedInputImpactRow): MetricScope[] | null {
+  if (!row.owner_metric_key) return null;
+  if (row.scope_selector === "cl" || row.scope_selector === "kn" || row.scope_selector === "global") {
+    return [row.scope_selector];
+  }
+  if (row.scope_selector !== "output-site" || row.output_scope_policy !== "site") return null;
+  const siteScopes = parseDerivedSiteScopes(row.site_scopes_json);
+  if (!siteScopes) return null;
+  return resolveDerivedMetricInputScopes(
+    { outputScopePolicy: "site", siteScopes },
+    { alias: row.alias, kind: "metric", metricKey: row.metric_key, scope: "output-site", unit: "" }
+  );
+}
+
 export function readSourceImpact(
   database: Database.Database,
   input: { confirmResolved?: boolean; metricKey: string; metricScope: "cl" | "kn" | "global" | "all" }
@@ -141,13 +187,35 @@ export function readSourceImpact(
           .map(({ configuredScope: _configuredScope, ...consumer }) => consumer)
         : []
     ));
-    const derivedRows = database.prepare(
-      "SELECT derived_metric_key FROM derived_metric_inputs WHERE metric_key = ?"
-    ).all(input.metricKey) as Array<{ derived_metric_key: string }>;
-    const derived = derivedRows.map((row): SourceImpactConsumer => ({
-      kind: "derived",
-      metricKey: row.derived_metric_key
-    }));
+    const derivedRows = database.prepare(`
+      SELECT
+        inputs.alias,
+        inputs.derived_metric_key,
+        inputs.metric_key,
+        definitions.output_scope_policy,
+        definitions.metric_key AS owner_metric_key,
+        inputs.scope_selector,
+        definitions.site_scopes_json
+      FROM derived_metric_inputs AS inputs
+      LEFT JOIN derived_metric_definitions AS definitions
+        ON definitions.metric_key = inputs.derived_metric_key
+      WHERE inputs.metric_key = ?
+      ORDER BY inputs.derived_metric_key, inputs.alias
+    `).all(input.metricKey) as DerivedInputImpactRow[];
+    const derived: SourceImpactConsumer[] = [];
+    let derivedLookupFailed = false;
+    for (const row of derivedRows) {
+      const scopes = resolveDerivedInputImpactScopes(row);
+      if (!scopes) {
+        derivedLookupFailed = true;
+        continue;
+      }
+      if (input.metricScope !== "all" && !scopes.includes(input.metricScope)) continue;
+      derived.push({ kind: "derived", metricKey: row.derived_metric_key });
+    }
+    if (derivedLookupFailed) {
+      return { ...evaluateSourceMutationImpact({ consumers: [], lookupFailed: true }), registeredExpectations: [] };
+    }
     const consumers = [...live, ...drafts, ...derived];
     return {
       ...evaluateSourceMutationImpact({

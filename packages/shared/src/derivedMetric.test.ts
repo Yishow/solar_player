@@ -6,7 +6,8 @@ import {
   DERIVED_METRIC_KNOWN_UNITS,
   DERIVED_METRIC_OUTPUT_SCOPE_POLICIES,
   DERIVED_METRIC_SCOPE_SELECTORS,
-  derivedMetricCatalogMetadata
+  derivedMetricCatalogMetadata,
+  resolveDerivedMetricInputScopes
 } from "./derivedMetric.js";
 
 test("shared derived metric DTOs cover scope policies, inputs, selectors, units, and safe fields", () => {
@@ -55,5 +56,33 @@ test("shared derived metric DTOs cover scope policies, inputs, selectors, units,
   assert.equal(
     ["script", "code", "sql", "shell", "network", "file"].some((key) => key in siteDefinition),
     false
+  );
+});
+
+test("derived metric input scopes expand explicit, output-site, and global selectors consistently", () => {
+  const siteDefinition = { outputScopePolicy: "site" as const };
+  assert.deepEqual(
+    resolveDerivedMetricInputScopes(siteDefinition, {
+      alias: "source", kind: "metric", metricKey: "sameKey", scope: "cl", unit: "kW"
+    }),
+    ["cl"]
+  );
+  assert.deepEqual(
+    resolveDerivedMetricInputScopes({ ...siteDefinition, siteScopes: ["kn"] }, {
+      alias: "source", kind: "metric", metricKey: "sameKey", scope: "output-site", unit: "kW"
+    }),
+    ["kn"]
+  );
+  assert.deepEqual(
+    resolveDerivedMetricInputScopes(siteDefinition, {
+      alias: "source", kind: "metric", metricKey: "sameKey", scope: "output-site", unit: "kW"
+    }),
+    ["cl", "kn"]
+  );
+  assert.deepEqual(
+    resolveDerivedMetricInputScopes({ outputScopePolicy: "global" }, {
+      alias: "source", kind: "metric", metricKey: "sameKey", scope: "global", unit: "kW"
+    }),
+    ["global"]
   );
 });

@@ -10,6 +10,8 @@ import type {
 import {
   co2TreeEquivalentFactor,
   DERIVED_METRIC_SCOPE_SELECTORS,
+  resolveDerivedMetricInputScopes,
+  resolveDerivedMetricOutputScopes,
   resolvePlaybackMetricCatalog
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
@@ -198,7 +200,7 @@ function resolveMetricInputScopes(
   definition: DerivedMetricDefinition,
   input: Extract<DerivedMetricInput, { kind: "metric" }>
 ): MetricScope[] {
-  return input.scope === "output-site" ? outputScopes(definition) : [input.scope];
+  return resolveDerivedMetricInputScopes(definition, input);
 }
 
 function isManagedSourceMetricInput(
@@ -530,8 +532,7 @@ function readDefinitions(database: Database.Database): DerivedMetricDefinition[]
 }
 
 function outputScopes(definition: DerivedMetricDefinition): MetricScope[] {
-  if (definition.outputScopePolicy !== "site") return ["global"];
-  return definition.siteScopes ?? ["cl", "kn"];
+  return resolveDerivedMetricOutputScopes(definition);
 }
 
 function retireExcludedRuntimeRows(
