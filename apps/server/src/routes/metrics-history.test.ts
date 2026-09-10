@@ -1055,6 +1055,69 @@ test("N4 management history reports a canonical result for every range of a conf
   }
 });
 
+test("configured calendar projection failure stays canonical while the rest of management history remains readable", async () => {
+  seedLegacySentinelFixture();
+  const database = getDatabase();
+  const app = await buildApp();
+  const originalPrepare = database.prepare;
+  let projectionFailures = 0;
+  database.prepare = ((sql: string) => {
+    if (sql.includes("consumption_projections") && projectionFailures === 0) {
+      projectionFailures += 1;
+      throw Object.assign(new Error("SELECT private FROM secret_table"), { code: "SQLITE_BUSY" });
+    }
+    return originalPrepare.call(database, sql);
+  }) as typeof database.prepare;
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/data-hub/energy-history?metricScope=kn&range=month"
+    });
+
+    assert.equal(response.statusCode, 200, response.body);
+    const body = response.json() as {
+      periodSummary: { issues?: string[]; quality: string; valueKwh: string | null } | null;
+      summaries: SummaryRow[];
+    };
+    assert.equal(projectionFailures, 1);
+    assert.equal(body.periodSummary?.quality, "unavailable");
+    assert.equal(body.periodSummary?.valueKwh, null);
+    assert.deepEqual(body.periodSummary?.issues, ["UNRESOLVED_ACCOUNTING_PERIOD:month", "SQLITE_BUSY"]);
+    assert.doesNotMatch(response.body, /private|secret_table|SELECT/);
+    assert.ok(body.summaries.length > 0, "other readable history data stays in the response");
+  } finally {
+    database.prepare = originalPrepare;
+    await app.close();
+  }
+});
+
+test("a full database outage still follows the management history error envelope", async () => {
+  seedLegacySentinelFixture();
+  const database = getDatabase();
+  const app = await buildApp();
+  const originalPrepare = database.prepare;
+  database.prepare = (() => {
+    throw new Error("private database outage");
+  }) as typeof database.prepare;
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/data-hub/energy-history?metricScope=kn&range=month"
+    });
+
+    assert.equal(response.statusCode, 500, response.body);
+    const body = response.json() as { error?: string; success?: boolean };
+    assert.equal(body.success, false);
+    assert.equal(body.error, "Internal Server Error");
+    assert.doesNotMatch(response.body, /private database outage/);
+  } finally {
+    database.prepare = originalPrepare;
+    await app.close();
+  }
+});
+
 test("N4 management history keeps the week and total spans distinct from the calendar year", async () => {
   const fixture = seedRangeSpanFixture();
   const app = await buildApp();

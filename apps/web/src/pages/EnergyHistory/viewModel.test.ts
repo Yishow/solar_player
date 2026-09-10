@@ -525,3 +525,80 @@ test("N4 a cumulative range without a canonical span keeps the source row unchan
 
   assert.equal(model.bottomSummary.find((item) => item.label === "資料來源")?.detailLabel, "");
 });
+
+const legacyConsumptionSentinel = 987654.321;
+const calendarRanges = ["day", "month", "year"] as const;
+
+function legacySummary(date: string, consumptionTotal: number): DailyEnergySummary {
+  return {
+    co2Total: 1,
+    consumptionTotal,
+    date,
+    generationTotal: 10,
+    peakConsumption: null,
+    peakConsumptionTime: null,
+    peakGeneration: null,
+    peakGenerationTime: null,
+    selfConsumptionTotal: 3
+  };
+}
+
+for (const range of calendarRanges) {
+  test(`N4 ${range} canonical unavailable consumption does not use the legacy sentinel or zero`, () => {
+    const model = buildEnergyHistoryViewModel({
+      counters: cumulativeCounters,
+      metricScope: "kn",
+      now: "2026-05-13T10:02:00.000Z",
+      periodSummary: {
+        issues: [`UNRESOLVED_ACCOUNTING_PERIOD:${range}`],
+        quality: "unavailable",
+        valueKwh: null
+      },
+      range,
+      snapshots,
+      summaries: [legacySummary("2026-09-02", legacyConsumptionSentinel)]
+    });
+
+    assert.equal(model.metricCards[2]?.valueLabel, "--");
+    assert.notEqual(model.metricCards[2]?.valueLabel, "987,654");
+    assert.notEqual(model.metricCards[2]?.valueLabel, "0");
+    assert.equal(model.monitoringState.category, "degraded");
+    assert.match(model.monitoringState.detailLabel, new RegExp(`UNRESOLVED_ACCOUNTING_PERIOD:${range}`));
+  });
+}
+
+for (const range of calendarRanges) {
+  test(`N4 ${range} measured zero remains a valid zero beside the legacy sentinel`, () => {
+    const model = buildEnergyHistoryViewModel({
+      counters: cumulativeCounters,
+      metricScope: "kn",
+      now: "2026-05-13T10:02:00.000Z",
+      periodSummary: { quality: "exact", valueKwh: "0" },
+      range,
+      snapshots,
+      summaries: [legacySummary("2026-09-02", legacyConsumptionSentinel)]
+    });
+
+    assert.equal(model.metricCards[2]?.valueLabel, "0");
+    assert.notEqual(model.metricCards[2]?.valueLabel, "--");
+  });
+}
+
+for (const range of calendarRanges) {
+  test(`N3 ${range} without an accounting profile keeps the legacy summary compatibility path`, () => {
+    const model = buildEnergyHistoryViewModel({
+      counters: cumulativeCounters,
+      metricScope: "kn",
+      now: "2026-05-13T10:02:00.000Z",
+      periodSummary: null,
+      range,
+      snapshots,
+      summaries: [
+        legacySummary("2026-09-01", 120),
+        legacySummary("2026-09-02", 80)
+      ]
+    });
+
+    assert.equal(model.metricCards[2]?.valueLabel, range === "day" ? "120" : "200");
+  });
+}

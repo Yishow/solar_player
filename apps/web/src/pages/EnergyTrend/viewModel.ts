@@ -111,7 +111,11 @@ export function buildEnergyTrendViewModel({
   const co2Aggregate = co2Count === 0 ? null : co2Sum;
 
   const liveGenerationTotal = readLiveMetric(liveSnapshot, "todayGeneration");
-  const liveConsumptionTotal = periodSummary?.valueKwh === null ? null : periodSummary ? Number(periodSummary.valueKwh) : null;
+  const liveConsumptionTotal = periodSummary?.valueKwh === null
+    ? null
+    : periodSummary
+      ? Number(periodSummary.valueKwh)
+      : readLiveMetric(liveSnapshot, "consumptionEnergy");
   const liveRatioValue = readLiveMetric(liveSnapshot, "selfConsumptionRatio");
   const liveCo2Value = readLiveMetric(liveSnapshot, "todayCo2Reduction");
   const livePowerValue = readLiveMetric(liveSnapshot, "realTimePower");

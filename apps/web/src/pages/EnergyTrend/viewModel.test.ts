@@ -206,3 +206,62 @@ test("N4 a measured zero week is reported as zero rather than missing", () => {
 
   assert.equal(model.cards[2]?.valueLabel, "0");
 });
+
+const legacyConsumptionSentinel = 987654.321;
+const calendarRanges = ["day", "month"] as const;
+
+const legacySentinelLiveSnapshot: LiveMetricsSnapshot = {
+  ...liveSnapshot,
+  metrics: {
+    ...liveSnapshot.metrics,
+    consumptionEnergy: {
+      ...liveSnapshot.metrics.consumptionEnergy!,
+      value: legacyConsumptionSentinel
+    }
+  }
+};
+
+for (const range of calendarRanges) {
+  test(`N4 ${range} canonical unavailable consumption does not use the legacy sentinel or zero`, () => {
+    const model = buildEnergyTrendViewModel({
+      liveSnapshot: legacySentinelLiveSnapshot,
+      now: "2026-05-13T10:02:00.000Z",
+      periodSummary: { quality: "unavailable", valueKwh: null },
+      range,
+      snapshots: historySnapshots
+    });
+
+    assert.equal(model.cards[2]?.valueLabel, "--");
+    assert.notEqual(model.cards[2]?.valueLabel, "987,654");
+    assert.notEqual(model.cards[2]?.valueLabel, "0");
+  });
+}
+
+for (const range of calendarRanges) {
+  test(`N4 ${range} measured zero remains a valid zero beside the legacy sentinel`, () => {
+    const model = buildEnergyTrendViewModel({
+      liveSnapshot: legacySentinelLiveSnapshot,
+      now: "2026-05-13T10:02:00.000Z",
+      periodSummary: { quality: "exact", valueKwh: "0" },
+      range,
+      snapshots: historySnapshots
+    });
+
+    assert.equal(model.cards[2]?.valueLabel, "0");
+    assert.notEqual(model.cards[2]?.valueLabel, "--");
+    assert.notEqual(model.cards[2]?.valueLabel, "987,654");
+  });
+}
+
+for (const range of calendarRanges) {
+  test(`N3 ${range} without an accounting profile keeps the legacy live compatibility path`, () => {
+    const model = buildEnergyTrendViewModel({
+      liveSnapshot,
+      now: "2026-05-13T10:02:00.000Z",
+      range,
+      snapshots: historySnapshots
+    });
+
+    assert.equal(model.cards[2]?.valueLabel, "12,680");
+  });
+}

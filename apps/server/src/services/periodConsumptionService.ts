@@ -321,14 +321,17 @@ export function tryResolvePersistedPeriodConsumption(
   if (!profile) {
     return null;
   }
-  const period = periodSelectionFromRange(range, asOf, profile.siteTimeZone);
-  if (!period) {
+  if (range === "week" || range === "total") {
     // A configured profile always answers with a canonical result, so the consumers can tell
     // "no supported measurement" apart from "no accounting profile" and never fall back to a
     // legacy counter. Spans are not cached as projections: that store only knows calendar ranges.
-    return tryResolveSpanConsumption(database, scope, range as "week" | "total", asOf, profile);
+    return tryResolveSpanConsumption(database, scope, range, asOf, profile);
   }
   try {
+    const period = periodSelectionFromRange(range, asOf, profile.siteTimeZone);
+    if (!period) {
+      return unavailablePeriodResult(profile, range, asOf);
+    }
     const result = resolvePersistedPeriodConsumption(database, scope, period, asOf);
     const projectedRange = period.kind;
     const contextKey = projectionContextKey(result);
@@ -338,9 +341,31 @@ export function tryResolvePersistedPeriodConsumption(
       return { ...active, freshness: result.freshness, freshnessState: result.freshnessState };
     }
     return result;
-  } catch {
-    return null;
+  } catch (error) {
+    return unavailablePeriodResult(profile, range, asOf, error);
   }
+}
+
+function unavailablePeriodResult(
+  profile: SiteEnergyProfileV1,
+  range: "day" | "month" | "year",
+  asOf: string,
+  error?: unknown
+): PeriodConsumptionResult {
+  const code = typeof error === "object" && error !== null && "code" in error
+    ? (error as { code?: unknown }).code
+    : undefined;
+  const cause = typeof code === "string" && /^[A-Z0-9_]{1,64}$/.test(code)
+    ? code
+    : "PERIOD_CONSUMPTION_RESOLUTION_FAILED";
+  return {
+    calculatedThrough: asOf,
+    issues: [`UNRESOLVED_ACCOUNTING_PERIOD:${range}`, cause],
+    profileRevision: profile.revision,
+    quality: "unavailable",
+    siteTimeZone: profile.siteTimeZone,
+    valueKwh: null
+  };
 }
 
 /**

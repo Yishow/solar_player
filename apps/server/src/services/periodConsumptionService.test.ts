@@ -440,3 +440,134 @@ test("N4 a configured profile without usable evidence still returns a canonical 
   assert.equal(tryResolvePersistedPeriodConsumption(database, "global" as unknown as "kn", "total", N4_AS_OF), null);
   database.close();
 });
+
+function failCalendarRead(database: Database.Database, table: string, error: unknown) {
+  const prepare = database.prepare.bind(database);
+  const reads = { failures: 0, afterFailure: 0 };
+  database.prepare = ((sql: string) => {
+    if (reads.failures > 0) reads.afterFailure += 1;
+    if (sql.includes(table)) {
+      reads.failures += 1;
+      throw error;
+    }
+    return prepare(sql);
+  }) as typeof database.prepare;
+  return reads;
+}
+
+const CALENDAR_AS_OF = "2026-09-01T04:00:00Z";
+
+for (const range of ["day", "month", "year"] as const) {
+  for (const [failure, table] of [
+    ["calculation", "meter_readings_accepted"],
+    ["projection", "consumption_projections"]
+  ] as const) {
+    test(`configured ${range} ${failure} failure remains unavailable without catch-time reads`, (t) => {
+      const database = createDatabase();
+      t.after(() => database.close());
+      const opening = range === "year" ? "2025-12-31T16:00:00Z" : "2026-08-31T16:00:00Z";
+      seedAcceptedReading(database, source(1, "epoch-1"), "100", opening, opening);
+      seedAcceptedReading(database, source(1, "epoch-1"), "150", CALENDAR_AS_OF, CALENDAR_AS_OF);
+      assert.equal(tryResolvePersistedPeriodConsumption(database, "kn", range, CALENDAR_AS_OF)?.valueKwh, "50");
+      const reads = failCalendarRead(database, table, new Error("SELECT secret FROM private_table; raw-stack-sentinel"));
+
+      const result = tryResolvePersistedPeriodConsumption(database, "kn", range, CALENDAR_AS_OF);
+
+      assert.deepEqual(result, {
+        calculatedThrough: CALENDAR_AS_OF,
+        issues: [`UNRESOLVED_ACCOUNTING_PERIOD:${range}`, "PERIOD_CONSUMPTION_RESOLUTION_FAILED"],
+        profileRevision: 1,
+        quality: "unavailable",
+        siteTimeZone: "Asia/Taipei",
+        valueKwh: null
+      }, "only known metadata is returned, without invented boundaries, coverage, or exception details");
+      assert.deepEqual(reads, { failures: 1, afterFailure: 0 });
+    });
+  }
+
+  for (const closingValue of ["100", "150"]) {
+    test(`configured ${range} retains the measured ${closingValue === "100" ? "zero" : "positive"} result`, (t) => {
+      const database = createDatabase();
+      t.after(() => database.close());
+      const opening = range === "year" ? "2025-12-31T16:00:00Z" : "2026-08-31T16:00:00Z";
+      seedAcceptedReading(database, source(1, "epoch-1"), "100", opening, opening);
+      seedAcceptedReading(database, source(1, "epoch-1"), closingValue, CALENDAR_AS_OF, CALENDAR_AS_OF);
+
+      const result = tryResolvePersistedPeriodConsumption(database, "kn", range, CALENDAR_AS_OF);
+
+      assert.equal(result?.quality, "exact");
+      assert.equal(result?.valueKwh, closingValue === "100" ? "0" : "50");
+    });
+  }
+}
+
+for (const [label, code, expected] of [
+  ["missing", undefined, "PERIOD_CONSUMPTION_RESOLUTION_FAILED"],
+  ["valid", "SQLITE_BUSY", "SQLITE_BUSY"],
+  ["one character", "0", "0"],
+  ["maximum length", "A".repeat(64), "A".repeat(64)],
+  ["empty", "", "PERIOD_CONSUMPTION_RESOLUTION_FAILED"],
+  ["lowercase", "sqlite_busy", "PERIOD_CONSUMPTION_RESOLUTION_FAILED"],
+  ["SQL", "SELECT * FROM secrets", "PERIOD_CONSUMPTION_RESOLUTION_FAILED"],
+  ["newline", "SQLITE_BUSY\n", "PERIOD_CONSUMPTION_RESOLUTION_FAILED"],
+  ["too long", "A".repeat(65), "PERIOD_CONSUMPTION_RESOLUTION_FAILED"],
+  ["numeric", 42, "PERIOD_CONSUMPTION_RESOLUTION_FAILED"],
+  ["object", { private: "sentinel" }, "PERIOD_CONSUMPTION_RESOLUTION_FAILED"]
+] as const) {
+  test(`calendar diagnostics sanitize ${label} error codes`, (t) => {
+    const database = createDatabase();
+    t.after(() => database.close());
+    const error = Object.assign(new Error("private SQL message sentinel"), { code });
+    error.stack = "private stack sentinel";
+    const reads = failCalendarRead(database, "meter_readings_accepted", error);
+
+    const result = tryResolvePersistedPeriodConsumption(database, "kn", "month", CALENDAR_AS_OF);
+
+    assert.deepEqual(result?.issues, ["UNRESOLVED_ACCOUNTING_PERIOD:month", expected]);
+    assert.doesNotMatch(JSON.stringify(result), /private|sentinel|SELECT/);
+    assert.deepEqual(reads, { failures: 1, afterFailure: 0 });
+  });
+}
+
+test("calendar parsing failures after profile lookup remain unavailable", (t) => {
+  const database = createDatabase();
+  t.after(() => database.close());
+  database.prepare("UPDATE site_energy_profiles SET site_time_zone = 'invalid-zone'").run();
+
+  for (const range of ["day", "month", "year"] as const) {
+    const result = tryResolvePersistedPeriodConsumption(database, "kn", range, CALENDAR_AS_OF);
+    assert.equal(result?.quality, "unavailable");
+    assert.equal(result?.valueKwh, null);
+    assert.equal(result?.siteTimeZone, "invalid-zone");
+    assert.deepEqual(result?.issues, [`UNRESOLVED_ACCOUNTING_PERIOD:${range}`, "PERIOD_CONSUMPTION_RESOLUTION_FAILED"]);
+  }
+});
+
+test("global and absent profiles retain null but unreadable profiles still throw", (t) => {
+  const database = createDatabase();
+  t.after(() => database.close());
+  for (const range of ["day", "week", "month", "year", "total"] as const) {
+    assert.equal(tryResolvePersistedPeriodConsumption(database, "cl", range, CALENDAR_AS_OF), null);
+  }
+  const error = new Error("profile read unavailable");
+  const reads = failCalendarRead(database, "site_energy_profiles", error);
+  for (const range of ["day", "week", "month", "year", "total"] as const) {
+    assert.equal(tryResolvePersistedPeriodConsumption(database, "global", range, CALENDAR_AS_OF), null);
+  }
+  assert.equal(reads.failures, 0, "global compatibility must not query a site profile");
+  assert.throws(() => tryResolvePersistedPeriodConsumption(database, "kn", "day", CALENDAR_AS_OF), (caught) => caught === error);
+});
+
+for (const range of ["week", "total"] as const) {
+  test(`${range} calculation failures retain their existing span diagnostics`, (t) => {
+    const database = createDatabase();
+    t.after(() => database.close());
+    failCalendarRead(database, "meter_readings_accepted", Object.assign(new Error("unavailable"), { code: "SQLITE_BUSY" }));
+
+    const result = tryResolvePersistedPeriodConsumption(database, "kn", range, CALENDAR_AS_OF);
+
+    assert.equal(result?.quality, "unavailable");
+    assert.equal(result?.valueKwh, null);
+    assert.deepEqual(result?.issues, [`UNRESOLVED_ACCOUNTING_SPAN:${range}`, "SQLITE_BUSY"]);
+  });
+}
