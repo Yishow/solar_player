@@ -197,7 +197,10 @@ test("mqtt settings reuses one editable loader before deferred diagnostics refre
   assert.match(mqttSettingsRemoteSyncSource, /refreshDeferredSettingsDiagnostics/);
   assert.match(mqttSettingsControllerSource, /readCachedMqttEditableModel\(\)/);
   assert.match(mqttSettingsIndexSource, /export async function loadMqttSettingsRoute\(\)/);
-  assert.match(mqttSettingsDataSource, /const applyMqttEditableModel = useCallback\(\(model: MqttEditableModel\) => {/);
+  assert.match(
+    mqttSettingsDataSource,
+    /const applyMqttEditableModel = useCallback\(\([\s\S]{0,180}model: MqttEditableModel,[\s\S]{0,180}weatherRequest:/
+  );
   assert.match(mqttSettingsDataSource, /const initialSettings = initialConnectionModel\?\.settings \?\? initialEditableModel\?\.settings \?\? defaultMqttFormState/);
   assert.match(mqttSettingsDataSource, /useState<MqttSettingsForm>\(initialSettings\)/);
   assert.match(mqttSettingsDataSource, /await loadMqttEditableModel\(\{ force: initialEditableModel !== null \}\)/);
@@ -205,12 +208,15 @@ test("mqtt settings reuses one editable loader before deferred diagnostics refre
   assert.match(mqttSettingsLoadModelSource, /let cachedMqttEditableModel: MqttEditableModel \| null = null/);
   assert.match(mqttSettingsLoadModelSource, /if \(!options\.force && cachedMqttEditableModel\)/);
   assert.match(mqttSettingsDataSource, /const loadMqttEditableModel = useCallback\(async/);
-  assert.match(mqttSettingsRemoteSyncSource, /await loadMqttEditableModel\(\{ propagateError: true, topicsAsPolling: true \}\)/);
+  assert.match(
+    mqttSettingsRemoteSyncSource,
+    /await loadMqttEditableModel\(\{[\s\S]{0,180}propagateError: true,[\s\S]{0,180}topicsAsPolling: true,[\s\S]{0,180}weatherDiscard: discardDraft/
+  );
   assert.match(mqttSettingsRemoteSyncSource, /refreshDeferredSettingsDiagnostics\(\[reloadReadiness\]\)/);
 
   const reloadNowSource = mqttSettingsRemoteSyncSource.slice(
-    mqttSettingsRemoteSyncSource.indexOf("reloadNow: async () => {"),
-    mqttSettingsRemoteSyncSource.indexOf("useDisplaySyncRefresh", mqttSettingsRemoteSyncSource.indexOf("reloadNow: async () => {"))
+    mqttSettingsRemoteSyncSource.indexOf("reloadNow: async (context) => {"),
+    mqttSettingsRemoteSyncSource.indexOf("useDisplaySyncRefresh", mqttSettingsRemoteSyncSource.indexOf("reloadNow: async (context) => {"))
   );
   assert.doesNotMatch(reloadNowSource, /Promise\.all\(\[/);
 });
@@ -299,6 +305,17 @@ test("mqtt settings keeps dirty guard and five-second polling lifecycle across c
     mqttSettingsDataSource,
     /return \(\) => \{\s*active = false;\s*window\.clearInterval\(pollTimer\);\s*\}/
   );
+});
+
+test("mqtt settings wires explicit keep-editing and discard actions to the remote sync banner", () => {
+  assert.match(mqttSettingsIndexSource, /<RemoteSyncBanner/);
+  assert.match(mqttSettingsIndexSource, /onKeepEditing=\{remoteSync\.keepEditing\}/);
+  assert.match(
+    mqttSettingsIndexSource,
+    /onReloadNow=\{\(\) => remoteSync\.discardAndReload\(\)\.catch\(\(\) => \{\}\)\}/
+  );
+  assert.match(mqttSettingsRemoteSyncSource, /stickyPending:\s*!connectionsOnly/);
+  assert.match(mqttSettingsRemoteSyncSource, /weatherDiscard:\s*discardDraft/);
 });
 
 test("mqtt settings preserves controller callback wiring for connection and workspace actions", () => {

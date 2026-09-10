@@ -35,6 +35,7 @@ export function useMqttSettingsRemoteSync({
     loadSettings,
     settings,
     topics,
+    weatherReloadResult,
     weatherSettings
   } = data;
   const draftSections = useMemo(
@@ -50,14 +51,23 @@ export function useMqttSettingsRemoteSync({
     [draftSections]
   );
   const syncDraftGuard = useDisplaySyncDraftGuard({
+    externalReloadResult: weatherReloadResult,
     isDirty: isDirty,
     relevantScopes: MQTT_SETTINGS_DISPLAY_SYNC_SCOPES,
-    reloadNow: async () => {
+    stickyPending: !connectionsOnly,
+    reloadNow: async (context) => {
+      const discardDraft = context?.discardDraft ?? false;
       if (connectionsOnly) {
         await loadSettings({ propagateError: true });
       } else {
-        await loadMqttEditableModel({ propagateError: true, topicsAsPolling: true });
+        const weatherOutcome = await loadMqttEditableModel({
+          propagateError: true,
+          topicsAsPolling: true,
+          weatherDiscard: discardDraft
+        });
         await loadPlaybackPages();
+        refreshDeferredSettingsDiagnostics([reloadReadiness]);
+        return weatherOutcome;
       }
       refreshDeferredSettingsDiagnostics([reloadReadiness]);
     }

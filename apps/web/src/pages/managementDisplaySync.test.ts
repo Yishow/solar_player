@@ -79,7 +79,7 @@ test("mqtt settings wires its display-sync guard through the controller boundary
   assert.match(mqttSettingsControllerSource, /remoteSync:\s*remote\.syncDraftGuard/);
   assert.match(mqttSettingsRemoteSyncSource, /useDisplaySyncDraftGuard\(\{/);
   assert.match(mqttSettingsRemoteSyncSource, /isDirty:\s*isDirty/);
-  assert.match(mqttSettingsRemoteSyncSource, /reloadNow:\s*async \(\) => \{/);
+  assert.match(mqttSettingsRemoteSyncSource, /reloadNow:\s*async \(context\) => \{/);
 });
 
 test("management surfaces keep clean summary reloads inside their display-sync adapters", () => {

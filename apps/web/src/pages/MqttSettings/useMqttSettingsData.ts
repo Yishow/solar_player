@@ -35,12 +35,19 @@ import {
   type WeatherDiagnostic,
   type WeatherSettings
 } from "@solar-display/shared";
+import {
+  hasDisplaySyncDraftChanges,
+  type DisplaySyncReloadResult
+} from "../../hooks/displaySyncDraftGuard";
 
 export type MqttEditableModelLoadOptions = {
   force?: boolean;
   propagateError?: boolean;
   topicsAsPolling?: boolean;
+  weatherDiscard?: boolean;
 };
+
+export type WeatherSettingsLoadOutcome = DisplaySyncReloadResult;
 
 export type MqttSettingsDataController = {
   actionState: ActionState;
@@ -49,17 +56,21 @@ export type MqttSettingsDataController = {
   hasLoadedMqttSettings: boolean;
   hasLoadedTopics: boolean;
   hasLoadedWeatherSettings: boolean;
+  weatherReloadResult: WeatherSettingsLoadOutcome | null;
   lastConnectionTest: ConnectionTestFeedback;
   lastSyncedSettings: MqttSettingsForm;
   lastSyncedTopics: TopicMapping[];
   lastSyncedTopicsRef: { current: TopicMapping[] };
   lastSyncedWeatherSettings: WeatherSettings;
-  loadMqttEditableModel: (options?: MqttEditableModelLoadOptions) => Promise<void>;
+  loadMqttEditableModel: (options?: MqttEditableModelLoadOptions) => Promise<WeatherSettingsLoadOutcome>;
   loadPlaybackPages: () => Promise<void>;
   loadSettings: (options?: { propagateError?: boolean }) => Promise<void>;
   loadTopics: (options: { isPolling: boolean; propagateError?: boolean }) => Promise<void>;
   loadWeatherDiagnostic: () => Promise<void>;
-  loadWeatherSettings: (options?: { propagateError?: boolean }) => Promise<void>;
+  loadWeatherSettings: (options?: {
+    propagateError?: boolean;
+    discardDraft?: boolean;
+  }) => Promise<WeatherSettingsLoadOutcome>;
   markDirty: (nextMessage: string) => void;
   message: string;
   playbackPages: PlaybackPage[];
@@ -101,8 +112,15 @@ export function useMqttSettingsData({
   const [topics, setTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const lastSyncedTopicsRef = useRef(lastSyncedTopics);
-  const [weatherSettings, setWeatherSettings] = useState<WeatherSettings>(initialWeatherSettings);
+  const [weatherSettings, setWeatherSettingsState] = useState<WeatherSettings>(initialWeatherSettings);
   const [lastSyncedWeatherSettings, setLastSyncedWeatherSettings] = useState<WeatherSettings>(initialWeatherSettings);
+  const weatherSettingsRef = useRef(initialWeatherSettings);
+  const lastSyncedWeatherSettingsRef = useRef(initialWeatherSettings);
+  const weatherRequestGenerationRef = useRef(0);
+  const weatherMutationGenerationRef = useRef(0);
+  const settingsRequestGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+  const [weatherReloadResult, setWeatherReloadResult] = useState<WeatherSettingsLoadOutcome | null>(null);
   const [playbackPages, setPlaybackPages] = useState<PlaybackPage[]>([]);
   const [weatherDiagnostic, setWeatherDiagnostic] = useState<WeatherDiagnostic | null>(null);
   const [lastConnectionTest, setLastConnectionTest] = useState<ConnectionTestFeedback>(null);
@@ -129,24 +147,89 @@ export function useMqttSettingsData({
     lastSyncedTopicsRef.current = lastSyncedTopics;
   }, [lastSyncedTopics]);
 
+  useEffect(() => {
+    weatherSettingsRef.current = weatherSettings;
+  }, [weatherSettings]);
+
+  useEffect(() => {
+    lastSyncedWeatherSettingsRef.current = lastSyncedWeatherSettings;
+  }, [lastSyncedWeatherSettings]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      weatherRequestGenerationRef.current += 1;
+    };
+  }, []);
+
+  const setWeatherSettings = useCallback<Dispatch<SetStateAction<WeatherSettings>>>((update) => {
+    weatherMutationGenerationRef.current += 1;
+    const nextWeatherSettings = typeof update === "function"
+      ? update(weatherSettingsRef.current)
+      : update;
+    weatherSettingsRef.current = nextWeatherSettings;
+    setWeatherSettingsState(nextWeatherSettings);
+  }, []);
+
+  const beginWeatherRequest = useCallback((discardDraft: boolean) => ({
+    discardDraft,
+    mutationGeneration: weatherMutationGenerationRef.current,
+    operationToken: ++weatherRequestGenerationRef.current,
+    startedDirty: hasDisplaySyncDraftChanges(
+      weatherSettingsRef.current,
+      lastSyncedWeatherSettingsRef.current
+    )
+  }), []);
+
+  const commitWeatherSettings = useCallback((
+    request: ReturnType<typeof beginWeatherRequest>,
+    nextWeatherSettings: WeatherSettings,
+    publishReloadResult = true
+  ): WeatherSettingsLoadOutcome => {
+    if (!mountedRef.current || request.operationToken !== weatherRequestGenerationRef.current) {
+      return { operationToken: request.operationToken, outcome: "stale" };
+    }
+    if (
+      request.mutationGeneration !== weatherMutationGenerationRef.current
+      || (request.startedDirty && !request.discardDraft)
+    ) {
+      const result = { operationToken: request.operationToken, outcome: "deferred" } as const;
+      if (publishReloadResult) {
+        setWeatherReloadResult(result);
+      }
+      return result;
+    }
+    weatherSettingsRef.current = nextWeatherSettings;
+    lastSyncedWeatherSettingsRef.current = nextWeatherSettings;
+    setWeatherSettingsState(nextWeatherSettings);
+    setLastSyncedWeatherSettings(nextWeatherSettings);
+    setHasLoadedWeatherSettings(true);
+    const result = { operationToken: request.operationToken, outcome: "committed" } as const;
+    if (publishReloadResult) {
+      setWeatherReloadResult(result);
+    }
+    return result;
+  }, [beginWeatherRequest]);
+
   const markDirty = useCallback((nextMessage: string) => {
     setLastConnectionTest(null);
     setMessage(nextMessage);
     setErrorMessage("");
   }, []);
 
-  const applyMqttEditableModel = useCallback((model: MqttEditableModel) => {
+  const applyMqttEditableModel = useCallback((
+    model: MqttEditableModel,
+    weatherRequest: ReturnType<typeof beginWeatherRequest>
+  ) => {
     setSettings(model.settings);
     setLastSyncedSettings(model.settings);
     setStatus(model.status);
     setTopics(model.topics);
     setLastSyncedTopics(model.topics);
     lastSyncedTopicsRef.current = model.topics;
-    setWeatherSettings(model.weatherSettings);
-    setLastSyncedWeatherSettings(model.weatherSettings);
     setHasLoadedMqttSettings(true);
     setHasLoadedTopics(true);
-    setHasLoadedWeatherSettings(true);
     setLastConnectionTest(null);
     setMessage("MQTT 設定已同步。");
     setErrorMessage("");
@@ -155,12 +238,17 @@ export function useMqttSettingsData({
       isLoadingSettings: false,
       isLoadingTopics: false
     }));
-  }, []);
+    return commitWeatherSettings(weatherRequest, model.weatherSettings);
+  }, [commitWeatherSettings]);
 
   const loadSettings = useCallback(async ({ propagateError = false }: { propagateError?: boolean } = {}) => {
+    const requestGeneration = ++settingsRequestGenerationRef.current;
     setActionState((current) => ({ ...current, isLoadingSettings: true }));
     try {
       const response = await requestJson<MqttSettingsResponse>("/api/settings/mqtt");
+      if (!mountedRef.current || requestGeneration !== settingsRequestGenerationRef.current) {
+        return;
+      }
       const nextSettings = toFormState(response.settings);
       if (connectionsOnly) {
         rememberMqttConnectionModel({ settings: nextSettings, status: response.status });
@@ -174,12 +262,17 @@ export function useMqttSettingsData({
       setErrorMessage("");
     } catch (error) {
       const nextError = error instanceof Error ? error : new Error("載入 MQTT 設定失敗。");
+      if (!mountedRef.current || requestGeneration !== settingsRequestGenerationRef.current) {
+        return;
+      }
       setErrorMessage(nextError.message);
       if (propagateError) {
         throw nextError;
       }
     } finally {
-      setActionState((current) => ({ ...current, isLoadingSettings: false }));
+      if (mountedRef.current && requestGeneration === settingsRequestGenerationRef.current) {
+        setActionState((current) => ({ ...current, isLoadingSettings: false }));
+      }
     }
   }, [connectionsOnly]);
 
@@ -224,18 +317,34 @@ export function useMqttSettingsData({
     }
   }, []);
 
-  const loadWeatherSettings = useCallback(async ({ propagateError = false }: { propagateError?: boolean } = {}) => {
+  const loadWeatherSettings = useCallback(async ({
+    propagateError = false,
+    discardDraft = false,
+    publishReloadResult = true
+  }: {
+    propagateError?: boolean;
+    discardDraft?: boolean;
+    publishReloadResult?: boolean;
+  } = {}): Promise<WeatherSettingsLoadOutcome> => {
+    const weatherRequest = beginWeatherRequest(discardDraft);
     try {
       const nextWeatherSettings = await getWeatherSettings();
-      setWeatherSettings(nextWeatherSettings);
-      setLastSyncedWeatherSettings(nextWeatherSettings);
-      setHasLoadedWeatherSettings(true);
+      return commitWeatherSettings(weatherRequest, nextWeatherSettings, publishReloadResult);
     } catch (error) {
-      if (propagateError) {
-        throw error instanceof Error ? error : new Error("載入天氣設定失敗。");
+      if (!mountedRef.current || weatherRequest.operationToken !== weatherRequestGenerationRef.current) {
+        return { operationToken: weatherRequest.operationToken, outcome: "stale" };
       }
+      const nextError = error instanceof Error ? error : new Error("載入天氣設定失敗。");
+      if (publishReloadResult) {
+        setWeatherReloadResult({ operationToken: weatherRequest.operationToken, outcome: "deferred" });
+      }
+      setErrorMessage(nextError.message);
+      if (propagateError) {
+        throw nextError;
+      }
+      return { operationToken: weatherRequest.operationToken, outcome: "deferred" };
     }
-  }, []);
+  }, [beginWeatherRequest, commitWeatherSettings]);
 
   const loadWeatherDiagnostic = useCallback(async () => {
     try {
@@ -256,21 +365,82 @@ export function useMqttSettingsData({
   const loadMqttEditableModel = useCallback(async ({
     force = false,
     propagateError = false,
-    topicsAsPolling = false
-  }: MqttEditableModelLoadOptions = {}) => {
+    topicsAsPolling = false,
+    weatherDiscard = false
+  }: MqttEditableModelLoadOptions = {}): Promise<WeatherSettingsLoadOutcome> => {
     if (topicsAsPolling) {
+      let aggregateError: unknown;
+      let weatherOutcome: WeatherSettingsLoadOutcome = {
+        operationToken: weatherRequestGenerationRef.current,
+        outcome: "stale"
+      };
+      const captureFailure = async (load: () => Promise<void>) => {
+        try {
+          await load();
+        } catch (error) {
+          aggregateError ??= error;
+        }
+      };
       await loadEditableSettingsLane([
-        () => loadSettings({ propagateError }),
-        () => loadTopics({ isPolling: true, propagateError }),
-        () => loadWeatherSettings({ propagateError })
+        () => captureFailure(() => loadSettings({ propagateError: true })),
+        () => captureFailure(() => loadTopics({ isPolling: true, propagateError: true })),
+        async () => {
+          const weatherLoad = loadWeatherSettings({
+            discardDraft: weatherDiscard,
+            propagateError: true,
+            publishReloadResult: false
+          });
+          const operationToken = weatherRequestGenerationRef.current;
+          try {
+            weatherOutcome = await weatherLoad;
+          } catch (error) {
+            weatherOutcome = { operationToken, outcome: "failed" };
+            aggregateError ??= error;
+          }
+        }
       ]);
-      return;
+      if (aggregateError !== undefined) {
+        if (
+          weatherOutcome.outcome === "stale"
+          || weatherOutcome.operationToken !== weatherRequestGenerationRef.current
+        ) {
+          return { operationToken: weatherOutcome.operationToken, outcome: "stale" };
+        }
+        const failedResult = {
+          operationToken: weatherOutcome.operationToken,
+          outcome: "failed"
+        } as const;
+        const nextError = aggregateError instanceof Error
+          ? aggregateError
+          : new Error("載入 MQTT 設定失敗。");
+        setWeatherReloadResult(failedResult);
+        setErrorMessage(nextError.message);
+        if (propagateError) {
+          throw nextError;
+        }
+        return failedResult;
+      }
+      if (
+        weatherOutcome.outcome === "stale"
+        || weatherOutcome.operationToken !== weatherRequestGenerationRef.current
+      ) {
+        return { operationToken: weatherOutcome.operationToken, outcome: "stale" };
+      }
+      setWeatherReloadResult(weatherOutcome);
+      return weatherOutcome;
     }
 
+    const weatherRequest = beginWeatherRequest(weatherDiscard);
     try {
       const model = await loadCachedMqttEditableModel({ force });
-      applyMqttEditableModel(model);
+      if (!mountedRef.current) {
+        return { operationToken: weatherRequest.operationToken, outcome: "stale" };
+      }
+      return applyMqttEditableModel(model, weatherRequest);
     } catch (error) {
+      if (!mountedRef.current || weatherRequest.operationToken !== weatherRequestGenerationRef.current) {
+        return { operationToken: weatherRequest.operationToken, outcome: "stale" };
+      }
       if (propagateError) {
         throw error instanceof Error ? error : new Error("載入 MQTT 設定失敗。");
       }
@@ -280,8 +450,9 @@ export function useMqttSettingsData({
         isLoadingSettings: false,
         isLoadingTopics: false
       }));
+      return { operationToken: weatherRequest.operationToken, outcome: "failed" };
     }
-  }, [applyMqttEditableModel, loadSettings, loadTopics, loadWeatherSettings]);
+  }, [applyMqttEditableModel, beginWeatherRequest, loadSettings, loadTopics, loadWeatherSettings]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -357,6 +528,7 @@ export function useMqttSettingsData({
     status,
     topics,
     weatherDiagnostic,
+    weatherReloadResult,
     weatherSettings
   };
 }

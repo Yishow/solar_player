@@ -4,6 +4,7 @@ import test from "node:test";
 import type { WeatherCurrentSnapshot, WeatherDiagnostic, WeatherHeaderContract, WeatherOptionsResponse, WeatherSettings } from "@solar-display/shared";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import { MqttSettingsContent } from "./MqttSettingsContent";
 import type { TopicMapping } from "./viewModel";
 
@@ -136,6 +137,23 @@ function createTopicMapping(overrides: Partial<TopicMapping> = {}): TopicMapping
     ...overrides
   };
 }
+
+test("mqtt settings keeps Weather controls visible with the deferred remote-change banner", () => {
+  const html = renderContent({
+    remoteSyncBanner: React.createElement(RemoteSyncBanner, {
+      onKeepEditing: () => undefined,
+      onReloadNow: async () => undefined
+    })
+  });
+
+  assert.match(html, /mgmt-remote-sync-banner/);
+  assert.match(html, /遠端已有新資料，尚未套用。/);
+  assert.match(html, /稍後再說/);
+  assert.match(html, /Keep Editing/);
+  assert.match(html, /重新同步/);
+  assert.match(html, /Reload Latest/);
+  assert.match(html, /mqtt-weather-card/);
+});
 
 function createWeatherOptions(overrides: Partial<WeatherOptionsResponse> = {}): WeatherOptionsResponse {
   return {
