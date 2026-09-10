@@ -10,6 +10,8 @@ DRILL=0
 CONFIRM_TOKEN=""
 HEALTH_URL_DEFAULT="http://127.0.0.1:3000/health"
 HEALTH_TIMEOUT_SECONDS="${RESTORE_HEALTH_TIMEOUT_SECONDS:-20}"
+HEALTH_RESPONSE_MAX_BYTES=65536
+HEALTH_CLEANUP_GRACE_MS=2000
 # Documented production overwrite token.
 REQUIRED_CONFIRM="RESTORE-OVERWRITE"
 
@@ -82,6 +84,67 @@ while [[ "$#" -gt 0 ]]; do
     *) fail "Unknown option: $1" ;;
   esac
 done
+
+INTEGRITY_STATUS="skipped"
+MIGRATIONS_STATUS="skipped"
+HEALTH_STATUS="skipped"
+HEALTH_PROCESS_CLEANUP_STATUS="ok"
+DRILL_SUMMARY_EMITTED=0
+WORK_DIR=""
+ROLLBACK_DIR=""
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "${value}"
+}
+
+emit_drill_summary() {
+  local status="$1"
+  local full_drill="$2"
+  local cleanup_status="$3"
+  local owned_path="${4:-}"
+  printf '{"status":"%s","mode":"full-drill","fullDrill":%s,"phases":[' "${status}" "${full_drill}"
+  printf '{"name":"integrity","required":true,"status":"%s"},' "${INTEGRITY_STATUS}"
+  printf '{"name":"migrations","required":true,"status":"%s"},' "${MIGRATIONS_STATUS}"
+  printf '{"name":"health","required":true,"status":"%s"}' "${HEALTH_STATUS}"
+  printf '],"cleanup":{"status":"%s"}' "${cleanup_status}"
+  if [[ "${cleanup_status}" == "unknown" && -n "${owned_path}" ]]; then
+    printf ',"ownedTempPath":"%s"' "$(json_escape "${owned_path}")"
+  fi
+  printf '}\n'
+}
+
+cleanup() {
+  local exit_code=$?
+  local cleanup_status="${HEALTH_PROCESS_CLEANUP_STATUS:-ok}"
+  local owned_path=""
+  set +e
+
+  if [[ -n "${WORK_DIR:-}" ]]; then
+    rm -rf -- "${WORK_DIR}"
+    if [[ -e "${WORK_DIR}" ]]; then
+      cleanup_status="unknown"
+      owned_path="${WORK_DIR}"
+    fi
+  fi
+  if [[ -n "${ROLLBACK_DIR:-}" ]]; then
+    rm -rf -- "${ROLLBACK_DIR}"
+    if [[ -e "${ROLLBACK_DIR}" ]]; then
+      cleanup_status="unknown"
+      [[ -n "${owned_path}" ]] || owned_path="${ROLLBACK_DIR}"
+    fi
+  fi
+
+  if [[ "${DRILL}" == "1" && "${exit_code}" -ne 0 && "${DRILL_SUMMARY_EMITTED}" == "0" ]]; then
+    emit_drill_summary "failed" "false" "${cleanup_status}" "${owned_path}"
+  fi
+}
+trap cleanup EXIT
 
 [[ -n "${BACKUP_DIR}" ]] || fail "--backup-dir is required"
 [[ -d "${BACKUP_DIR}" ]] || fail "Backup directory not found: ${BACKUP_DIR}"
@@ -231,124 +294,386 @@ target_is_nonempty() {
 run_integrity_check() {
   local root="$1"
   local db_path="${root}/data/solar-display.sqlite"
+  INTEGRITY_STATUS="failed"
 
   if [[ ! -f "${db_path}" ]]; then
-    ok "no sqlite database present; integrity_check skipped"
+    INTEGRITY_STATUS="unavailable"
+    echo "ERROR: restored sqlite database is unavailable for integrity_check" >&2
     return 0
   fi
 
-  command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for restore integrity_check"
-  local integrity
-  integrity="$(sqlite3 "${db_path}" "PRAGMA integrity_check;")"
-  if [[ "${integrity}" != "ok" ]]; then
-    fail "SQLite integrity_check failed after restore: ${integrity}"
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    INTEGRITY_STATUS="unavailable"
+    echo "ERROR: sqlite3 is unavailable for restore integrity_check" >&2
+    return 0
   fi
+  local integrity
+  if ! integrity="$(sqlite3 "${db_path}" "PRAGMA integrity_check;" 2>/dev/null)"; then
+    echo "ERROR: SQLite integrity_check could not read the restored database" >&2
+    return 0
+  fi
+  if [[ "${integrity}" != "ok" ]]; then
+    echo "ERROR: SQLite integrity_check failed after restore" >&2
+    return 0
+  fi
+  INTEGRITY_STATUS="ok"
   ok "sqlite integrity_check ok"
 }
 
 run_migrations() {
   local root="$1"
+  MIGRATIONS_STATUS="failed"
 
   if [[ -n "${RESTORE_DRILL_MIGRATE_CMD:-}" ]]; then
-    (
+    if (
       cd "${root}"
-      # shellcheck disable=SC2086
       env DATA_DIR="${root}/data" INSTALL_DIR="${root}" bash -lc "${RESTORE_DRILL_MIGRATE_CMD}"
-    )
-    ok "migrations completed (override command)"
+    ); then
+      MIGRATIONS_STATUS="ok"
+      ok "migrations completed (override command)"
+    else
+      echo "ERROR: migration override failed in restore drill" >&2
+    fi
     return 0
   fi
 
-  if [[ -f "${root}/apps/server/dist/db/migrate.js" || -f "${root}/package.json" ]]; then
-    if command -v node >/dev/null 2>&1 && [[ -f "${root}/apps/server/dist/db/migrate.js" ]]; then
-      (
-        cd "${root}"
-        DATA_DIR="${root}/data" LOG_DIR="${root}/logs" node --input-type=module -e '
-          import { pathToFileURL } from "node:url";
-          import { resolve } from "node:path";
-          const mod = await import(pathToFileURL(resolve("apps/server/dist/db/migrate.js")).href);
-          mod.migrateDatabase();
-        '
-      ) || fail "pending migrations failed in restore drill"
-      ok "migrations completed"
-      return 0
-    fi
+  local migrate_js="${root}/apps/server/dist/db/migrate.js"
+  if [[ ! -r "${migrate_js}" ]]; then
+    MIGRATIONS_STATUS="unavailable"
+    echo "ERROR: migration entrypoint is unavailable in restored application" >&2
+    return 0
   fi
-
-  # Fixture-friendly default when no server code is present: no-op success with notice.
-  ok "migrations skipped (no migrate entrypoint in target); treat as complete for inventory-only drill"
+  if ! command -v node >/dev/null 2>&1; then
+    MIGRATIONS_STATUS="unavailable"
+    echo "ERROR: node runtime is unavailable for restored migrations" >&2
+    return 0
+  fi
+  if (
+    cd "${root}"
+    DATA_DIR="${root}/data" LOG_DIR="${root}/logs" node --input-type=module -e '
+      import { pathToFileURL } from "node:url";
+      import { resolve } from "node:path";
+      const mod = await import(pathToFileURL(resolve("apps/server/dist/db/migrate.js")).href);
+      if (typeof mod.migrateDatabase !== "function") {
+        throw new Error("migrateDatabase export is not callable");
+      }
+      await Promise.resolve(mod.migrateDatabase());
+    '
+  ); then
+    MIGRATIONS_STATUS="ok"
+    ok "migrations completed"
+  else
+    echo "ERROR: pending migrations failed in restore drill" >&2
+  fi
 }
 
 run_health_smoke() {
   local root="$1"
+  HEALTH_STATUS="failed"
+  HEALTH_PROCESS_CLEANUP_STATUS="ok"
 
-  if [[ -n "${RESTORE_DRILL_HEALTH_CMD:-}" ]]; then
-    (
-      cd "${root}"
-      # shellcheck disable=SC2086
-      env DATA_DIR="${root}/data" INSTALL_DIR="${root}" bash -lc "${RESTORE_DRILL_HEALTH_CMD}"
-    )
-    ok "health smoke returned healthy (override command)"
+  if [[ "${RESTORE_SKIP_HEALTH:-0}" == "1" ]]; then
+    HEALTH_STATUS="skipped"
+    echo "ERROR: health smoke skipped by RESTORE_SKIP_HEALTH=1; result is not full verification" >&2
     return 0
   fi
 
-  if [[ "${RESTORE_SKIP_HEALTH:-0}" == "1" ]]; then
-    ok "health smoke skipped by RESTORE_SKIP_HEALTH=1"
+  if ! command -v node >/dev/null 2>&1; then
+    HEALTH_STATUS="unavailable"
+    echo "ERROR: node runtime is unavailable for bounded health supervision" >&2
     return 0
   fi
 
   local server_js="${root}/apps/server/dist/server.js"
-  if [[ ! -f "${server_js}" ]]; then
-    # Without a real server binary, require an explicit override in automated fixtures.
-    fail "health smoke requires apps/server/dist/server.js or RESTORE_DRILL_HEALTH_CMD"
+  local health_mode="server"
+  if [[ -n "${RESTORE_DRILL_HEALTH_CMD:-}" ]]; then
+    health_mode="override"
+  elif [[ ! -f "${server_js}" ]]; then
+    HEALTH_STATUS="unavailable"
+    echo "ERROR: health smoke server entrypoint is unavailable in restored application" >&2
+    return 0
+  elif ! command -v curl >/dev/null 2>&1; then
+    HEALTH_STATUS="unavailable"
+    echo "ERROR: curl is unavailable for restored server health smoke" >&2
+    return 0
   fi
 
   mkdir -p "${root}/logs" "${root}/data"
   local port
   port="${RESTORE_DRILL_PORT:-$((30000 + RANDOM % 1000))}"
-  local health_url="http://127.0.0.1:${port}/health"
-  local pid=""
-  (
-    cd "${root}"
-    PORT="${port}" DATA_DIR="${root}/data" LOG_DIR="${root}/logs" \
-      node "${server_js}" >"${root}/logs/restore-drill-server.log" 2>&1 &
-    echo $! >"${root}/logs/restore-drill-server.pid"
-  )
-  pid="$(cat "${root}/logs/restore-drill-server.pid")"
+  local supervisor_rc=0
+  set +e
+  DRILL_HEALTH_ROOT="${root}" \
+    DRILL_HEALTH_MODE="${health_mode}" \
+    DRILL_HEALTH_PORT="${port}" \
+    DRILL_HEALTH_COMMAND="${RESTORE_DRILL_HEALTH_CMD:-}" \
+    DRILL_HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS}" \
+    DRILL_HEALTH_MAX_BYTES="${HEALTH_RESPONSE_MAX_BYTES}" \
+    DRILL_HEALTH_CLEANUP_GRACE_MS="${HEALTH_CLEANUP_GRACE_MS}" \
+    node --input-type=module <<'NODE'
+import { spawn } from "node:child_process";
+import { closeSync, mkdirSync, openSync } from "node:fs";
+import { performance } from "node:perf_hooks";
+import { resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
-  local elapsed=0
-  local healthy=0
-  while (( elapsed < HEALTH_TIMEOUT_SECONDS )); do
-    if curl -fsS "${health_url}" 2>/dev/null | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"\|status.:.ok\|"ok"'; then
-      healthy=1
-      break
-    fi
-    # Also accept plain ok body.
-    if curl -fsS "${health_url}" 2>/dev/null | grep -qi 'ok'; then
-      healthy=1
-      break
-    fi
-    sleep 1
-    elapsed=$((elapsed + 1))
-  done
+const root = process.env.DRILL_HEALTH_ROOT;
+const mode = process.env.DRILL_HEALTH_MODE;
+const command = process.env.DRILL_HEALTH_COMMAND ?? "";
+const port = Number(process.env.DRILL_HEALTH_PORT);
+const timeoutSeconds = Number(process.env.DRILL_HEALTH_TIMEOUT_SECONDS);
+const maxBytes = Number(process.env.DRILL_HEALTH_MAX_BYTES);
+const cleanupGraceMs = Number(process.env.DRILL_HEALTH_CLEANUP_GRACE_MS);
+if (!root || !Number.isFinite(port) || !Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0
+  || !Number.isSafeInteger(maxBytes) || maxBytes <= 0 || !Number.isFinite(cleanupGraceMs) || cleanupGraceMs < 0) {
+  process.exit(3);
+}
 
-  kill "${pid}" 2>/dev/null || true
-  wait "${pid}" 2>/dev/null || true
-  rm -f "${root}/logs/restore-drill-server.pid"
+const deadline = performance.now() + timeoutSeconds * 1000;
+let owned = null;
+let ownedExit = Promise.resolve({ code: 0, signal: null });
+let ownedReaped = true;
+let signalHandling = false;
 
-  [[ "${healthy}" -eq 1 ]] || fail "health smoke did not return healthy response at ${health_url} within ${HEALTH_TIMEOUT_SECONDS}s"
-  ok "health smoke returned healthy response"
+function remainingMs() {
+  return Math.max(0, deadline - performance.now());
+}
+
+function groupAlive(pgid) {
+  if (!pgid) return false;
+  try {
+    process.kill(-pgid, 0);
+    return true;
+  } catch (error) {
+    return error?.code !== "ESRCH";
+  }
+}
+
+function sendGroupSignal(pgid, signal) {
+  try {
+    process.kill(-pgid, signal);
+    return true;
+  } catch (error) {
+    return error?.code === "ESRCH";
+  }
+}
+
+function setOwned(child) {
+  owned = child;
+  ownedReaped = false;
+  ownedExit = new Promise((resolveExit) => {
+    child.once("exit", (code, signal) => {
+      ownedReaped = true;
+      resolveExit({ code, signal });
+    });
+    child.once("error", (error) => {
+      ownedReaped = true;
+      resolveExit({ code: null, signal: null, error });
+    });
+  });
+  return child;
+}
+
+async function terminateOwned() {
+  if (!owned?.pid) return "ok";
+  const pgid = owned.pid;
+  const cleanupDeadline = performance.now() + cleanupGraceMs;
+  const killAt = cleanupDeadline - Math.min(100, cleanupGraceMs);
+  sendGroupSignal(pgid, "SIGTERM");
+  while (groupAlive(pgid) && performance.now() < killAt) {
+    await delay(Math.min(25, Math.max(1, killAt - performance.now())));
+  }
+  if (groupAlive(pgid)) {
+    sendGroupSignal(pgid, "SIGKILL");
+  }
+  while (groupAlive(pgid) && performance.now() < cleanupDeadline) {
+    await delay(Math.min(10, Math.max(1, cleanupDeadline - performance.now())));
+  }
+  const reapRemaining = Math.max(0, cleanupDeadline - performance.now());
+  if (!ownedReaped && reapRemaining > 0) {
+    await Promise.race([ownedExit, delay(reapRemaining)]);
+  }
+  return groupAlive(pgid) || !ownedReaped ? "unknown" : "ok";
+}
+
+async function finish(kind) {
+  const cleanup = await terminateOwned();
+  if (kind === "ok" && cleanup === "ok") process.exit(0);
+  if (cleanup !== "ok") process.exit(4);
+  if (kind === "unavailable") process.exit(2);
+  process.exit(3);
+}
+
+for (const [signal, code] of [["SIGHUP", 129], ["SIGINT", 130], ["SIGTERM", 143]]) {
+  process.on(signal, () => {
+    if (signalHandling) return;
+    signalHandling = true;
+    void terminateOwned().finally(() => process.exit(code));
+  });
+}
+
+function validHealthBody(body) {
+  if (body.equals(Buffer.from("ok")) || body.equals(Buffer.from("ok\n")) || body.equals(Buffer.from("ok\r\n"))) {
+    return true;
+  }
+  try {
+    const parsed = JSON.parse(body.toString("utf8"));
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) && parsed.status === "ok";
+  } catch {
+    return false;
+  }
+}
+
+async function waitUntilDeadline(completion) {
+  const remaining = remainingMs();
+  if (remaining <= 0) return { timeout: true };
+  return Promise.race([
+    completion.then((value) => ({ timeout: false, ...value })),
+    delay(remaining).then(() => ({ timeout: true }))
+  ]);
+}
+
+async function runOverride() {
+  const logPath = resolve(root, "logs/restore-drill-health-override.log");
+  const logFd = openSync(logPath, "w", 0o600);
+  let child;
+  try {
+    child = setOwned(spawn("bash", ["-lc", command], {
+      cwd: root,
+      detached: true,
+      env: { ...process.env, DATA_DIR: resolve(root, "data"), INSTALL_DIR: root },
+      stdio: ["ignore", "pipe", logFd]
+    }));
+  } finally {
+    closeSync(logFd);
+  }
+  const chunks = [];
+  let capturedBytes = 0;
+  let oversized = false;
+  const stdoutEnded = new Promise((resolveEnd) => {
+    child.stdout.once("end", resolveEnd);
+    child.stdout.once("error", resolveEnd);
+  });
+  child.stdout.on("data", (chunk) => {
+    if (oversized) return;
+    if (capturedBytes + chunk.length > maxBytes) {
+      oversized = true;
+      sendGroupSignal(child.pid, "SIGTERM");
+      return;
+    }
+    chunks.push(chunk);
+    capturedBytes += chunk.length;
+  });
+  const completion = Promise.all([ownedExit, stdoutEnded]).then(([outcome]) => outcome);
+  const outcome = await waitUntilDeadline(completion);
+  if (outcome.timeout || remainingMs() <= 0 || oversized || outcome.error || outcome.code !== 0) {
+    await finish("failed");
+  }
+  await finish(validHealthBody(Buffer.concat(chunks)) ? "ok" : "failed");
+}
+
+async function runCurl(url) {
+  return new Promise((resolveCurl) => {
+    const maxTimeMs = Math.floor(remainingMs());
+    if (maxTimeMs < 1) {
+      resolveCurl({ code: null, deadline: true, oversized: false, body: Buffer.alloc(0) });
+      return;
+    }
+    const args = ["-fsS", "--max-time", (maxTimeMs / 1000).toFixed(3), url];
+    const child = spawn("curl", args, { stdio: ["ignore", "pipe", "ignore"] });
+    const chunks = [];
+    let capturedBytes = 0;
+    let oversized = false;
+    let settled = false;
+    let spawnError = null;
+    const settle = (value) => {
+      if (settled) return;
+      settled = true;
+      resolveCurl(value);
+    };
+    child.stdout.on("data", (chunk) => {
+      if (oversized) return;
+      if (capturedBytes + chunk.length > maxBytes) {
+        oversized = true;
+        child.kill("SIGKILL");
+        return;
+      }
+      chunks.push(chunk);
+      capturedBytes += chunk.length;
+    });
+    child.once("error", (error) => {
+      spawnError = error;
+    });
+    child.once("close", (code) => settle({ code, error: spawnError, oversized, body: Buffer.concat(chunks) }));
+  });
+}
+
+async function runServer() {
+  mkdirSync(resolve(root, "logs"), { recursive: true });
+  const logFd = openSync(resolve(root, "logs/restore-drill-server.log"), "w", 0o600);
+  try {
+    setOwned(spawn(process.execPath, [resolve(root, "apps/server/dist/server.js")], {
+      cwd: root,
+      detached: true,
+      env: { ...process.env, PORT: String(port), DATA_DIR: resolve(root, "data"), LOG_DIR: resolve(root, "logs") },
+      stdio: ["ignore", logFd, logFd]
+    }));
+  } finally {
+    closeSync(logFd);
+  }
+  const url = `http://127.0.0.1:${port}/health`;
+  while (remainingMs() > 0) {
+    if (!groupAlive(owned.pid)) {
+      await finish("failed");
+    }
+    const probe = await runCurl(url);
+    if (probe.oversized) {
+      await finish("failed");
+    }
+    if (probe.code === 0 && remainingMs() > 0) {
+      await finish(validHealthBody(probe.body) ? "ok" : "failed");
+    }
+    const afterProbe = remainingMs();
+    if (afterProbe <= 0) break;
+    await delay(Math.min(100, afterProbe));
+  }
+  await finish("failed");
+}
+
+if (mode === "override") {
+  await runOverride();
+} else {
+  await runServer();
+}
+NODE
+  supervisor_rc=$?
+  set -e
+
+  case "${supervisor_rc}" in
+    0)
+      HEALTH_STATUS="ok"
+      ok "health smoke returned healthy response"
+      ;;
+    2)
+      HEALTH_STATUS="unavailable"
+      echo "ERROR: health smoke entrypoint is unavailable" >&2
+      ;;
+    4)
+      HEALTH_STATUS="failed"
+      HEALTH_PROCESS_CLEANUP_STATUS="unknown"
+      echo "ERROR: health smoke failed and owned process cleanup could not be confirmed" >&2
+      ;;
+    *)
+      HEALTH_STATUS="failed"
+      echo "ERROR: health smoke failed strict response, deadline, or process checks" >&2
+      ;;
+  esac
 }
 
 verify_backup
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/solar-restore-XXXXXX")"
 EXTRACT_DIR="${WORK_DIR}/extract"
-ROLLBACK_DIR=""
-cleanup() {
-  rm -rf "${WORK_DIR}" "${ROLLBACK_DIR}"
-}
-trap cleanup EXIT
 
 mkdir -p "${EXTRACT_DIR}"
 extract_runtime_to "${EXTRACT_DIR}"
@@ -373,13 +698,46 @@ if [[ "${DRILL}" == "1" ]]; then
   fi
 
   run_integrity_check "${DRILL_ROOT}"
-  run_migrations "${DRILL_ROOT}"
-  run_health_smoke "${DRILL_ROOT}"
+  if [[ "${INTEGRITY_STATUS}" == "ok" ]]; then
+    run_migrations "${DRILL_ROOT}"
+  fi
+  if [[ "${INTEGRITY_STATUS}" == "ok" && "${MIGRATIONS_STATUS}" == "ok" ]]; then
+    run_health_smoke "${DRILL_ROOT}"
+  fi
 
-  ok "restore drill completed"
-  echo "DRILL_ROOT=${DRILL_ROOT}"
-  echo "Restore drill verified integrity, migrations, and health against temp root only."
-  exit 0
+  DRILL_STATUS="failed"
+  DRILL_FULL="false"
+  if [[ "${INTEGRITY_STATUS}" == "ok" && "${MIGRATIONS_STATUS}" == "ok" && "${HEALTH_STATUS}" == "ok" ]]; then
+    DRILL_STATUS="ok"
+    DRILL_FULL="true"
+  elif [[ "${INTEGRITY_STATUS}" == "ok" && "${MIGRATIONS_STATUS}" == "ok"
+    && "${HEALTH_STATUS}" == "skipped" && "${RESTORE_SKIP_HEALTH:-0}" == "1" ]]; then
+    DRILL_STATUS="incomplete"
+  fi
+
+  DRILL_CLEANUP_STATUS="${HEALTH_PROCESS_CLEANUP_STATUS}"
+  DRILL_OWNED_PATH=""
+  if [[ "${DRILL_CLEANUP_STATUS}" == "ok" ]]; then
+    if rm -rf -- "${WORK_DIR}" && [[ ! -e "${WORK_DIR}" ]]; then
+      WORK_DIR=""
+      ROLLBACK_DIR=""
+    else
+      DRILL_CLEANUP_STATUS="unknown"
+      DRILL_OWNED_PATH="${WORK_DIR}"
+    fi
+  else
+    DRILL_OWNED_PATH="${WORK_DIR}"
+  fi
+
+  if [[ "${DRILL_CLEANUP_STATUS}" != "ok" ]]; then
+    DRILL_STATUS="failed"
+    DRILL_FULL="false"
+  fi
+  trap - EXIT
+  DRILL_SUMMARY_EMITTED=1
+  emit_drill_summary "${DRILL_STATUS}" "${DRILL_FULL}" "${DRILL_CLEANUP_STATUS}" "${DRILL_OWNED_PATH}"
+  [[ "${DRILL_STATUS}" == "ok" ]] && exit 0
+  exit 1
 fi
 
 [[ -n "${TARGET_ROOT}" ]] || fail "--target-root is required unless --drill is set"

@@ -3595,6 +3595,7 @@ test("runtime restore drill verifies integrity migrations and health on temp roo
       path.join(projectDir, "apps/server/dist/db/migrate.js"),
       "export function migrateDatabase() { console.log('fixture migration ran'); }\n"
     );
+    chmodSync(path.join(projectDir, "apps/server/dist/db/migrate.js"), 0o644);
     writeFileSync(
       path.join(projectDir, "apps/server/dist/server.js"),
       `import { createServer } from "node:http";
@@ -3641,9 +3642,345 @@ server.listen(Number(process.env.PORT), "127.0.0.1");
     assert.match(drillResult.stdout, /health smoke returned healthy/i);
     assert.match(drillResult.stdout, /fixture migration ran/i);
     assert.doesNotMatch(drillResult.stdout, /migrations skipped/i);
+    const summary = parseRestoreDrillSummary(drillResult);
+    assert.deepEqual(summary, {
+      status: "ok",
+      mode: "full-drill",
+      fullDrill: true,
+      phases: [
+        { name: "integrity", required: true, status: "ok" },
+        { name: "migrations", required: true, status: "ok" },
+        { name: "health", required: true, status: "ok" }
+      ],
+      cleanup: { status: "ok" }
+    });
     assert.equal(readFileSync(productionMarker, "utf8"), "must-remain\n");
   } finally {
     removeTempDir(projectDir);
+  }
+});
+
+function parseRestoreDrillSummary(result) {
+  const lines = `${result.stdout ?? ""}\n${result.stderr ?? ""}`
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .reverse();
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (parsed && parsed.mode === "full-drill" && Array.isArray(parsed.phases)) {
+        return parsed;
+      }
+    } catch {
+      // Human-readable diagnostic line; keep looking for the machine summary.
+    }
+  }
+  assert.fail(`missing restore drill JSON summary:\n${result.stdout}\n${result.stderr}`);
+}
+
+function prepareRestoreDrillFixture(options = {}) {
+  const projectDir = makeFixtureProject();
+  const backupRoot = path.join(projectDir, "backups");
+  writeFileSync(path.join(projectDir, "deploy/export-runtime-state.sh"), readFileSync(exportScriptPath, "utf8"));
+  writeFileSync(path.join(projectDir, "deploy/restore-runtime-state.sh"), readFileSync(restoreScriptPath, "utf8"));
+  markBashExecutable(path.join(projectDir, "deploy/export-runtime-state.sh"));
+  markBashExecutable(path.join(projectDir, "deploy/restore-runtime-state.sh"));
+
+  if (options.database === false) {
+    rmSync(path.join(projectDir, "data/solar-display.sqlite"), { force: true });
+  }
+  if (options.migration !== false) {
+    mkdirSync(path.join(projectDir, "apps/server/dist/db"), { recursive: true });
+    writeFileSync(
+      path.join(projectDir, "apps/server/dist/db/migrate.js"),
+      options.migrationSource ?? "export function migrateDatabase() { process.stdout.write('fixture migration ran\\n'); }\n"
+    );
+    chmodSync(path.join(projectDir, "apps/server/dist/db/migrate.js"), 0o644);
+  }
+  if (options.server === false) {
+    rmSync(path.join(projectDir, "apps/server/dist/server.js"), { force: true });
+  } else if (typeof options.serverSource === "string") {
+    writeFileSync(path.join(projectDir, "apps/server/dist/server.js"), options.serverSource);
+  } else {
+    writeFileSync(
+      path.join(projectDir, "apps/server/dist/server.js"),
+      `import { createServer } from "node:http";
+const server = createServer((request, response) => {
+  response.setHeader("content-type", "application/json");
+  response.end(JSON.stringify({ status: request.url === "/health" ? "ok" : "not-found" }));
+});
+server.listen(Number(process.env.PORT), "127.0.0.1");
+`
+    );
+  }
+
+  const exportResult = runBashScript("deploy/export-runtime-state.sh", [], {
+    cwd: projectDir,
+    env: {
+      ...process.env,
+      INSTALL_DIR: projectDir,
+      EXPORT_OUTPUT_DIR: backupRoot,
+      EXPORT_TIMESTAMP: "drill-matrix",
+      EXPORT_ALLOW_LIVE: "1"
+    },
+    bashPathKeys: ["INSTALL_DIR", "EXPORT_OUTPUT_DIR"],
+    encoding: "utf8"
+  });
+  assert.equal(exportResult.status, 0, exportResult.stderr || exportResult.stdout);
+  return { backupDir: path.join(backupRoot, "drill-matrix"), projectDir };
+}
+
+function runRestoreDrill(fixture, env = {}) {
+  return runBashScript(
+    "deploy/restore-runtime-state.sh",
+    ["--backup-dir", fixture.backupDir, "--drill"],
+    {
+      cwd: fixture.projectDir,
+      env: { ...process.env, RESTORE_HEALTH_TIMEOUT_SECONDS: "2", ...env },
+      encoding: "utf8"
+    }
+  );
+}
+
+test("runtime restore drill reports failed setup before required phases run", () => {
+  const fixture = prepareRestoreDrillFixture();
+  try {
+    rmSync(path.join(fixture.backupDir, "prior-application.tar.gz"), { force: true });
+    const result = runRestoreDrill(fixture);
+    assert.notEqual(result.status, 0);
+    const summary = parseRestoreDrillSummary(result);
+    assert.equal(summary.status, "failed");
+    assert.equal(summary.fullDrill, false);
+    assert.deepEqual(summary.phases, [
+      { name: "integrity", required: true, status: "skipped" },
+      { name: "migrations", required: true, status: "skipped" },
+      { name: "health", required: true, status: "skipped" }
+    ]);
+    assert.deepEqual(summary.cleanup, { status: "ok" });
+    assert.doesNotMatch(result.stdout + result.stderr, /restore drill completed|full verified/iu);
+  } finally {
+    removeTempDir(fixture.projectDir);
+  }
+});
+
+test("runtime restore drill accepts only the bounded health body contract", () => {
+  const accepted = [
+    ["json", `printf '%s' '{"status":"ok","note":"token error counter is zero"}'`],
+    ["plain", `printf 'ok'`],
+    ["plain-lf", `printf 'ok\\n'`],
+    ["plain-crlf", `printf 'ok\\r\\n'`],
+    [
+      "exact-byte-limit",
+      `node -e 'const p="{\\"status\\":\\"ok\\",\\"note\\":\\""; const s="\\"}"; process.stdout.write(p + "x".repeat(65536 - p.length - s.length) + s)'`
+    ]
+  ];
+  const rejected = [
+    ["two-lf", `printf 'ok\\n\\n'`],
+    ["leading-space", `printf ' ok'`],
+    ["trailing-space", `printf 'ok '`],
+    ["text", `printf 'ok now'`],
+    ["not-ok", `printf 'not-ok'`],
+    ["other-field", `printf '%s' '{"status":"failed","note":"ok token"}'`],
+    ["missing-status", `printf '%s' '{"note":"ok"}'`],
+    ["array", `printf '%s' '[{"status":"ok"}]'`],
+    ["malformed", `printf '%s' '{"status":"ok"'`],
+    ["empty", `:`],
+    ["oversize", `node -e 'process.stdout.write("x".repeat(65537))'`]
+  ];
+
+  for (const [label, command] of accepted) {
+    const fixture = prepareRestoreDrillFixture({ server: false });
+    try {
+      const result = runRestoreDrill(fixture, { RESTORE_DRILL_HEALTH_CMD: command });
+      assert.equal(result.status, 0, `${label}: ${result.stderr || result.stdout}`);
+      const summary = parseRestoreDrillSummary(result);
+      assert.equal(summary.status, "ok", label);
+      assert.equal(summary.fullDrill, true, label);
+      assert.equal(summary.phases[2]?.status, "ok", label);
+    } finally {
+      removeTempDir(fixture.projectDir);
+    }
+  }
+
+  for (const [label, command] of rejected) {
+    const fixture = prepareRestoreDrillFixture({ server: false });
+    try {
+      const result = runRestoreDrill(fixture, { RESTORE_DRILL_HEALTH_CMD: command });
+      assert.notEqual(result.status, 0, `${label}: unexpectedly succeeded`);
+      const summary = parseRestoreDrillSummary(result);
+      assert.equal(summary.status, "failed", label);
+      assert.equal(summary.fullDrill, false, label);
+      assert.equal(summary.phases[2]?.status, "failed", label);
+      assert.equal(summary.cleanup?.status, "ok", label);
+      assert.doesNotMatch(result.stdout + result.stderr, /restore drill completed|full verified/iu, label);
+    } finally {
+      removeTempDir(fixture.projectDir);
+    }
+  }
+});
+
+test("runtime restore drill fails closed on missing required entrypoints and explicit health skip", () => {
+  const cases = [
+    {
+      label: "missing database",
+      fixture: { database: false },
+      expectedPhase: ["integrity", "unavailable"],
+      expectedStatus: "failed"
+    },
+    {
+      label: "missing migration",
+      fixture: { migration: false },
+      expectedPhase: ["migrations", "unavailable"],
+      expectedStatus: "failed"
+    },
+    {
+      label: "missing server",
+      fixture: { server: false },
+      expectedPhase: ["health", "unavailable"],
+      expectedStatus: "failed"
+    },
+    {
+      label: "health skipped",
+      fixture: {},
+      env: { RESTORE_SKIP_HEALTH: "1" },
+      expectedPhase: ["health", "skipped"],
+      expectedStatus: "incomplete"
+    }
+  ];
+
+  for (const testCase of cases) {
+    const fixture = prepareRestoreDrillFixture(testCase.fixture);
+    try {
+      const result = runRestoreDrill(fixture, testCase.env);
+      assert.notEqual(result.status, 0, `${testCase.label}: unexpectedly succeeded`);
+      const summary = parseRestoreDrillSummary(result);
+      assert.equal(summary.status, testCase.expectedStatus, testCase.label);
+      assert.equal(summary.fullDrill, false, testCase.label);
+      const phase = summary.phases.find((candidate) => candidate.name === testCase.expectedPhase[0]);
+      assert.equal(phase?.status, testCase.expectedPhase[1], testCase.label);
+      assert.equal(summary.cleanup?.status, "ok", testCase.label);
+      assert.doesNotMatch(result.stdout + result.stderr, /restore drill completed|full verified/iu, testCase.label);
+    } finally {
+      removeTempDir(fixture.projectDir);
+    }
+  }
+});
+
+test("runtime restore drill treats migration and health overrides as distinct contracts", () => {
+  const validFixture = prepareRestoreDrillFixture({ migration: false, server: false });
+  try {
+    const result = runRestoreDrill(validFixture, {
+      RESTORE_DRILL_MIGRATE_CMD: ":",
+      RESTORE_DRILL_HEALTH_CMD: "printf 'ok'"
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const summary = parseRestoreDrillSummary(result);
+    assert.equal(summary.phases[1]?.status, "ok");
+    assert.equal(summary.phases[2]?.status, "ok");
+  } finally {
+    removeTempDir(validFixture.projectDir);
+  }
+
+  const invalidFixture = prepareRestoreDrillFixture({ server: true });
+  try {
+    const result = runRestoreDrill(invalidFixture, { RESTORE_DRILL_HEALTH_CMD: "printf 'not-ok'" });
+    assert.notEqual(result.status, 0, "invalid override must not fall back to the valid server.js fixture");
+    const summary = parseRestoreDrillSummary(result);
+    assert.equal(summary.phases[2]?.status, "failed");
+  } finally {
+    removeTempDir(invalidFixture.projectDir);
+  }
+});
+
+test("runtime restore drill rejects a non-callable default migration entrypoint", () => {
+  const fixture = prepareRestoreDrillFixture({ migrationSource: "export const notMigration = true;\n" });
+  try {
+    const result = runRestoreDrill(fixture);
+    assert.notEqual(result.status, 0);
+    const summary = parseRestoreDrillSummary(result);
+    assert.equal(summary.status, "failed");
+    assert.equal(summary.phases[0]?.status, "ok");
+    assert.equal(summary.phases[1]?.status, "failed");
+    assert.equal(summary.phases[2]?.status, "skipped");
+  } finally {
+    removeTempDir(fixture.projectDir);
+  }
+});
+
+test("runtime restore drill applies strict bodies and one deadline to the default server path", () => {
+  const invalidFixture = prepareRestoreDrillFixture({
+    serverSource: `import { createServer } from "node:http";
+const server = createServer((_request, response) => response.end('not-ok'));
+server.listen(Number(process.env.PORT), "127.0.0.1");
+`
+  });
+  try {
+    const result = runRestoreDrill(invalidFixture);
+    assert.notEqual(result.status, 0);
+    assert.equal(parseRestoreDrillSummary(result).phases[2]?.status, "failed");
+  } finally {
+    removeTempDir(invalidFixture.projectDir);
+  }
+
+  const neverListeningFixture = prepareRestoreDrillFixture({
+    serverSource: "setInterval(() => {}, 1000);\n"
+  });
+  try {
+    const startedAt = Date.now();
+    const result = runRestoreDrill(neverListeningFixture, { RESTORE_HEALTH_TIMEOUT_SECONDS: "1" });
+    const elapsedMs = Date.now() - startedAt;
+    assert.notEqual(result.status, 0);
+    const summary = parseRestoreDrillSummary(result);
+    assert.equal(summary.phases[2]?.status, "failed");
+    assert.equal(summary.cleanup?.status, "ok");
+    assert.ok(elapsedMs < 3_500, `default server probes reset the health deadline: ${elapsedMs}ms`);
+  } finally {
+    removeTempDir(neverListeningFixture.projectDir);
+  }
+});
+
+test("runtime restore drill retries delayed server startup within one health deadline", () => {
+  const fixture = prepareRestoreDrillFixture({
+    serverSource: `import { createServer } from "node:http";
+const server = createServer((_request, response) => response.end('{"status":"ok"}'));
+setTimeout(() => server.listen(Number(process.env.PORT), "127.0.0.1"), 250);
+`
+  });
+  try {
+    const startedAt = Date.now();
+    const result = runRestoreDrill(fixture, { RESTORE_HEALTH_TIMEOUT_SECONDS: "2" });
+    const elapsedMs = Date.now() - startedAt;
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(parseRestoreDrillSummary(result).phases[2]?.status, "ok");
+    assert.ok(elapsedMs < 2_000, `health retry exceeded its shared deadline: ${elapsedMs}ms`);
+  } finally {
+    removeTempDir(fixture.projectDir);
+  }
+});
+
+test("runtime restore drill times out and reaps an override process group", () => {
+  const fixture = prepareRestoreDrillFixture({ server: false });
+  const childPidPath = path.join(tmpdir(), `solar-restore-drill-child-${process.pid}-${Date.now()}.pid`);
+  try {
+    const command = `sleep 30 & child=$!; printf '%s' "$child" > ${quoteForBash(toBashPathValue(childPidPath))}; wait`;
+    const startedAt = Date.now();
+    const result = runRestoreDrill(fixture, {
+      RESTORE_DRILL_HEALTH_CMD: command,
+      RESTORE_HEALTH_TIMEOUT_SECONDS: "1"
+    });
+    const elapsedMs = Date.now() - startedAt;
+    assert.notEqual(result.status, 0);
+    const summary = parseRestoreDrillSummary(result);
+    assert.equal(summary.phases[2]?.status, "failed");
+    assert.equal(summary.cleanup?.status, "ok");
+    assert.ok(elapsedMs < 3_500, `deadline plus cleanup grace was exceeded: ${elapsedMs}ms`);
+    assert.equal(waitForPathExists(childPidPath, 500), true, "override child pid fixture was not created");
+    const childPid = Number(readFileSync(childPidPath, "utf8"));
+    assert.throws(() => process.kill(childPid, 0), /ESRCH/u, `owned child ${childPid} survived cleanup`);
+  } finally {
+    rmSync(childPidPath, { force: true });
+    removeTempDir(fixture.projectDir);
   }
 });
 
