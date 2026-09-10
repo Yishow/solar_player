@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
-import { meterIdentityKey, type PeriodConsumptionResult } from "@solar-display/shared";
+import type { PeriodConsumptionResult } from "@solar-display/shared";
+import { selectProjectionFingerprintEvidence } from "./accountingEvidenceSelection.js";
 import { canonicalJson } from "./authoringCanonicalJson.js";
-import { loadAcceptedMeterReadings, type AcceptedMeterReadingRow } from "./meterReadingService.js";
+import type { AcceptedMeterReadingRow } from "./meterReadingService.js";
 
 export type ConsumptionProjection = PeriodConsumptionResult & {
   active: boolean;
@@ -35,38 +36,26 @@ function rowToProjection(row: Record<string, unknown>): ConsumptionProjection {
   };
 }
 
+// The fingerprint rows of a projection, freshly selected on every call.
 function projectionSamples(database: Database.Database, scope: "cl" | "kn", result?: PeriodConsumptionResult) {
-  const rows = loadAcceptedMeterReadings(database, scope);
-  if (!result?.periodStart || !result.calculatedThrough || !result.meterIds) return rows;
-  const members = new Set(result.meterIds);
-  const start = Date.parse(result.periodStart);
-  const through = Date.parse(result.calculatedThrough);
-  const baselines = new Map<string, AcceptedMeterReadingRow>();
-  const instant = (row: AcceptedMeterReadingRow) => Date.parse(row.source_timestamp ?? row.received_at);
-  const selected = rows.filter((row) => {
-    if (!members.has(row.channel_id) || instant(row) > through) return false;
-    if (instant(row) >= start) return true;
-    const identity = meterIdentityKey({
-      metricScope: scope,
-      meterId: row.meter_id,
-      channelId: row.channel_id,
-      sourceRevision: row.source_revision,
-      epochId: row.epoch_id
-    });
-    const prior = baselines.get(identity);
-    if (!prior || instant(row) > instant(prior)) baselines.set(identity, row);
-    return false;
-  });
-  return [...selected, ...baselines.values()].sort((a, b) => a.reading_id.localeCompare(b.reading_id));
+  return selectProjectionFingerprintEvidence(database, scope, result).rows;
+}
+
+function fingerprintChecksum(rows: readonly AcceptedMeterReadingRow[]) {
+  return createHash("sha256").update(JSON.stringify(rows)).digest("hex");
+}
+
+function fingerprintWatermark(rows: readonly AcceptedMeterReadingRow[]) {
+  const times = rows.map((row) => Date.parse(row.source_timestamp ?? row.received_at)).filter(Number.isFinite);
+  return times.length ? new Date(times.reduce((latest, time) => Math.max(latest, time), -Infinity)).toISOString() : null;
 }
 
 export function acceptedSampleChecksum(database: Database.Database, scope: "cl" | "kn", result?: PeriodConsumptionResult) {
-  return createHash("sha256").update(JSON.stringify(projectionSamples(database, scope, result))).digest("hex");
+  return fingerprintChecksum(projectionSamples(database, scope, result));
 }
 
 export function acceptedWatermark(database: Database.Database, scope: "cl" | "kn", result?: PeriodConsumptionResult) {
-  const times = projectionSamples(database, scope, result).map((row) => Date.parse(row.source_timestamp ?? row.received_at)).filter(Number.isFinite);
-  return times.length ? new Date(times.reduce((latest, time) => Math.max(latest, time), -Infinity)).toISOString() : null;
+  return fingerprintWatermark(projectionSamples(database, scope, result));
 }
 
 export function projectionContextKey(result: PeriodConsumptionResult) {
@@ -80,13 +69,24 @@ export function shadowProject(
   result: PeriodConsumptionResult,
   scope: "cl" | "kn",
   range: ConsumptionProjection["range"],
-  checksum = acceptedSampleChecksum(database, scope, result),
-  watermark = acceptedWatermark(database, scope, result)
+  checksum?: string,
+  watermark?: string | null
 ) {
   const contextKey = projectionContextKey(result);
-  const inputChecksum = acceptedSampleChecksum(database, scope, result);
-  if (checksum !== inputChecksum) projectionError("PROJECTION_INPUT_CHANGED");
-  const projectionId = createHash("sha256").update(canonicalJson({ result, scope, range, checksum, watermark, inputChecksum })).digest("hex");
+  // One fresh selection at candidate creation serves the input check and any
+  // checksum or watermark the caller did not supply.
+  const evidence = projectionSamples(database, scope, result);
+  const inputChecksum = fingerprintChecksum(evidence);
+  const evidenceWatermark = fingerprintWatermark(evidence);
+  const sampleChecksum = checksum === undefined ? inputChecksum : checksum;
+  const resolvedWatermark = watermark === undefined ? evidenceWatermark : watermark;
+  if (sampleChecksum !== inputChecksum) projectionError("PROJECTION_INPUT_CHANGED");
+  if (result.periodStart && result.calculatedThrough && result.meterIds && watermark !== undefined && watermark !== evidenceWatermark) {
+    projectionError("PROJECTION_INPUT_CHANGED");
+  }
+  const projectionId = createHash("sha256")
+    .update(canonicalJson({ result, scope, range, checksum: sampleChecksum, watermark: resolvedWatermark, inputChecksum }))
+    .digest("hex");
   const current = readActiveProjection(database, scope, range, contextKey);
   const algorithmVersion = result.calculationVersion ?? "e2-v1";
   const createdAt = new Date().toISOString();
@@ -105,8 +105,8 @@ export function shadowProject(
     result.quality,
     result.siteTimeZone,
     result.valueKwh,
-    watermark,
-    checksum,
+    resolvedWatermark,
+    sampleChecksum,
     createdAt,
     contextKey,
     JSON.stringify(result),
@@ -127,9 +127,17 @@ export function activateProjection(database: Database.Database, candidate: Consu
     if (!row) projectionError("PROJECTION_NOT_FOUND");
     const stored = rowToProjection(row);
     const current = readActiveProjection(database, stored.scope, stored.range, stored.contextKey);
+    const currentEvidence = projectionSamples(database, stored.scope, stored);
+    const currentInputChecksum = fingerprintChecksum(currentEvidence);
+    if (row.input_checksum !== currentInputChecksum) projectionError("PROJECTION_INPUT_CHANGED");
+    if (
+      stored.periodStart && stored.calculatedThrough && stored.meterIds
+      && stored.watermark !== fingerprintWatermark(currentEvidence)
+    ) {
+      projectionError("PROJECTION_INPUT_CHANGED");
+    }
     if (current?.projectionId === stored.projectionId) return current;
     if ((current?.projectionId ?? null) !== row.expected_active_id) projectionError("PROJECTION_ACTIVATION_CONFLICT");
-    if (row.input_checksum !== acceptedSampleChecksum(database, stored.scope, stored)) projectionError("PROJECTION_INPUT_CHANGED");
     if (current?.watermark && (!stored.watermark || Date.parse(stored.watermark) < Date.parse(current.watermark))) {
       projectionError("PROJECTION_WATERMARK_STALE");
     }

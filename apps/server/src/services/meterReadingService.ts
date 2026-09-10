@@ -343,15 +343,144 @@ export type AcceptedMeterReadingRow = {
   boundary_max_age_seconds: number;
 };
 
-export function loadAcceptedMeterReadings(database: Database.Database, scope: "cl" | "kn"): AcceptedMeterReadingRow[] {
-  return database.prepare(`
+export type AcceptedReadingIdentity = {
+  epochId: string;
+  meterId: string;
+  sourceRevision: number;
+};
+
+// Every accepted-reading read returns exactly this row shape, so a bounded read
+// and the full-scope read can be compared, hashed and resolved interchangeably.
+const ACCEPTED_READING_SELECT = `
     SELECT a.reading_id, a.meter_id, a.channel_id, a.source_revision, a.epoch_id, a.normalized_value_kwh,
       a.source_timestamp, a.received_at, a.timestamp_quality, COALESCE(a.measurement_kind, s.measurement_kind) AS measurement_kind,
       COALESCE(s.boundary_max_age_seconds, 300) AS boundary_max_age_seconds
     FROM meter_readings_accepted a
     LEFT JOIN meter_sources s ON s.metric_scope = a.metric_scope AND s.meter_id = a.meter_id
-      AND s.channel_id = a.channel_id AND s.source_revision = a.source_revision AND s.epoch_id = a.epoch_id
+      AND s.channel_id = a.channel_id AND s.source_revision = a.source_revision AND s.epoch_id = a.epoch_id`;
+
+/**
+ * A reading's evidence instant in epoch milliseconds as SQLite evaluates it:
+ * `Date.parse(source_timestamp ?? received_at)`. Both agree exactly on the ISO
+ * 8601 forms ingest stores — a `Z` or `±HH:MM` offset and at most millisecond
+ * precision. A string SQLite cannot evaluate yields NULL. The accepted-reading
+ * instant indexes (migration 052) are built on this exact expression, which is
+ * what lets the bounded reads below seek instead of scanning a whole scope.
+ */
+function acceptedReadingInstantMsSql(alias = "") {
+  return `CAST(ROUND(unixepoch(COALESCE(${alias}source_timestamp, ${alias}received_at), 'subsec') * 1000) AS INTEGER)`;
+}
+
+// A reading the period calculation can place in time: it carries a source
+// instant, or its receive time is explicitly marked as that instant's estimate.
+const CALCULATION_ELIGIBLE_SQL = "(source_timestamp IS NOT NULL OR timestamp_quality = 'receive-time-estimated')";
+
+/** Every accepted reading of a scope. Kept for callers that genuinely need the whole scope. */
+export function loadAcceptedMeterReadings(database: Database.Database, scope: "cl" | "kn"): AcceptedMeterReadingRow[] {
+  return database.prepare(`${ACCEPTED_READING_SELECT}
     WHERE a.metric_scope = ?
     ORDER BY a.reading_id
   `).all(scope) as AcceptedMeterReadingRow[];
+}
+
+/**
+ * Accepted readings of `channelIds` whose evidence instant lies in
+ * [fromMs, toMs], plus every reading of those channels whose instant SQLite
+ * cannot evaluate — their presence tells the caller the bounds are not trustworthy.
+ */
+export function loadAcceptedMeterReadingsInWindow(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  channelIds: readonly string[],
+  fromMs: number,
+  toMs: number
+): AcceptedMeterReadingRow[] {
+  if (channelIds.length === 0) {
+    return [];
+  }
+  const instant = acceptedReadingInstantMsSql("a.");
+  const channels = `a.metric_scope = ? AND a.channel_id IN (${channelIds.map(() => "?").join(", ")})`;
+  // Two branches rather than `IS NULL OR BETWEEN`: an OR over the instant leaves
+  // the planner only the (scope, channel) prefix, which walks the channel's whole
+  // history. Each branch here is its own bounded seek on the instant index.
+  return database.prepare(`${ACCEPTED_READING_SELECT}
+    WHERE ${channels} AND ${instant} BETWEEN ? AND ?
+    UNION ALL${ACCEPTED_READING_SELECT}
+    WHERE ${channels} AND ${instant} IS NULL
+    ORDER BY reading_id
+  `).all(scope, ...channelIds, fromMs, toMs, scope, ...channelIds) as AcceptedMeterReadingRow[];
+}
+
+/** One identity's accepted readings whose evidence instant lies in [fromMs, toMs]. */
+export function loadAcceptedMeterReadingsForIdentityWindow(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  channelId: string,
+  identity: AcceptedReadingIdentity,
+  fromMs: number,
+  toMs: number
+): AcceptedMeterReadingRow[] {
+  const instant = acceptedReadingInstantMsSql("a.");
+  return database.prepare(`${ACCEPTED_READING_SELECT}
+    WHERE a.metric_scope = ? AND a.channel_id = ? AND a.meter_id = ? AND a.source_revision = ? AND a.epoch_id = ?
+      AND ${instant} BETWEEN ? AND ?
+    ORDER BY a.reading_id
+  `).all(scope, channelId, identity.meterId, identity.sourceRevision, identity.epochId, fromMs, toMs) as AcceptedMeterReadingRow[];
+}
+
+/**
+ * The newest evidence instant at or before `atOrBeforeMs` on a channel,
+ * optionally for one full identity. `calculationEligible` skips readings the
+ * period calculation cannot place in time. Null when there is none.
+ */
+export function findLatestAcceptedInstantMs(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  channelId: string,
+  atOrBeforeMs: number,
+  options: { calculationEligible: boolean; identity?: AcceptedReadingIdentity }
+): number | null {
+  const instant = acceptedReadingInstantMsSql();
+  const { identity } = options;
+  const row = database.prepare(`
+    SELECT ${instant} AS instant_ms FROM meter_readings_accepted
+    WHERE metric_scope = ? AND channel_id = ?
+      ${identity ? "AND meter_id = ? AND source_revision = ? AND epoch_id = ?" : ""}
+      AND ${instant} <= ?
+      ${options.calculationEligible ? `AND ${CALCULATION_ELIGIBLE_SQL}` : ""}
+    ORDER BY ${instant} DESC
+    LIMIT 1
+  `).get(
+    scope,
+    channelId,
+    ...(identity ? [identity.meterId, identity.sourceRevision, identity.epochId] : []),
+    atOrBeforeMs
+  ) as { instant_ms: number } | undefined;
+  return row?.instant_ms ?? null;
+}
+
+/** Every full identity that has ever reported on a channel, in identity order. */
+export function listAcceptedReadingIdentities(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  channelId: string
+): AcceptedReadingIdentity[] {
+  // Stepping to the next identity key keeps this an index seek per identity
+  // rather than a scan of every reading the channel has ever accepted.
+  const next = database.prepare(`
+    SELECT meter_id, source_revision, epoch_id FROM meter_readings_accepted
+    WHERE metric_scope = ? AND channel_id = ? AND (meter_id, source_revision, epoch_id) > (?, ?, ?)
+    ORDER BY meter_id, source_revision, epoch_id
+    LIMIT 1
+  `);
+  const identities: AcceptedReadingIdentity[] = [];
+  let key: [string, number, string] = ["", Number.MIN_SAFE_INTEGER, ""];
+  for (;;) {
+    const row = next.get(scope, channelId, ...key) as { epoch_id: string; meter_id: string; source_revision: number } | undefined;
+    if (!row) {
+      return identities;
+    }
+    identities.push({ epochId: row.epoch_id, meterId: row.meter_id, sourceRevision: row.source_revision });
+    key = [row.meter_id, row.source_revision, row.epoch_id];
+  }
 }

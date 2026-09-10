@@ -7,7 +7,23 @@ import type { MeterSourceDefinition } from "@solar-display/shared";
 import { shadowProject, activateProjection } from "./consumptionProjectionService.js";
 import { saveMeterSource } from "./meterSourceCatalogService.js";
 import { seedAcceptedReading, ingestMeterReading } from "./meterReadingService.js";
-import { loadAcceptedSamples, resolveDailyConsumptionPoints, resolvePersistedPeriodConsumption, tryResolvePersistedPeriodConsumption } from "./periodConsumptionService.js";
+import { readFreshnessPolicy } from "./freshnessPolicyService.js";
+import {
+  loadAcceptedSamples,
+  loadEffectivePeriodContext,
+  monthDateKeys,
+  periodSelectionFromRange,
+  rangeSpanFromRange,
+  rangeWindowFor,
+  resolveConsumptionForRangeWindow,
+  resolveDailyConsumptionPoints,
+  resolveDailyPointsFromEvidence,
+  resolvePeriodFromEvidence,
+  resolvePersistedPeriodConsumption,
+  resolveSpanFromEvidence,
+  tryResolvePersistedPeriodConsumption
+} from "./periodConsumptionService.js";
+import { getActiveProfile, listPersistedProfiles } from "./siteEnergyProfileRepository.js";
 
 function createDatabase(effectiveFrom = "2026-01-01T00:00:00+08:00") {
   const database = new Database(":memory:");
@@ -249,7 +265,7 @@ test("E3 a projection matching the current context is reused without rewriting a
 });
 
 
-test("a full-year date set loads accepted samples once instead of re-scanning per day", () => {
+test("a full-year date set selects accepted samples once instead of re-scanning per day", () => {
   const database = createDatabase();
   const definition = source(1, "epoch-1");
   const dates: string[] = [];
@@ -273,7 +289,7 @@ test("a full-year date set loads accepted samples once instead of re-scanning pe
 
   const points = resolveDailyConsumptionPoints(database, "kn", dates, "2026-12-31T16:00:00Z");
   assert.equal(points?.length, 365);
-  assert.equal(readingQueries, 1);
+  assert.equal(readingQueries, 2, "one window query and one identity-seek statement serve all 365 dates");
   assert.equal(points?.find((point) => point.date === "2026-01-01")?.valueKwh, null);
   database.close();
 });
@@ -439,6 +455,171 @@ test("N4 a configured profile without usable evidence still returns a canonical 
   }
   assert.equal(tryResolvePersistedPeriodConsumption(database, "global" as unknown as "kn", "total", N4_AS_OF), null);
   database.close();
+});
+
+// Counts the queries and rows read from accepted readings, so a test can require
+// that unrelated history is never materialized.
+function recordAcceptedRowReads(database: Database.Database) {
+  const reads = { queries: 0, rows: 0 };
+  const prepare = database.prepare.bind(database);
+  database.prepare = ((sql: string) => {
+    const statement = prepare(sql);
+    if (!sql.includes("meter_readings_accepted")) {
+      return statement;
+    }
+    reads.queries += 1;
+    const all = statement.all.bind(statement);
+    const get = statement.get.bind(statement);
+    statement.all = ((...parameters: unknown[]) => {
+      const rows = all(...parameters);
+      reads.rows += rows.length;
+      return rows;
+    }) as typeof statement.all;
+    statement.get = ((...parameters: unknown[]) => {
+      const row = get(...parameters);
+      if (row !== undefined) reads.rows += 1;
+      return row;
+    }) as typeof statement.get;
+    return statement;
+  }) as typeof database.prepare;
+  return reads;
+}
+
+// Older readings of the same register, all before every window these tests resolve.
+function seedOldHistory(database: Database.Database, count: number) {
+  const insert = database.prepare(`
+    INSERT INTO meter_readings_accepted (
+      reading_id, metric_scope, meter_id, channel_id, source_revision, epoch_id, raw_value_decimal,
+      normalized_value_kwh, source_timestamp, received_at, timestamp_quality, origin, payload_hash, created_at, measurement_kind
+    ) VALUES (?, 'kn', 'kn-main', 'kn-main', 1, 'epoch-1', ?, ?, ?, ?, 'source', 'mqtt', ?, ?, 'cumulative-energy')
+  `);
+  database.transaction(() => {
+    for (let index = 0; index < count; index += 1) {
+      const instant = new Date(Date.parse("2023-01-01T00:00:00Z") + index * 3_600_000).toISOString();
+      insert.run(`old-${index}`, String(index), String(index), instant, instant, `old-${index}`, instant);
+    }
+  })();
+}
+
+test("persisted ranges resolve from bounded evidence exactly as from the full-load oracle", (t) => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  t.after(() => database.close());
+  seedOldHistory(database, 500);
+  seedCrossYearRegister(database);
+  seedAcceptedReading(database, source(1, "epoch-1"), "1750", "2026-08-31T16:00:00Z", "2026-08-31T16:00:00Z");
+  seedAcceptedReading(database, source(2, "epoch-2"), "5", "2026-09-01T08:00:00Z", "2026-09-01T08:00:00Z");
+  const profiles = listPersistedProfiles(database, "kn");
+  const active = getActiveProfile(database, "kn")!;
+  const freshnessPolicy = readFreshnessPolicy(database).policy;
+  const full = loadAcceptedSamples(database, "kn");
+  const reads = recordAcceptedRowReads(database);
+
+  for (const range of ["day", "month", "year"] as const) {
+    const period = periodSelectionFromRange(range, N4_AS_OF, active.siteTimeZone)!;
+    assert.deepStrictEqual(
+      resolvePersistedPeriodConsumption(database, "kn", period, N4_AS_OF),
+      resolvePeriodFromEvidence(profiles, full, period, N4_AS_OF, freshnessPolicy),
+      range
+    );
+  }
+  for (const range of ["week", "total"] as const) {
+    const span = rangeSpanFromRange(range, N4_AS_OF, active, active.siteTimeZone)!;
+    assert.deepStrictEqual(
+      tryResolvePersistedPeriodConsumption(database, "kn", range, N4_AS_OF),
+      resolveSpanFromEvidence(profiles, full, span, N4_AS_OF, freshnessPolicy),
+      range
+    );
+  }
+  assert.ok(reads.rows < 500, `five ranges read ${reads.rows} accepted rows; the 500 older readings must stay unread`);
+});
+
+test("profile selection, revision boundaries and the effective context are unchanged under bounded reads", (t) => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  t.after(() => database.close());
+  seedOldHistory(database, 300);
+  seedCrossYearRegister(database);
+  seedAcceptedReading(database, source(1, "epoch-1"), "1800", "2026-05-31T16:00:00Z", "2026-05-31T16:00:00Z");
+  activateSecondProfileRevision(database, "2026-06-15T00:00:00+08:00");
+  const profiles = listPersistedProfiles(database, "kn");
+  const freshnessPolicy = readFreshnessPolicy(database).policy;
+  const full = loadAcceptedSamples(database, "kn");
+  const june = { kind: "month" as const, month: 6, year: 2026 };
+
+  for (const [period, options] of [[june, {}], [june, { profileRevision: 1 }], [{ kind: "year" as const, year: 2026 }, {}]] as const) {
+    assert.deepStrictEqual(
+      resolvePersistedPeriodConsumption(database, "kn", period, N4_AS_OF, options),
+      resolvePeriodFromEvidence(profiles, full, period, N4_AS_OF, freshnessPolicy, options),
+      JSON.stringify([period, options])
+    );
+  }
+  assert.throws(() => resolvePersistedPeriodConsumption(database, "kn", june, N4_AS_OF, { profileRevision: 99 }), /UNKNOWN_PROFILE_REVISION/);
+
+  const rangeWindow = rangeWindowFor("month", N4_AS_OF, getActiveProfile(database, "kn")!)!;
+  const context = loadEffectivePeriodContext(database, "kn", rangeWindow, N4_AS_OF);
+  assert.ok(context.samples.every((sample) => !sample.readingId?.startsWith("old-")), "the context carries no unrelated history");
+  const resolveChannel = (samples: typeof full) => resolveConsumptionForRangeWindow(rangeWindow, {
+    asOf: N4_AS_OF,
+    freshnessPolicy: context.freshnessPolicy,
+    meterIds: ["kn-main"],
+    profile: context.profile,
+    samples
+  });
+  assert.deepStrictEqual(resolveChannel(context.samples), resolveChannel(full));
+});
+
+test("daily points resolve from one bounded read and equal the full-load oracle on every date", (t) => {
+  const database = createDatabase();
+  t.after(() => database.close());
+  seedOldHistory(database, 400);
+  const definition = source(1, "epoch-1");
+  seedAcceptedReading(database, definition, "100", "2026-07-31T16:00:00Z", "2026-07-31T16:00:00Z");
+  for (let day = 1; day <= 30; day += 3) {
+    const instant = new Date(Date.parse("2026-07-31T16:00:00Z") + day * 86_400_000).toISOString();
+    seedAcceptedReading(database, definition, String(100 + day * 10), instant, instant);
+  }
+  seedAcceptedReading(database, source(2, "epoch-2"), "1", "2026-09-05T00:00:00Z", "2026-09-05T00:00:00Z");
+  seedAcceptedReading(database, source(2, "epoch-2"), "40", "2026-09-10T00:00:00Z", "2026-09-10T00:00:00Z");
+  const asOf = "2026-09-12T00:00:00Z";
+  const dates = [...monthDateKeys("2026-08"), ...monthDateKeys("2026-09"), "2026-02-30", "not-a-date"];
+  const profiles = listPersistedProfiles(database, "kn");
+  const freshnessPolicy = readFreshnessPolicy(database).policy;
+  const oracle = resolveDailyPointsFromEvidence(profiles, loadAcceptedSamples(database, "kn"), freshnessPolicy, dates, asOf);
+  const reads = recordAcceptedRowReads(database);
+
+  const oneDate = resolveDailyConsumptionPoints(database, "kn", ["2026-08-15"], asOf);
+  const oneDateReads = { ...reads };
+  resolveDailyConsumptionPoints(database, "kn", Array.from({ length: 365 }, () => "2026-08-15"), asOf);
+  const repeatedDateReads = {
+    queries: reads.queries - oneDateReads.queries,
+    rows: reads.rows - oneDateReads.rows
+  };
+  const beforeWideClosure = { ...reads };
+  const points = resolveDailyConsumptionPoints(database, "kn", dates, asOf);
+  const wideClosureReads = {
+    queries: reads.queries - beforeWideClosure.queries,
+    rows: reads.rows - beforeWideClosure.rows
+  };
+
+  assert.deepStrictEqual(points, oracle);
+  assert.deepStrictEqual(oneDate, oracle.filter((point) => point.date === "2026-08-15"));
+  assert.deepStrictEqual(repeatedDateReads, oneDateReads, "the query and row counts do not grow with the number of dates in one closure");
+  assert.ok(wideClosureReads.queries < dates.length, "a wider multi-profile closure remains independent of the date count");
+  assert.ok(wideClosureReads.rows < 400, "the 400 older readings stay unread");
+});
+
+test("an as-of before the requested window resolves from the evidence before that as-of", (t) => {
+  const database = createDatabase();
+  t.after(() => database.close());
+  seedOldHistory(database, 100);
+  seedAcceptedReading(database, source(1, "epoch-1"), "100", "2026-06-01T00:00:00Z", "2026-06-01T00:00:00Z");
+  seedAcceptedReading(database, source(1, "epoch-1"), "150", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z");
+  const september = { kind: "month" as const, month: 9, year: 2026 };
+  const asOf = "2026-08-15T00:00:00Z";
+
+  assert.deepStrictEqual(
+    resolvePersistedPeriodConsumption(database, "kn", september, asOf),
+    resolvePeriodFromEvidence(listPersistedProfiles(database, "kn"), loadAcceptedSamples(database, "kn"), september, asOf, readFreshnessPolicy(database).policy)
+  );
 });
 
 function failCalendarRead(database: Database.Database, table: string, error: unknown) {

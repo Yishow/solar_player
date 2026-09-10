@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import {
   monthBoundaryInProfileZone,
+  profileMemberChannelIds,
   resolveAccountingSpanConsumption,
   resolvePeriodConsumption,
   periodWindow,
@@ -15,28 +16,12 @@ import {
 import { readFreshnessPolicy } from "./freshnessPolicyService.js";
 import { getActiveProfile, listPersistedProfiles } from "./siteEnergyProfileRepository.js";
 import { readActiveProjection, acceptedSampleChecksum, projectionContextKey } from "./consumptionProjectionService.js";
-
+import { selectCalculationEvidence, toPeriodSamples } from "./accountingEvidenceSelection.js";
 import { loadAcceptedMeterReadings } from "./meterReadingService.js";
 
+/** Every accepted reading of a scope as resolver samples, for callers that need the whole scope. */
 export function loadAcceptedSamples(database: Database.Database, scope: "cl" | "kn"): PeriodSample[] {
-  const rows = loadAcceptedMeterReadings(database, scope);
-  return rows.slice().sort((a, b) => {
-    const timeA = Date.parse(a.source_timestamp ?? a.received_at);
-    const timeB = Date.parse(b.source_timestamp ?? b.received_at);
-    return timeA - timeB || a.reading_id.localeCompare(b.reading_id);
-  }).map((row) => ({
-    readingId: row.reading_id,
-    boundaryMaxAgeSeconds: row.boundary_max_age_seconds,
-    channelId: row.channel_id,
-    epochId: row.epoch_id,
-    meterId: row.meter_id,
-    sourceTimestamp: row.source_timestamp,
-    receivedAt: row.received_at,
-    timestampQuality: row.timestamp_quality,
-    measurementKind: row.measurement_kind ?? "unknown",
-    sourceRevision: row.source_revision,
-    valueKwh: row.normalized_value_kwh
-  }));
+  return toPeriodSamples(loadAcceptedMeterReadings(database, scope));
 }
 
 export function calendarPartsInProfileZone(instantUtc: string, siteTimeZone: string) {
@@ -241,6 +226,29 @@ function selectEffectiveForWindow(
   };
 }
 
+/**
+ * Resolver samples for `channelIds` covering every window in `selections`, from
+ * one bounded selection. Each window is resolved through its own capped instant,
+ * so the read spans the earliest window's opening to the latest through-instant;
+ * the resolver's month coverage days fall inside their month and need nothing more.
+ */
+function selectEvidenceSamples(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  channelIds: readonly string[],
+  selections: ReadonlyArray<Pick<EffectivePeriodSelection, "throughMs" | "window">>
+): PeriodSample[] {
+  if (selections.length === 0) {
+    return [];
+  }
+  return toPeriodSamples(selectCalculationEvidence(database, {
+    channelIds,
+    fromMs: Math.min(...selections.map((selection) => Math.min(selection.window.startMs, selection.throughMs))),
+    scope,
+    throughMs: Math.max(...selections.map((selection) => selection.throughMs))
+  }).rows);
+}
+
 export function loadEffectivePeriodContext(
   database: Database.Database,
   scope: "cl" | "kn",
@@ -248,11 +256,15 @@ export function loadEffectivePeriodContext(
   asOf: string,
   options: { profileRevision?: number } = {}
 ): EffectivePeriodContext {
+  const selection = selectEffectiveRangeWindow(listPersistedProfiles(database, scope), rangeWindow, asOf, options);
+  const freshnessPolicy = readFreshnessPolicy(database).policy;
   return {
-    ...selectEffectiveRangeWindow(listPersistedProfiles(database, scope), rangeWindow, asOf, options),
+    ...selection,
     asOf,
-    freshnessPolicy: readFreshnessPolicy(database).policy,
-    samples: loadAcceptedSamples(database, scope)
+    freshnessPolicy,
+    // Consumers resolve this window for channels of this profile only, which the
+    // resolver itself enforces, so its member channels bound the evidence.
+    samples: selectEvidenceSamples(database, scope, profileMemberChannelIds(selection.profile), [selection])
   };
 }
 
@@ -263,10 +275,17 @@ export function resolvePersistedPeriodConsumption(
   asOf: string,
   options: { profileRevision?: number; meterIds?: string[]; timeZone?: string; start?: string; end?: string } = {}
 ) {
-  return resolveWithEvidence(listPersistedProfiles(database, scope), loadAcceptedSamples(database, scope), period, asOf, readFreshnessPolicy(database).policy, options);
+  const profiles = listPersistedProfiles(database, scope);
+  const selection = selectEffectivePeriod(profiles, period, asOf, options);
+  const samples = selectEvidenceSamples(database, scope, options.meterIds ?? selection.profile.siteTotal.memberChannelIds, [selection]);
+  return resolvePeriodFromEvidence(profiles, samples, period, asOf, readFreshnessPolicy(database).policy, options);
 }
 
-function resolveWithEvidence(
+/**
+ * The one period resolution used for every persisted read. Services hand it the
+ * evidence they selected; tests hand it the full-scope evidence as the oracle.
+ */
+export function resolvePeriodFromEvidence(
   storedProfiles: SiteEnergyProfileV1[], samples: PeriodSample[], period: PeriodSelection, asOf: string, freshnessPolicy: FreshnessPolicy,
   options: { profileRevision?: number; meterIds?: string[]; timeZone?: string; start?: string; end?: string } = {}
 ) {
@@ -285,7 +304,7 @@ function resolveWithEvidence(
 }
 
 /** A span reaches the same accumulated-delta, identity and quality core as a calendar period. */
-function resolveSpanWithEvidence(
+export function resolveSpanFromEvidence(
   storedProfiles: SiteEnergyProfileV1[], samples: PeriodSample[], span: AccountingSpan, asOf: string, freshnessPolicy: FreshnessPolicy
 ) {
   const rangeWindow: RangeWindow = { kind: "span", span };
@@ -392,7 +411,9 @@ function tryResolveSpanConsumption(
     return unavailableSpanResult(activeProfile, range, asOf);
   }
   try {
-    return resolveSpanWithEvidence(profiles, loadAcceptedSamples(database, scope), span, asOf, readFreshnessPolicy(database).policy);
+    const selection = selectEffectiveRangeWindow(profiles, { kind: "span", span }, asOf);
+    const samples = selectEvidenceSamples(database, scope, selection.profile.siteTotal.memberChannelIds, [selection]);
+    return resolveSpanFromEvidence(profiles, samples, span, asOf, readFreshnessPolicy(database).policy);
   } catch (error) {
     // A broken profile must stay distinguishable from "no evidence yet", so the raised code is
     // carried into the diagnostics instead of collapsing into one opaque reason.
@@ -439,13 +460,8 @@ export function monthDateKeys(month: string): string[] {
   return Array.from({ length: daysInMonth }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
 }
 
-function dailyConsumptionPoint(
-  profiles: SiteEnergyProfileV1[],
-  samples: PeriodSample[],
-  freshnessPolicy: FreshnessPolicy,
-  date: string,
-  asOf: string
-): DailyConsumptionPoint | null {
+/** The day period a `YYYY-MM-DD` key names, or null for a key the daily series skips. */
+function dailyPeriodOf(date: string): PeriodSelection | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match) {
     return null;
@@ -454,8 +470,22 @@ function dailyConsumptionPoint(
   if (period.month! < 1 || period.month! > 12 || period.day! < 1 || period.day! > 31) {
     return null;
   }
+  return period;
+}
+
+function dailyConsumptionPoint(
+  profiles: SiteEnergyProfileV1[],
+  samples: PeriodSample[],
+  freshnessPolicy: FreshnessPolicy,
+  date: string,
+  asOf: string
+): DailyConsumptionPoint | null {
+  const period = dailyPeriodOf(date);
+  if (!period) {
+    return null;
+  }
   try {
-    const result = resolveWithEvidence(profiles, samples, period, asOf, freshnessPolicy);
+    const result = resolvePeriodFromEvidence(profiles, samples, period, asOf, freshnessPolicy);
     return {
       date,
       profileRevision: result.profileRevision,
@@ -486,8 +516,32 @@ export function resolveDailyConsumptionPoints(
   if (dates.length === 0) {
     return [];
   }
-  const samples = loadAcceptedSamples(database, scope);
+  // Each date resolves against its own effective profile; one bounded read covers them all.
+  const selections = dates.flatMap((date) => {
+    const period = dailyPeriodOf(date);
+    if (!period) {
+      return [];
+    }
+    try {
+      return [selectEffectivePeriod(profiles, period, asOf)];
+    } catch {
+      return [];
+    }
+  });
+  const channelIds = selections.flatMap((selection) => selection.profile.siteTotal.memberChannelIds);
+  const samples = selectEvidenceSamples(database, scope, channelIds, selections);
   const freshnessPolicy = readFreshnessPolicy(database).policy;
+  return resolveDailyPointsFromEvidence(profiles, samples, freshnessPolicy, dates, asOf);
+}
+
+/** The one daily-point resolution, over whichever evidence the caller selected. */
+export function resolveDailyPointsFromEvidence(
+  profiles: SiteEnergyProfileV1[],
+  samples: PeriodSample[],
+  freshnessPolicy: FreshnessPolicy,
+  dates: string[],
+  asOf: string
+): DailyConsumptionPoint[] {
   return dates
     .map((date) => dailyConsumptionPoint(profiles, samples, freshnessPolicy, date, asOf))
     .filter((point): point is DailyConsumptionPoint => point !== null);
