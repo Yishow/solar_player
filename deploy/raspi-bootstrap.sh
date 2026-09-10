@@ -1,5 +1,7 @@
 #!/bin/bash
+set +x
 set -euo pipefail
+LC_ALL=C
 
 MODE="update"
 DEPLOY_SCOPE=""
@@ -8,7 +10,14 @@ MQTT_HOST="192.168.31.62"
 BUNDLE_DIR=""
 DESKTOP="xfce-xrdp"
 RDP_AUTH="passwordless"
-RDP_PASSWORD="${RDP_PASSWORD:-}"
+RDP_PASSWORD_ENV="${RDP_PASSWORD-}"
+export -n RDP_PASSWORD 2>/dev/null || true
+unset RDP_PASSWORD
+RDP_PASSWORD="${RDP_PASSWORD_ENV}"
+unset RDP_PASSWORD_ENV
+RDP_PASSWORD_FILE=""
+OWNED_RDP_PARENT=""
+SOLAR_SECRET_ALLOWED_ROOTS="${SOLAR_SECRET_ALLOWED_ROOTS:-/run/solar-display-deploy-secrets:/run/solar-display-bootstrap-secrets}"
 DRY_RUN=0
 SKIP_DISK=0
 APPLY_READONLY=0
@@ -26,6 +35,103 @@ HOTSPOT_PRIORITY="100"
 fail() {
   echo "ERROR: $*" >&2
   exit 1
+}
+
+stat_field() {
+  local format="$1"
+  local bsd_format="${format}"
+  [[ "${format}" != "%a" ]] || bsd_format="%Lp"
+  stat -c "${format}" "$2" 2>/dev/null || stat -f "${bsd_format}" "$2" 2>/dev/null
+}
+
+validate_rdp_password_file() {
+  local file_path="$1"
+  local parent marker owner parent_owner marker_uid marker_magic marker_owner marker_file marker_extra marker_fd
+  local allowed_root allowed=0
+  [[ "${file_path}" == /* && -f "${file_path}" && ! -L "${file_path}" ]] || return 1
+  parent="${file_path%/*}"
+  [[ "${file_path}" == "${parent}/rdp-password" ]] || return 1
+  [[ "${parent##*/}" == .solar-deploy-* || "${parent##*/}" == .solar-bootstrap-* ]] || return 1
+  while IFS= read -r -d ':' allowed_root || [[ -n "${allowed_root}" ]]; do
+    if [[ "${parent}" == "${allowed_root%/}/"* && "${parent#"${allowed_root%/}/"}" != */* ]]; then
+      allowed=1
+      break
+    fi
+  done <<< "${SOLAR_SECRET_ALLOWED_ROOTS}:"
+  [[ "${allowed}" == "1" ]] || return 1
+  [[ -d "${parent}" && ! -L "${parent}" ]] || return 1
+  [[ "$(stat_field '%a' "${parent}")" == "700" ]] || return 1
+  [[ "$(stat_field '%a' "${file_path}")" == "600" ]] || return 1
+  owner="$(stat_field '%u' "${file_path}")" || return 1
+  [[ "${owner}" == "0" || "${owner}" == "${EUID}" || "${owner}" == "${SUDO_UID:-}" ]] || return 1
+  parent_owner="$(stat_field '%u' "${parent}")" || return 1
+  [[ "${parent_owner}" == "${owner}" || "${parent_owner}" == "0" ]] || return 1
+  marker="${parent}/.solar-deploy-secret-marker"
+  [[ -f "${marker}" && ! -L "${marker}" && "$(stat_field '%a' "${marker}")" == "600" ]] || return 1
+  marker_uid="$(stat_field '%u' "${marker}")" || return 1
+  [[ "${marker_uid}" == "${owner}" || "${marker_uid}" == "0" ]] || return 1
+  exec {marker_fd}<"${marker}" || return 1
+  IFS= read -r marker_magic <&"${marker_fd}" || { exec {marker_fd}<&-; return 1; }
+  IFS= read -r marker_owner <&"${marker_fd}" || { exec {marker_fd}<&-; return 1; }
+  IFS= read -r marker_file <&"${marker_fd}" || { exec {marker_fd}<&-; return 1; }
+  marker_extra=""
+  IFS= read -r marker_extra <&"${marker_fd}" && { exec {marker_fd}<&-; return 1; }
+  exec {marker_fd}<&-
+  [[ "${marker_magic}" == "SOLAR-DEPLOY-SECRET-MARKER/1" ]] || return 1
+  [[ "${marker_owner}" == "owner=${owner}" && "${marker_file}" == "file=rdp-password" && -z "${marker_extra}" ]]
+}
+
+cleanup_owned_rdp_file() {
+  local cleanup_status=0 candidate candidate_owner
+  [[ -n "${OWNED_RDP_PARENT}" ]] || return 0
+  if validate_rdp_password_file "${OWNED_RDP_PARENT}/rdp-password"; then
+    rm -f -- "${OWNED_RDP_PARENT}/rdp-password" "${OWNED_RDP_PARENT}/.solar-deploy-secret-marker" || cleanup_status=1
+  elif [[ "${OWNED_RDP_PARENT}" == /run/solar-display-bootstrap-secrets/.solar-bootstrap-* \
+    && -d "${OWNED_RDP_PARENT}" && ! -L "${OWNED_RDP_PARENT}" \
+    && "$(stat_field '%a' "${OWNED_RDP_PARENT}")" == "700" \
+    && "$(stat_field '%u' "${OWNED_RDP_PARENT}")" == "0" ]]; then
+    for candidate in "${OWNED_RDP_PARENT}/rdp-password" "${OWNED_RDP_PARENT}/.solar-deploy-secret-marker"; do
+      if [[ -e "${candidate}" ]]; then
+        candidate_owner="$(stat_field '%u' "${candidate}")" || { cleanup_status=1; continue; }
+        if [[ -f "${candidate}" && ! -L "${candidate}" && "${candidate_owner}" == "0" ]]; then
+          rm -f -- "${candidate}" || cleanup_status=1
+        else
+          cleanup_status=1
+        fi
+      fi
+    done
+  else
+    cleanup_status=1
+  fi
+  rmdir -- "${OWNED_RDP_PARENT}" 2>/dev/null || cleanup_status=1
+  if [[ "${cleanup_status}" == "0" ]]; then
+    echo "RDP secret cleanup: ok" >&2
+    OWNED_RDP_PARENT=""
+  else
+    echo "RDP secret cleanup: unknown; validate exact recovery path before removal: ${OWNED_RDP_PARENT}" >&2
+    return 1
+  fi
+}
+
+create_legacy_rdp_password_file() {
+  local owner
+  (( ${#RDP_PASSWORD} <= 4096 )) || fail "legacy RDP password exceeds 4096 bytes"
+  [[ "${RDP_PASSWORD}" != *$'\r'* && "${RDP_PASSWORD}" != *$'\n'* ]] \
+    || fail "legacy RDP password contains a forbidden byte"
+  OWNED_RDP_PARENT="$(mktemp -d /run/solar-display-bootstrap-secrets/.solar-bootstrap-XXXXXX)" \
+    || fail "cannot create legacy RDP secret parent"
+  trap cleanup_owned_rdp_file EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  chmod 700 "${OWNED_RDP_PARENT}"
+  RDP_PASSWORD_FILE="${OWNED_RDP_PARENT}/rdp-password"
+  (set -C; : > "${RDP_PASSWORD_FILE}") || fail "cannot create legacy RDP secret file"
+  chmod 600 "${RDP_PASSWORD_FILE}"
+  printf '%s' "${RDP_PASSWORD}" > "${RDP_PASSWORD_FILE}"
+  owner="$(stat_field '%u' "${RDP_PASSWORD_FILE}")" || fail "cannot inspect legacy RDP secret owner"
+  printf 'SOLAR-DEPLOY-SECRET-MARKER/1\nowner=%s\nfile=rdp-password\n' "${owner}" > "${OWNED_RDP_PARENT}/.solar-deploy-secret-marker"
+  chmod 600 "${OWNED_RDP_PARENT}/.solar-deploy-secret-marker"
 }
 
 ok() {
@@ -192,7 +298,8 @@ while [[ "$#" -gt 0 ]]; do
     --bundle-dir) BUNDLE_DIR="${2:-}"; shift 2 ;;
     --desktop) DESKTOP="${2:-}"; shift 2 ;;
     --rdp-auth) RDP_AUTH="${2:-}"; shift 2 ;;
-    --rdp-password) RDP_PASSWORD="${2:-}"; shift 2 ;;
+    --rdp-password) RDP_PASSWORD="${2:-}"; echo "WARNING: --rdp-password is deprecated; use --rdp-password-file" >&2; shift 2 ;;
+    --rdp-password-file) RDP_PASSWORD_FILE="${2:-}"; shift 2 ;;
     --kiosk-user) KIOSK_USER="${2:-}"; shift 2 ;;
     --hotspot-connection-id) HOTSPOT_CONNECTION_ID="${2:-}"; shift 2 ;;
     --hotspot-scan-ssid) HOTSPOT_SCAN_SSID="${2:-}"; shift 2 ;;
@@ -530,6 +637,18 @@ if [[ "${DRY_RUN}" == "1" ]]; then
   exit 0
 fi
 
+if [[ -n "${RDP_PASSWORD_FILE}" ]]; then
+  validate_rdp_password_file "${RDP_PASSWORD_FILE}" || fail "--rdp-password-file failed owner, marker, type, mode, or containment validation"
+elif [[ -n "${RDP_PASSWORD}" ]]; then
+  install -d -m 700 /run/solar-display-bootstrap-secrets
+  [[ -d /run/solar-display-bootstrap-secrets && ! -L /run/solar-display-bootstrap-secrets ]] \
+    || fail "legacy RDP secret root is not a regular directory"
+  [[ "$(stat_field '%a' /run/solar-display-bootstrap-secrets)" == "700" \
+    && "$(stat_field '%u' /run/solar-display-bootstrap-secrets)" == "0" ]] \
+    || fail "legacy RDP secret root must be root-owned mode 700"
+  create_legacy_rdp_password_file
+fi
+
 if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
   require_app_update_prerequisites
   create_verified_runtime_backup
@@ -578,11 +697,15 @@ install_node_if_needed
   sudo -u "${KIOSK_USER}" bash -lc 'source "${HOME}/.nvm/nvm.sh" 2>/dev/null || true; pnpm install --prod --no-frozen-lockfile'
 )
 
-"${INSTALL_DIR}/deploy/configure-lightweight-desktop.sh" \
-  --user "${KIOSK_USER}" \
-  --desktop "${DESKTOP}" \
-  --rdp-auth "${RDP_AUTH}" \
-  ${RDP_PASSWORD:+--rdp-password "${RDP_PASSWORD}"}
+desktop_args=(
+  --user "${KIOSK_USER}"
+  --desktop "${DESKTOP}"
+  --rdp-auth "${RDP_AUTH}"
+)
+if [[ -n "${RDP_PASSWORD_FILE}" ]]; then
+  desktop_args+=(--rdp-password-file "${RDP_PASSWORD_FILE}")
+fi
+"${INSTALL_DIR}/deploy/configure-lightweight-desktop.sh" "${desktop_args[@]}"
 
 INSTALL_DIR="${INSTALL_DIR}" KIOSK_USER="${KIOSK_USER}" "${INSTALL_DIR}/deploy/install-kiosk.sh"
 

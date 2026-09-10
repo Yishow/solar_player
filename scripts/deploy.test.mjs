@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -459,6 +459,910 @@ function isExecutable(filePath) {
 
   return (statSync(filePath).mode & 0o111) !== 0;
 }
+
+const secretTransportEnvironmentKeys = ["SSH_PASSWORD", "SUDO_PASSWORD", "RDP_PASSWORD", "SSHPASS"];
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function bashEscapedRepresentation(value) {
+  const result = spawnSync(bashCommand, ["-c", "printf '%q' \"$1\"", "bash", value], {
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result.stdout.trim();
+}
+
+function secretRepresentations(value) {
+  return [
+    value,
+    quoteForBash(value),
+    bashEscapedRepresentation(value),
+    Buffer.from(value, "utf8").toString("base64"),
+    encodeURIComponent(value),
+    JSON.stringify(value)
+  ].filter((representation) => representation.length > 0);
+}
+
+function assertSecretRepresentationsAbsent(contents, values) {
+  for (const value of values) {
+    for (const representation of secretRepresentations(value)) {
+      assert.equal(
+        contents.includes(representation),
+        false,
+        `secret representation leaked: ${representation}`
+      );
+    }
+  }
+}
+
+function writeExecutableFixture(filePath, contents) {
+  writeFileSync(filePath, `${contents}\n`, "utf8");
+  markBashExecutable(filePath);
+}
+
+function createSecretTransportFixture() {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "solar-secret-transport-"));
+  const fakeBinDir = path.join(fixtureRoot, "fake-bin");
+  const authCaptureDir = path.join(fixtureRoot, "auth-capture");
+  const fdSourceDir = path.join(fixtureRoot, "fd-sources");
+  const capturePath = path.join(fixtureRoot, "child-capture.log");
+  const frameCapturePath = path.join(fixtureRoot, "bootstrap-frame.bin");
+  const authCountPath = path.join(fixtureRoot, "sshpass-count");
+  const rsyncCountPath = path.join(fixtureRoot, "rsync-count");
+  const rsyncRshCapturePath = path.join(fixtureRoot, "rsync-rsh.log");
+  const entrypointPath = path.join(fixtureRoot, "scripts/raspi-onekey-deploy.sh");
+
+  mkdirSync(fakeBinDir, { recursive: true });
+  mkdirSync(authCaptureDir, { recursive: true });
+  mkdirSync(fdSourceDir, { recursive: true });
+  mkdirSync(path.dirname(entrypointPath), { recursive: true });
+
+  writeExecutableFixture(
+    path.join(fixtureRoot, "deploy.sh"),
+    [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      "{",
+      "  printf 'build argv\\n'",
+      "  printf '<%s>\\n' \"$@\"",
+      "  printf 'build env\\n'",
+      "  env | sort",
+      "} >> \"$CAPTURE_PATH\"",
+      "exit 0"
+    ].join("\n")
+  );
+  writeFileSync(entrypointPath, readFileSync(raspiDeployScriptPath, "utf8"), "utf8");
+  markBashExecutable(entrypointPath);
+
+  writeExecutableFixture(
+    path.join(fakeBinDir, "date"),
+    [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      "{",
+      "  printf 'date child\\n'",
+      "  env | sort",
+      "} >> \"$CAPTURE_PATH\"",
+      "printf '20260910120000\\n'"
+    ].join("\n")
+  );
+
+  writeExecutableFixture(
+    path.join(fakeBinDir, "ssh"),
+    [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      "{",
+      "  printf 'ssh argv\\n'",
+      "  printf '<%s>\\n' \"$@\"",
+      "  printf 'ssh env\\n'",
+      "  env | sort",
+      "} >> \"$CAPTURE_PATH\"",
+      "if [[ \"$*\" == *raspi-bootstrap.sh* ]]; then",
+      "  cat > \"$FRAME_CAPTURE_PATH\"",
+      "  if [[ -n \"${FAKE_BOOTSTRAP_OUTPUT:-}\" ]]; then printf '%s\\n' \"$FAKE_BOOTSTRAP_OUTPUT\"; fi",
+      "  if [[ -n \"${FAKE_BOOTSTRAP_SSH_STATUS:-}\" ]]; then exit \"$FAKE_BOOTSTRAP_SSH_STATUS\"; fi",
+      "fi",
+      "if [[ \"$*\" == *\"printf 'OK: ssh reachable on %s\\\\n'\"* ]]; then",
+      "  printf 'OK: ssh reachable on fake\\n'",
+      "fi",
+      "exit \"${FAKE_SSH_STATUS:-0}\""
+    ].join("\n")
+  );
+
+  writeExecutableFixture(
+    path.join(fakeBinDir, "sshpass"),
+    [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      "{",
+      "  printf 'sshpass argv\\n'",
+      "  printf '<%s>\\n' \"$@\"",
+      "  printf 'sshpass env\\n'",
+      "  env | sort",
+      "} >> \"$CAPTURE_PATH\"",
+      "auth_fd=",
+      "while [[ \"$#\" -gt 0 ]]; do",
+      "  case \"$1\" in",
+      "    -d) auth_fd=\"${2:-}\"; shift 2 ;;",
+      "    -d[0-9]*) auth_fd=\"${1#-d}\"; shift ;;",
+      "    -e) shift ;;",
+      "    -f|-p|-P) shift 2 ;;",
+      "    --) shift; break ;;",
+      "    ssh) break ;;",
+      "    *) shift ;;",
+      "  esac",
+      "done",
+      "count=0",
+      "if [[ -f \"$AUTH_COUNT_PATH\" ]]; then count=$(<\"$AUTH_COUNT_PATH\"); fi",
+      "count=$((count + 1))",
+      "printf '%s\\n' \"$count\" > \"$AUTH_COUNT_PATH\"",
+      "if [[ -n \"$auth_fd\" ]]; then",
+      "  cat \"/dev/fd/${auth_fd}\" > \"$AUTH_CAPTURE_DIR/auth-${count}.bin\"",
+      "else",
+      "  : > \"$AUTH_CAPTURE_DIR/auth-${count}.missing\"",
+      "fi",
+      "exec \"$@\""
+    ].join("\n")
+  );
+
+  writeExecutableFixture(
+    path.join(fakeBinDir, "rsync"),
+    [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      "{",
+      "  printf 'rsync argv\\n'",
+      "  printf '<%s>\\n' \"$@\"",
+      "  printf 'rsync env\\n'",
+      "  env | sort",
+      "} >> \"$CAPTURE_PATH\"",
+      "count=0",
+      "if [[ -f \"$RSYNC_COUNT_PATH\" ]]; then count=$(<\"$RSYNC_COUNT_PATH\"); fi",
+      "count=$((count + 1))",
+      "printf '%s\\n' \"$count\" > \"$RSYNC_COUNT_PATH\"",
+      "rsh_command=",
+      "while [[ \"$#\" -gt 0 ]]; do",
+      "  if [[ \"$1\" == \"-e\" ]]; then",
+      "    rsh_command=\"${2:-}\"",
+      "    printf '%s\\n' \"$rsh_command\" >> \"$RSYNC_RSH_CAPTURE_PATH\"",
+      "    shift 2",
+      "  else",
+      "    shift",
+      "  fi",
+      "done",
+      "auth_fd=",
+      "if [[ \"$rsh_command\" =~ sshpass[[:space:]]+-d[[:space:]]*([0-9]+) ]]; then",
+      "  auth_fd=\"${BASH_REMATCH[1]}\"",
+      "elif [[ \"$rsh_command\" =~ sshpass[[:space:]]+-d([0-9]+) ]]; then",
+      "  auth_fd=\"${BASH_REMATCH[1]}\"",
+      "fi",
+      "if [[ -n \"$auth_fd\" ]]; then",
+      "  cat \"/dev/fd/${auth_fd}\" > \"$AUTH_CAPTURE_DIR/rsync-auth-${count}.bin\"",
+      "else",
+      "  : > \"$AUTH_CAPTURE_DIR/rsync-auth-${count}.missing\"",
+      "fi",
+      "exit 0"
+    ].join("\n")
+  );
+
+  return {
+    root: fixtureRoot,
+    fakeBinDir,
+    authCaptureDir,
+    fdSourceDir,
+    capturePath,
+    frameCapturePath,
+    authCountPath,
+    rsyncCountPath,
+    rsyncRshCapturePath,
+    entrypointPath
+  };
+}
+
+function secretFixtureEnvironment(fixture, overrides = {}) {
+  const environment = {
+    ...process.env,
+    PATH: `${fixture.fakeBinDir}:${process.env.PATH ?? "/usr/bin:/bin"}`,
+    CAPTURE_PATH: fixture.capturePath,
+    FRAME_CAPTURE_PATH: fixture.frameCapturePath,
+    AUTH_CAPTURE_DIR: fixture.authCaptureDir,
+    AUTH_COUNT_PATH: fixture.authCountPath,
+    RSYNC_COUNT_PATH: fixture.rsyncCountPath,
+    RSYNC_RSH_CAPTURE_PATH: fixture.rsyncRshCapturePath
+  };
+
+  for (const key of secretTransportEnvironmentKeys) {
+    delete environment[key];
+  }
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete environment[key];
+    } else {
+      environment[key] = value;
+    }
+  }
+
+  return environment;
+}
+
+function runSecretTransportEntrypoint(
+  fixture,
+  { args = [], env = {}, fdContents = {}, trace = false } = {}
+) {
+  const stdio = ["ignore", "pipe", "pipe", "ignore", "ignore", "ignore"];
+  const openDescriptors = [];
+  const descriptorNames = ["ssh", "sudo", "rdp"];
+
+  try {
+    descriptorNames.forEach((name, offset) => {
+      if (!Object.hasOwn(fdContents, name)) {
+        return;
+      }
+
+      const sourcePath = path.join(fixture.fdSourceDir, `${name}-${openDescriptors.length}.bin`);
+      const sourceValue = fdContents[name];
+      writeFileSync(
+        sourcePath,
+        Buffer.isBuffer(sourceValue) ? sourceValue : Buffer.from(String(sourceValue), "utf8")
+      );
+      const descriptor = openSync(sourcePath, "r");
+      openDescriptors.push(descriptor);
+      stdio[offset + 3] = descriptor;
+    });
+
+    return spawnSync(
+      bashCommand,
+      [
+        ...(trace ? ["-x"] : []),
+        toBashScriptPath(fixture.root, fixture.entrypointPath),
+        ...args.map((value) => toBashPathValue(value))
+      ],
+      {
+        cwd: fixture.root,
+        env: secretFixtureEnvironment(fixture, env),
+        encoding: "utf8",
+        stdio
+      }
+    );
+  } finally {
+    for (const descriptor of openDescriptors) {
+      closeSync(descriptor);
+    }
+  }
+}
+
+function readSecretFixtureCapture(fixture) {
+  return existsSync(fixture.capturePath) ? readFileSync(fixture.capturePath, "utf8") : "";
+}
+
+function readSecretAuthCaptures(fixture) {
+  return readdirSync(fixture.authCaptureDir)
+    .filter((fileName) => /^auth-[0-9]+\.bin$/u.test(fileName))
+    .sort((left, right) => Number(left.match(/[0-9]+/u)[0]) - Number(right.match(/[0-9]+/u)[0]))
+    .map((fileName) => readFileSync(path.join(fixture.authCaptureDir, fileName)));
+}
+
+function encodeSecretFrame(sudoValue, rdpValue) {
+  const fields = [
+    Buffer.isBuffer(sudoValue) ? sudoValue : Buffer.from(String(sudoValue), "utf8"),
+    Buffer.isBuffer(rdpValue) ? rdpValue : Buffer.from(String(rdpValue), "utf8")
+  ];
+
+  return Buffer.concat([
+    Buffer.from("SOLAR-DEPLOY-SECRET-FRAME/1\n", "ascii"),
+    ...fields.flatMap((field) => [Buffer.from(`${field.length}\n`, "ascii"), field, Buffer.from("\n", "ascii")]),
+    Buffer.from("END\n", "ascii")
+  ]);
+}
+
+function secureDeployBaseArgs({ dryRun = false, passwordless = false } = {}) {
+  return [
+    "pi@fake-pi",
+    "--mode",
+    dryRun ? "update" : "init",
+    "--scope",
+    dryRun ? "app" : "full",
+    "--desktop",
+    "none",
+    "--rdp-auth",
+    passwordless ? "passwordless" : "system-password",
+    ...(dryRun ? ["--dry-run"] : [])
+  ];
+}
+
+function secretFrameBoundaryFixtures() {
+  const special = Buffer.from("with spaces 'single' $dollar;semi\\backslash", "utf8");
+  const max = Buffer.alloc(4096, "x");
+  const magic = Buffer.from("SOLAR-DEPLOY-SECRET-FRAME/1\n", "ascii");
+
+  return [
+    { name: "zero-byte fields", input: encodeSecretFrame("", ""), expected: "accept" },
+    { name: "immediate EOF after END", input: encodeSecretFrame("sudo", "rdp"), expected: "accept" },
+    { name: "special bytes round-trip", input: encodeSecretFrame(special, special), expected: "accept" },
+    { name: "4096-byte field", input: encodeSecretFrame(max, ""), expected: "accept" },
+    {
+      name: "4097-byte field",
+      input: Buffer.concat([magic, Buffer.from("4097\n", "ascii"), Buffer.alloc(4097, "x"), Buffer.from("\n0\n\nEND\n", "ascii")]),
+      expected: "reject"
+    },
+    {
+      name: "NUL payload",
+      input: encodeSecretFrame(Buffer.from([0]), ""),
+      expected: "reject"
+    },
+    {
+      name: "embedded NUL cannot be hidden by following bytes",
+      input: Buffer.concat([magic, Buffer.from("2\na\0b\n0\n\nEND\n", "binary")]),
+      expected: "reject"
+    },
+    {
+      name: "NUL replaces magic delimiter",
+      input: Buffer.concat([
+        Buffer.from("SOLAR-DEPLOY-SECRET-FRAME/1", "ascii"),
+        Buffer.from([0]),
+        Buffer.from("0\n\n0\n\nEND\n", "ascii")
+      ]),
+      expected: "reject"
+    },
+    {
+      name: "NUL replaces length delimiter",
+      input: Buffer.concat([magic, Buffer.from("1", "ascii"), Buffer.from([0]), Buffer.from("a\n0\n\nEND\n", "ascii")]),
+      expected: "reject"
+    },
+    {
+      name: "NUL replaces payload delimiter",
+      input: Buffer.concat([magic, Buffer.from("1\na", "ascii"), Buffer.from([0]), Buffer.from("0\n\nEND\n", "ascii")]),
+      expected: "reject"
+    },
+    {
+      name: "NUL replaces END delimiter",
+      input: Buffer.concat([magic, Buffer.from("0\n\n0\n\nEND", "ascii"), Buffer.from([0])]),
+      expected: "reject"
+    },
+    {
+      name: "CR payload",
+      input: encodeSecretFrame(Buffer.from("a\rb", "ascii"), ""),
+      expected: "reject"
+    },
+    {
+      name: "LF payload",
+      input: encodeSecretFrame(Buffer.from("a\nb", "ascii"), ""),
+      expected: "reject"
+    },
+    {
+      name: "non-canonical leading-zero length",
+      input: Buffer.concat([magic, Buffer.from("01\na\n0\n\nEND\n", "ascii")]),
+      expected: "reject"
+    },
+    {
+      name: "missing field delimiter",
+      input: Buffer.concat([magic, Buffer.from("1\na0\n\nEND\n", "ascii")]),
+      expected: "reject"
+    },
+    {
+      name: "truncated payload",
+      input: Buffer.concat([magic, Buffer.from("4\nabc\n0\n\nEND\n", "ascii")]),
+      expected: "reject"
+    },
+    {
+      name: "extra bytes after END",
+      input: Buffer.concat([encodeSecretFrame("", ""), Buffer.from("extra", "ascii")]),
+      expected: "reject"
+    }
+  ];
+}
+
+test("secret transport sources honor dry-run and isolate inherited secret environment", () => {
+  const secrets = ["ssh inherited secret", "sudo inherited secret", "rdp inherited secret", "stale sshpass secret"];
+  const fixtures = [];
+  const makeFixture = () => {
+    const fixture = createSecretTransportFixture();
+    fixtures.push(fixture);
+    return fixture;
+  };
+
+  try {
+    const fixture = makeFixture();
+    const result = runSecretTransportEntrypoint(fixture, {
+      args: [
+        ...secureDeployBaseArgs({ dryRun: true }),
+        "--ssh-password-fd", "99",
+        "--sudo-password-fd", "98",
+        "--rdp-password-fd", "97"
+      ],
+      env: {
+        SSH_PASSWORD: secrets[0],
+        SUDO_PASSWORD: secrets[1],
+        RDP_PASSWORD: secrets[2],
+        SSHPASS: secrets[3]
+      },
+      trace: true
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Dry run stages:/u);
+    assert.equal(readSecretFixtureCapture(fixture), "", "dry-run must not spawn build, date, ssh, sshpass, or rsync");
+    assertSecretRepresentationsAbsent(`${result.stdout}\n${result.stderr}`, secrets);
+
+    const precedenceFixture = makeFixture();
+    const precedence = runSecretTransportEntrypoint(precedenceFixture, {
+      args: [
+        ...secureDeployBaseArgs(),
+        "--ssh-password-fd", "3",
+        "--sudo-password-fd", "4",
+        "--rdp-password-fd", "5",
+        "--sudo-password", "ignored legacy sudo",
+        "--rdp-password", "ignored legacy rdp"
+      ],
+      env: {
+        SSH_PASSWORD: "ignored ssh env",
+        SUDO_PASSWORD: "ignored sudo env",
+        RDP_PASSWORD: "ignored rdp env"
+      },
+      fdContents: { ssh: "fd ssh", sudo: "fd sudo", rdp: "fd rdp" }
+    });
+    assert.equal(precedence.status, 0, precedence.stderr || precedence.stdout);
+    assert.match(precedence.stderr, /--sudo-password is deprecated/u);
+    assert.match(precedence.stderr, /--rdp-password is deprecated/u);
+    assert.deepEqual(readFileSync(precedenceFixture.frameCapturePath), encodeSecretFrame("fd sudo", "fd rdp"));
+    for (const captured of readSecretAuthCaptures(precedenceFixture)) assert.deepEqual(captured, Buffer.from("fd ssh"));
+
+    const emptyFixture = makeFixture();
+    const emptyFallsThrough = runSecretTransportEntrypoint(emptyFixture, {
+      args: [
+        ...secureDeployBaseArgs(),
+        "--ssh-password-fd", "3",
+        "--sudo-password-fd", "4",
+        "--rdp-password-fd", "5"
+      ],
+      env: { SSH_PASSWORD: "env ssh", SUDO_PASSWORD: "env sudo", RDP_PASSWORD: "env rdp" },
+      fdContents: { ssh: "", sudo: "", rdp: "" }
+    });
+    assert.equal(emptyFallsThrough.status, 0, emptyFallsThrough.stderr || emptyFallsThrough.stdout);
+    assert.deepEqual(readFileSync(emptyFixture.frameCapturePath), encodeSecretFrame("env sudo", "env rdp"));
+
+    for (const invalidCase of [
+      { name: "unreadable", args: ["--ssh-password-fd", "99"], fdContents: {} },
+      { name: "unreadable sudo", args: ["--sudo-password-fd", "99"], fdContents: {} },
+      { name: "unreadable rdp", args: ["--rdp-password-fd", "99"], fdContents: {} },
+      { name: "overlong", args: ["--ssh-password-fd", "3"], fdContents: { ssh: Buffer.alloc(4097, "x") } },
+      { name: "newline", args: ["--ssh-password-fd", "3"], fdContents: { ssh: "line one\nline two" } },
+      {
+        name: "aliased consumed source",
+        args: ["--ssh-password-fd", "3", "--sudo-password-fd", "3"],
+        fdContents: { ssh: "one read only" }
+      }
+    ]) {
+      const invalidFixture = makeFixture();
+      const invalid = runSecretTransportEntrypoint(invalidFixture, {
+        args: [...secureDeployBaseArgs(), ...invalidCase.args],
+        env: { SSH_PASSWORD: "must not fallback" },
+        fdContents: invalidCase.fdContents
+      });
+      assert.notEqual(invalid.status, 0, `${invalidCase.name} FD must fail closed`);
+      assert.equal(readSecretFixtureCapture(invalidFixture), "", `${invalidCase.name} FD must fail before the first child`);
+    }
+
+    const emptyEnvironmentFixture = makeFixture();
+    const emptyEnvironment = runSecretTransportEntrypoint(emptyEnvironmentFixture, {
+      args: secureDeployBaseArgs(),
+      env: { SSH_PASSWORD: "", SUDO_PASSWORD: "", RDP_PASSWORD: "" }
+    });
+    assert.equal(emptyEnvironment.status, 0, emptyEnvironment.stderr || emptyEnvironment.stdout);
+    assert.deepEqual(readFileSync(emptyEnvironmentFixture.frameCapturePath), encodeSecretFrame("", ""));
+    assert.deepEqual(readSecretAuthCaptures(emptyEnvironmentFixture), []);
+
+    const explicitEmptyFixture = makeFixture();
+    const explicitEmpty = runSecretTransportEntrypoint(explicitEmptyFixture, {
+      args: [
+        ...secureDeployBaseArgs(),
+        "--desktop", "xfce-xrdp",
+        "--rdp-auth", "passwordless",
+        "--rdp-password", ""
+      ],
+      env: { RDP_PASSWORD: "must not override explicit empty" }
+    });
+    assert.notEqual(explicitEmpty.status, 0);
+    assert.match(explicitEmpty.stderr, /deprecated|migration|passwordless requires/iu);
+    assert.equal(readSecretFixtureCapture(explicitEmptyFixture), "");
+
+    assert.doesNotMatch(readFileSync(raspiDeployScriptPath, "utf8"), /--ssh-password(?:\s|$)/mu);
+  } finally {
+    for (const fixture of fixtures) removeTempDir(fixture.root);
+  }
+});
+
+test("secret transport frame uses exact bytes and a fresh SSH auth descriptor for every child", () => {
+  const sshSecret = "ssh secret with spaces '$;\\\\";
+  const sudoSecret = "sudo secret";
+  const rdpSecret = "rdp secret";
+  const fixtures = [];
+
+  try {
+    for (let attempt = 0; attempt < 1; attempt += 1) {
+      const fixture = createSecretTransportFixture();
+      fixtures.push(fixture);
+      const result = runSecretTransportEntrypoint(fixture, {
+        args: [
+          ...secureDeployBaseArgs(),
+          "--desktop", "xfce-xrdp",
+          "--rdp-auth", "passwordless"
+        ],
+        env: {
+          SSH_PASSWORD: sshSecret,
+          SUDO_PASSWORD: sudoSecret,
+          RDP_PASSWORD: rdpSecret,
+          SSHPASS: "must be scrubbed",
+          resolved_ssh_password: "inherited resolved ssh",
+          resolved_sudo_password: "inherited resolved sudo",
+          resolved_rdp_password: "inherited resolved rdp",
+          legacy_sudo_password: "inherited legacy sudo",
+          legacy_rdp_password: "inherited legacy rdp"
+        }
+      });
+
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      assert.deepEqual(readFileSync(fixture.frameCapturePath), encodeSecretFrame(sudoSecret, rdpSecret));
+      const authCaptures = readSecretAuthCaptures(fixture);
+      assert.ok(authCaptures.length >= 4, "reachability, firstboot, staging, and bootstrap must each receive fresh auth");
+      for (const captured of authCaptures) assert.deepEqual(captured, Buffer.from(sshSecret));
+      const rsyncAuth = readdirSync(fixture.authCaptureDir).filter((name) => /^rsync-auth-[0-9]+\.bin$/u.test(name));
+      assert.equal(rsyncAuth.length, 1, "rsync must receive a separately readable auth descriptor");
+      assert.deepEqual(readFileSync(path.join(fixture.authCaptureDir, rsyncAuth[0])), Buffer.from(sshSecret));
+      assertSecretRepresentationsAbsent(
+        `${result.stdout}\n${result.stderr}\n${readSecretFixtureCapture(fixture)}\n${readFileSync(fixture.rsyncRshCapturePath, "utf8")}`,
+        [
+          sshSecret, sudoSecret, rdpSecret, "must be scrubbed",
+          "inherited resolved ssh", "inherited resolved sudo", "inherited resolved rdp",
+          "inherited legacy sudo", "inherited legacy rdp"
+        ]
+      );
+    }
+
+    const pairFixture = createSecretTransportFixture();
+    fixtures.push(pairFixture);
+    const pairSecret = "same-process ssh secret";
+    const entrypointSource = readFileSync(raspiDeployScriptPath, "utf8");
+    const runners = entrypointSource.match(/# BEGIN SOLAR SSH AUTH RUNNERS\n([\s\S]*?)# END SOLAR SSH AUTH RUNNERS/u)?.[1];
+    assert.ok(runners, "SSH auth runners must have extractable test boundaries");
+    const pairProbe = spawnSync(bashCommand, ["-c", [
+      "set -euo pipefail",
+      "resolved_ssh_password_set=1",
+      `resolved_ssh_password=${quoteForBash(pairSecret)}`,
+      "ssh_options=(-o StrictHostKeyChecking=accept-new)",
+      "rsync_ssh_options='-o StrictHostKeyChecking=accept-new'",
+      "TARGET=pi@fake-pi",
+      runners,
+      "for attempt in 1 2 3; do",
+      "  run_ssh true",
+      "  run_rsync fixture-source/ pi@fake-pi:fixture-target/",
+      "done"
+    ].join("\n")], {
+      env: secretFixtureEnvironment(pairFixture),
+      encoding: "utf8"
+    });
+    assert.equal(pairProbe.status, 0, pairProbe.stderr || pairProbe.stdout);
+    assert.equal(readSecretAuthCaptures(pairFixture).length, 3);
+    const pairRsyncAuth = readdirSync(pairFixture.authCaptureDir)
+      .filter((name) => /^rsync-auth-[0-9]+\.bin$/u.test(name));
+    assert.equal(pairRsyncAuth.length, 3);
+    for (const captured of [
+      ...readSecretAuthCaptures(pairFixture),
+      ...pairRsyncAuth.map((name) => readFileSync(path.join(pairFixture.authCaptureDir, name)))
+    ]) assert.deepEqual(captured, Buffer.from(pairSecret));
+
+    const source = readFileSync(raspiDeployScriptPath, "utf8");
+    const receiver = source.match(/# BEGIN SOLAR DEPLOY SECRET RECEIVER\n([\s\S]*?)# END SOLAR DEPLOY SECRET RECEIVER/u)?.[1];
+    assert.ok(receiver, "inline receiver must have extractable boundary markers");
+    for (const boundary of secretFrameBoundaryFixtures()) {
+      const fixtureRoot = mkdtempSync(path.join(tmpdir(), "solar-secret-receiver-"));
+      try {
+        const parsed = spawnSync(bashCommand, ["-c", receiver], {
+          input: boundary.input,
+          env: { ...process.env, SOLAR_SECRET_RECEIVER_ROOT: fixtureRoot },
+          encoding: "buffer"
+        });
+        assert.equal(parsed.status === 0 ? "accept" : "reject", boundary.expected, boundary.name);
+        if (boundary.expected === "accept") {
+          assert.deepEqual(readdirSync(fixtureRoot), [], `${boundary.name} must clean its owned target material`);
+        }
+      } finally {
+        removeTempDir(fixtureRoot);
+      }
+    }
+
+    const nonRootTemp = mkdtempSync(path.join(tmpdir(), "solar-secret-nonroot-"));
+    try {
+      const parsed = spawnSync(bashCommand, ["-c", receiver], {
+        input: encodeSecretFrame("", ""),
+        env: { ...process.env, TMPDIR: nonRootTemp, SOLAR_SECRET_INVOCATION_ID: "nonroot-fixture" },
+        encoding: "buffer"
+      });
+      assert.equal(parsed.status, 0, parsed.stderr?.toString() || parsed.stdout?.toString());
+      const roots = readdirSync(nonRootTemp);
+      assert.equal(roots.length, 1);
+      assert.equal(statSync(path.join(nonRootTemp, roots[0])).mode & 0o777, 0o700);
+      assert.deepEqual(readdirSync(path.join(nonRootTemp, roots[0])), []);
+    } finally {
+      removeTempDir(nonRootTemp);
+    }
+
+    const partialFailureRoot = mkdtempSync(path.join(tmpdir(), "solar-secret-partial-"));
+    const failingStat = path.join(partialFailureRoot, "fixture-stat");
+    writeExecutableFixture(failingStat, [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      "path_value=${@: -1}",
+      "[[ \"$path_value\" != */.solar-deploy-secret-marker ]] || exit 70",
+      "exec /usr/bin/stat \"$@\""
+    ].join("\n"));
+    try {
+      const failed = spawnSync(bashCommand, ["-c", receiver], {
+        input: encodeSecretFrame("", "rdp fixture"),
+        env: {
+          ...process.env,
+          SOLAR_SECRET_RECEIVER_ROOT: partialFailureRoot,
+          SOLAR_SECRET_RECEIVER_STAT_CMD: failingStat,
+          SOLAR_SECRET_INVOCATION_ID: "partial-failure"
+        },
+        encoding: "buffer"
+      });
+      assert.notEqual(failed.status, 0);
+      assert.deepEqual(
+        readdirSync(partialFailureRoot).filter((name) => name !== "fixture-stat"),
+        [],
+        "partial marker validation failure must remove exact owned secret material"
+      );
+    } finally {
+      removeTempDir(partialFailureRoot);
+    }
+  } finally {
+    for (const fixture of fixtures) removeTempDir(fixture.root);
+  }
+});
+
+test("secret transport secure file is the only RDP handoff across bootstrap and configurator", () => {
+  const entrypoint = readFileSync(raspiDeployScriptPath, "utf8");
+  const bootstrap = readFileSync(raspiBootstrapScriptPath, "utf8");
+  const configurator = readFileSync(lightweightDesktopScriptPath, "utf8");
+
+  assert.match(entrypoint, /SOLAR-DEPLOY-SECRET-FRAME\/1/u);
+  assert.match(entrypoint, /--rdp-password-file/u);
+  assert.match(bootstrap, /--rdp-password-file/u);
+  assert.match(configurator, /--rdp-password-file/u);
+  for (const source of [entrypoint, bootstrap, configurator]) {
+    assert.match(source, /(?:stat|test).*(?:600|700|owner|uid|regular|symlink|marker)/isu);
+  }
+  assert.match(bootstrap, /RDP_PASSWORD_FILE/u);
+  assert.match(configurator, /exec\s+\{[^}]+\}<\s*"\$\{RDP_PASSWORD_FILE\}"/u);
+  assert.match(configurator, /4096/u);
+  assert.match(entrypoint, /cleanup[^\n]*(?:ok|unknown)|cleanup[^\n]*status/iu);
+  assert.match(entrypoint, /HUP[\s\S]*INT[\s\S]*TERM/u);
+  assert.match(entrypoint, /recovery[\s\S]*(?:path|directory)/iu);
+  assert.doesNotMatch(entrypoint, /sshpass\s+-[ep]\b/u);
+  assert.doesNotMatch(entrypoint, /remote_args\+=\(\s*"--rdp-password"/u);
+  assert.doesNotMatch(bootstrap, /configure-lightweight-desktop\.sh[\s\S]*--rdp-password(?:\s|")/u);
+    assert.doesNotMatch(configurator, /rm\s+-[^\n]*\$\{?RDP_PASSWORD_FILE/u);
+
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "solar-secure-rdp-file-"));
+  const parent = path.join(fixtureRoot, ".solar-deploy-fixture");
+  const passwordFile = path.join(parent, "rdp-password");
+  const markerFile = path.join(parent, ".solar-deploy-secret-marker");
+  const installDir = path.join(fixtureRoot, "install");
+  const owner = process.getuid?.() ?? statSync(fixtureRoot).uid;
+  const password = "fixture password '$;\\\\";
+
+  try {
+    mkdirSync(parent, { mode: 0o700 });
+    writeFileSync(passwordFile, password, { mode: 0o600 });
+    writeFileSync(markerFile, `SOLAR-DEPLOY-SECRET-MARKER/1\nowner=${owner}\nfile=rdp-password\n`, { mode: 0o600 });
+    chmodSync(parent, 0o700);
+    chmodSync(passwordFile, 0o600);
+    chmodSync(markerFile, 0o600);
+
+    const bootstrapResult = runBashScript(raspiBootstrapScriptPath, [
+      "--mode", "init",
+      "--scope", "full",
+      "--install-dir", installDir,
+      "--skip-host-preflight",
+      "--skip-disk",
+      "--configure-env-only",
+      "--rdp-auth", "system-password",
+      "--rdp-password-file", passwordFile
+    ], {
+      cwd: repoRoot,
+      env: { ...process.env, SOLAR_SECRET_ALLOWED_ROOTS: fixtureRoot },
+      encoding: "utf8"
+    });
+    assert.equal(bootstrapResult.status, 0, bootstrapResult.stderr || bootstrapResult.stdout);
+    assert.equal(readFileSync(passwordFile, "utf8"), password, "bootstrap must not read or delete a caller-owned payload");
+
+    const reader = configurator.match(/# BEGIN SOLAR RDP PASSWORD FILE READER\n([\s\S]*?)# END SOLAR RDP PASSWORD FILE READER/u)?.[1];
+    assert.ok(reader, "configurator reader must have extractable test boundaries");
+    const readerResult = spawnSync(bashCommand, ["-c", [
+      "set -euo pipefail",
+      "fail() { printf 'ERROR: %s\\n' \"$*\" >&2; exit 1; }",
+      `SOLAR_SECRET_ALLOWED_ROOTS=${quoteForBash(toBashPathValue(fixtureRoot))}`,
+      `RDP_PASSWORD_FILE=${quoteForBash(toBashPathValue(passwordFile))}`,
+      reader,
+      "read_rdp_password_file_once",
+      "printf '%s\\n' \"${#RDP_PASSWORD}\""
+    ].join("\n")], { encoding: "utf8" });
+    assert.equal(readerResult.status, 0, readerResult.stderr || readerResult.stdout);
+    assert.equal(readerResult.stdout.trim(), String(Buffer.byteLength(password)));
+    assert.equal(readFileSync(passwordFile, "utf8"), password, "configurator must not delete a caller-owned payload");
+
+    const bundleDir = path.join(fixtureRoot, "bundle");
+    const integratedInstallDir = path.join(fixtureRoot, "integrated-install");
+    const fakeBinDir = path.join(fixtureRoot, "fake-bin");
+    const handoffCapture = path.join(fixtureRoot, "handoff.log");
+    mkdirSync(path.join(bundleDir, "deploy"), { recursive: true });
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFileSync(path.join(bundleDir, ".env.example"), "MQTT_BROKER=fixture\n");
+    for (const helper of [
+      "install-tailscale.sh", "install-kiosk.sh", "verify-kiosk-install.sh", "enable-readonly-root.sh"
+    ]) {
+      writeExecutableFixture(path.join(bundleDir, "deploy", helper), "#!/bin/bash\nexit 0");
+    }
+    writeExecutableFixture(path.join(fakeBinDir, "sudo"), "#!/bin/bash\nexit 0");
+    writeExecutableFixture(path.join(fakeBinDir, "chown"), "#!/bin/bash\nexit 0");
+    writeExecutableFixture(path.join(bundleDir, "deploy", "configure-lightweight-desktop.sh"), [
+      "#!/bin/bash",
+      "set -euo pipefail",
+      "LC_ALL=C",
+      "fail() { printf 'ERROR: %s\\n' \"$*\" >&2; exit 1; }",
+      "RDP_PASSWORD_FILE=",
+      "original_args=(\"$@\")",
+      "while [[ $# -gt 0 ]]; do",
+      "  case \"$1\" in",
+      "    --rdp-password-file) RDP_PASSWORD_FILE=\"${2:-}\"; shift 2 ;;",
+      "    --user|--desktop|--rdp-auth) shift 2 ;;",
+      "    *) exit 64 ;;",
+      "  esac",
+      "done",
+      "[[ -n \"$RDP_PASSWORD_FILE\" ]] || exit 65",
+      "payload_length=$(wc -c < \"$RDP_PASSWORD_FILE\")",
+      `{ printf '<%s>\\n' \"\${original_args[@]}\"; printf 'length=%s\\n' \"$payload_length\"; } > ${quoteForBash(toBashPathValue(handoffCapture))}`
+    ].join("\n"));
+
+    const integrated = runBashScript(raspiBootstrapScriptPath, [
+      "--mode", "init", "--scope", "full",
+      "--install-dir", integratedInstallDir,
+      "--bundle-dir", bundleDir,
+      "--skip-host-preflight", "--skip-disk",
+      "--desktop", "xfce-xrdp", "--rdp-auth", "passwordless",
+      "--rdp-password-file", passwordFile,
+      "--kiosk-user", process.env.USER || "pi"
+    ], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PATH: `${fakeBinDir}:${process.env.PATH ?? "/usr/bin:/bin"}`,
+        SOLAR_SECRET_ALLOWED_ROOTS: fixtureRoot
+      },
+      encoding: "utf8"
+    });
+    assert.equal(integrated.status, 0, integrated.stderr || integrated.stdout);
+    const handoff = readFileSync(handoffCapture, "utf8");
+    assert.match(handoff, new RegExp(`<--rdp-password-file>\\n<${escapeRegExp(passwordFile)}>`));
+    assert.match(handoff, new RegExp(`length=\\s*${Buffer.byteLength(password)}`));
+    assert.doesNotMatch(handoff, new RegExp(escapeRegExp(password)));
+    assert.equal(readFileSync(passwordFile, "utf8"), password, "actual bootstrap handoff must preserve caller-owned file");
+
+    chmodSync(passwordFile, 0o644);
+    const invalidMode = runBashScript(raspiBootstrapScriptPath, [
+      "--mode", "init", "--scope", "full", "--install-dir", installDir,
+      "--skip-host-preflight", "--skip-disk", "--configure-env-only",
+      "--rdp-auth", "system-password", "--rdp-password-file", passwordFile
+    ], {
+      cwd: repoRoot,
+      env: { ...process.env, SOLAR_SECRET_ALLOWED_ROOTS: fixtureRoot },
+      encoding: "utf8"
+    });
+    assert.notEqual(invalidMode.status, 0);
+    assert.match(invalidMode.stderr, /owner, marker, type, mode, or containment/u);
+    assert.equal(existsSync(passwordFile), true, "failed validation must not delete a caller path");
+
+    const disconnectFixture = createSecretTransportFixture();
+    try {
+      const disconnected = runSecretTransportEntrypoint(disconnectFixture, {
+        args: secureDeployBaseArgs(),
+        env: {
+          SSH_PASSWORD: "fixture ssh",
+          FAKE_BOOTSTRAP_SSH_STATUS: "255",
+          FAKE_BOOTSTRAP_OUTPUT: "RDP secret cleanup: ok"
+        }
+      });
+      assert.notEqual(disconnected.status, 0);
+      assert.match(disconnected.stderr, /cleanup: unknown.*reconnect.*owner, marker, type, and containment/isu);
+    } finally {
+      removeTempDir(disconnectFixture.root);
+    }
+  } finally {
+    removeTempDir(fixtureRoot);
+  }
+});
+
+test("secret transport catchable signal cleans exact receiver-owned material", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process-group signals");
+    return;
+  }
+  const source = readFileSync(raspiDeployScriptPath, "utf8");
+  const receiver = source.match(/# BEGIN SOLAR DEPLOY SECRET RECEIVER\n([\s\S]*?)# END SOLAR DEPLOY SECRET RECEIVER/u)?.[1];
+  assert.ok(receiver);
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "solar-secret-signal-"));
+  const fakeBootstrap = path.join(fixtureRoot, "fixture-bootstrap");
+  const fakeSudo = path.join(fixtureRoot, "fixture-sudo");
+  const readyPath = path.join(fixtureRoot, "ready");
+  writeExecutableFixture(fakeSudo, [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    "exec \"$@\""
+  ].join("\n"));
+  writeExecutableFixture(fakeBootstrap, [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    "trap 'exit 143' HUP INT TERM",
+    ": > \"$READY_PATH\"",
+    "while :; do sleep 1; done"
+  ].join("\n"));
+
+  const child = spawn(bashCommand, ["-c", receiver, "bash", "fixture-bootstrap-arg"], {
+    detached: true,
+    env: {
+      ...process.env,
+      READY_PATH: readyPath,
+      SOLAR_SECRET_RECEIVER_ROOT: fixtureRoot,
+      SOLAR_SECRET_RECEIVER_BOOTSTRAP_CMD: fakeBootstrap,
+      SOLAR_SECRET_RECEIVER_SUDO_CMD: fakeSudo,
+      SOLAR_SECRET_INVOCATION_ID: "signal-fixture"
+    },
+    stdio: ["pipe", "ignore", "pipe"]
+  });
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const childClosed = new Promise((resolve) => {
+    child.once("close", (code, signal) => resolve({ code, signal }));
+  });
+
+  try {
+    child.stdin.end(encodeSecretFrame("", "rdp fixture"));
+    const readyDeadline = Date.now() + 2_000;
+    while (!existsSync(readyPath) && child.exitCode === null && Date.now() < readyDeadline) {
+      await delay(20);
+    }
+    assert.equal(existsSync(readyPath), true, stderr);
+    process.kill(-child.pid, "SIGTERM");
+    const exit = await Promise.race([
+      childClosed,
+      delay(3_000).then(() => { throw new Error(`receiver did not exit after TERM: ${stderr}`); })
+    ]);
+    assert.notEqual(exit.code, 0);
+    assert.deepEqual(
+      readdirSync(fixtureRoot).filter((name) => name.startsWith(".solar-deploy-")),
+      [],
+      "TERM must remove the exact receiver-owned secret directory"
+    );
+    assert.match(stderr, /RDP secret cleanup: ok/u);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch (error) {
+        if (error?.code !== "ESRCH") throw error;
+      }
+      await childClosed;
+    }
+    removeTempDir(fixtureRoot);
+  }
+});
 
 test("Pi 5 fan helper writes one idempotent four-stage block before dtoverlay", () => {
   const fixtureDir = mkdtempSync(path.join(tmpdir(), "solar-display-pi5-fan-"));
@@ -1152,7 +2056,8 @@ test("raspi one-key deploy forwards hotspot policy and bootstrap orders it befor
 test("raspi one-key deploy supports non-interactive sudo and data creation confirmation", () => {
   const source = readFileSync(raspiDeployScriptPath, "utf8");
 
-  assert.match(source, /SUDO_PASSWORD="\$\{SUDO_PASSWORD:-\$\{SSH_PASSWORD:-\}\}"/);
+  assert.match(source, /resolved_sudo_password=.*resolved_ssh_password/u);
+  assert.match(source, /--sudo-password-fd/u);
   assert.match(source, /--sudo-password/);
   assert.match(source, /DATA_SIZE_GB="10"/);
   assert.match(source, /DATA_SIZE_GB_EXPLICIT=0/);
@@ -1160,7 +2065,7 @@ test("raspi one-key deploy supports non-interactive sudo and data creation confi
   assert.match(source, /\/boot\/firmware\/solar-deploy\.env/);
   assert.match(source, /Loaded first-boot deploy env/);
   assert.match(source, /--data-size-gb/);
-  assert.match(source, /sudo -S env CONFIRM_CREATE_DATA=CREATE-DATA/);
+  assert.match(source, /receiver_sudo_command[\s\S]*-S env[\s\S]*CONFIRM_CREATE_DATA=CREATE-DATA/u);
 });
 
 test("windows rdp helper stores TERMSRV credentials before launching mstsc", () => {
@@ -1628,7 +2533,7 @@ test("lightweight desktop helper fails closed for passwordless rdp without a pas
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /RDP passwordless requires --rdp-password or RDP_PASSWORD/);
+  assert.match(result.stderr, /RDP passwordless requires .*--rdp-password.*RDP_PASSWORD/);
 });
 
 test("display sleep helper disables system sleep and X blanking without touching RDP auth", () => {

@@ -1,11 +1,19 @@
 #!/bin/bash
+set +x
 set -euo pipefail
+LC_ALL=C
 
+RDP_PASSWORD_ENV="${RDP_PASSWORD-}"
+export -n RDP_PASSWORD 2>/dev/null || true
+unset RDP_PASSWORD
+RDP_PASSWORD="${RDP_PASSWORD_ENV}"
+unset RDP_PASSWORD_ENV
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KIOSK_USER="${KIOSK_USER:-pi}"
 DESKTOP="xfce-xrdp"
 RDP_AUTH="passwordless"
-RDP_PASSWORD="${RDP_PASSWORD:-}"
+RDP_PASSWORD_FILE=""
+SOLAR_SECRET_ALLOWED_ROOTS="${SOLAR_SECRET_ALLOWED_ROOTS:-/run/solar-display-deploy-secrets:/run/solar-display-bootstrap-secrets}"
 DRY_RUN=0
 
 fail() {
@@ -13,12 +21,76 @@ fail() {
   exit 1
 }
 
+# BEGIN SOLAR RDP PASSWORD FILE READER
+stat_field() {
+  local format="$1"
+  local bsd_format="${format}"
+  [[ "${format}" != "%a" ]] || bsd_format="%Lp"
+  stat -c "${format}" "$2" 2>/dev/null || stat -f "${bsd_format}" "$2" 2>/dev/null
+}
+
+validate_rdp_password_file() {
+  local file_path="$1"
+  local parent marker owner parent_owner marker_uid marker_magic marker_owner marker_file marker_extra marker_fd
+  local allowed_root allowed=0
+  [[ "${file_path}" == /* && -f "${file_path}" && ! -L "${file_path}" ]] || return 1
+  parent="${file_path%/*}"
+  [[ "${file_path}" == "${parent}/rdp-password" ]] || return 1
+  [[ "${parent##*/}" == .solar-deploy-* || "${parent##*/}" == .solar-bootstrap-* ]] || return 1
+  while IFS= read -r -d ':' allowed_root || [[ -n "${allowed_root}" ]]; do
+    if [[ "${parent}" == "${allowed_root%/}/"* && "${parent#"${allowed_root%/}/"}" != */* ]]; then
+      allowed=1
+      break
+    fi
+  done <<< "${SOLAR_SECRET_ALLOWED_ROOTS}:"
+  [[ "${allowed}" == "1" ]] || return 1
+  [[ -d "${parent}" && ! -L "${parent}" ]] || return 1
+  [[ "$(stat_field '%a' "${parent}")" == "700" && "$(stat_field '%a' "${file_path}")" == "600" ]] || return 1
+  owner="$(stat_field '%u' "${file_path}")" || return 1
+  [[ "${owner}" == "0" || "${owner}" == "${EUID}" || "${owner}" == "${SUDO_UID:-}" ]] || return 1
+  parent_owner="$(stat_field '%u' "${parent}")" || return 1
+  [[ "${parent_owner}" == "${owner}" || "${parent_owner}" == "0" ]] || return 1
+  marker="${parent}/.solar-deploy-secret-marker"
+  [[ -f "${marker}" && ! -L "${marker}" && "$(stat_field '%a' "${marker}")" == "600" ]] || return 1
+  marker_uid="$(stat_field '%u' "${marker}")" || return 1
+  [[ "${marker_uid}" == "${owner}" || "${marker_uid}" == "0" ]] || return 1
+  exec {marker_fd}<"${marker}" || return 1
+  IFS= read -r marker_magic <&"${marker_fd}" || { exec {marker_fd}<&-; return 1; }
+  IFS= read -r marker_owner <&"${marker_fd}" || { exec {marker_fd}<&-; return 1; }
+  IFS= read -r marker_file <&"${marker_fd}" || { exec {marker_fd}<&-; return 1; }
+  marker_extra=""
+  IFS= read -r marker_extra <&"${marker_fd}" && { exec {marker_fd}<&-; return 1; }
+  exec {marker_fd}<&-
+  [[ "${marker_magic}" == "SOLAR-DEPLOY-SECRET-MARKER/1" ]] || return 1
+  [[ "${marker_owner}" == "owner=${owner}" && "${marker_file}" == "file=rdp-password" && -z "${marker_extra}" ]]
+}
+
+read_rdp_password_file_once() {
+  local password_fd read_status
+  validate_rdp_password_file "${RDP_PASSWORD_FILE}" \
+    || fail "--rdp-password-file failed owner, marker, type, mode, or containment validation"
+  RDP_PASSWORD=""
+  exec {password_fd}<"${RDP_PASSWORD_FILE}" || fail "cannot open --rdp-password-file"
+  if IFS= read -r -d '' -n 4097 RDP_PASSWORD <&"${password_fd}"; then
+    read_status=0
+  else
+    read_status=$?
+  fi
+  exec {password_fd}<&- || fail "cannot close --rdp-password-file"
+  (( read_status != 0 )) || fail "--rdp-password-file contains NUL or exceeds 4096 bytes"
+  (( ${#RDP_PASSWORD} <= 4096 )) || fail "--rdp-password-file exceeds 4096 bytes"
+  [[ "${RDP_PASSWORD}" != *$'\r'* && "${RDP_PASSWORD}" != *$'\n'* ]] \
+    || fail "--rdp-password-file contains a forbidden byte"
+}
+# END SOLAR RDP PASSWORD FILE READER
+
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --user) KIOSK_USER="${2:-}"; shift 2 ;;
     --desktop) DESKTOP="${2:-}"; shift 2 ;;
     --rdp-auth) RDP_AUTH="${2:-}"; shift 2 ;;
-    --rdp-password) RDP_PASSWORD="${2:-}"; shift 2 ;;
+    --rdp-password) RDP_PASSWORD="${2:-}"; echo "WARNING: --rdp-password is deprecated; use --rdp-password-file" >&2; shift 2 ;;
+    --rdp-password-file) RDP_PASSWORD_FILE="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     *) fail "Unknown option: $1" ;;
   esac
@@ -32,8 +104,8 @@ if [[ "${DESKTOP}" == "none" ]]; then
   exit 0
 fi
 
-if [[ "${RDP_AUTH}" == "passwordless" && -z "${RDP_PASSWORD}" ]]; then
-  fail "RDP passwordless requires --rdp-password or RDP_PASSWORD; SSH and sudo remain password-protected"
+if [[ "${RDP_AUTH}" == "passwordless" && -z "${RDP_PASSWORD}" && -z "${RDP_PASSWORD_FILE}" ]]; then
+  fail "RDP passwordless requires --rdp-password-file, --rdp-password, or RDP_PASSWORD; SSH and sudo remain password-protected"
 fi
 
 echo "Desktop: xfce-xrdp"
@@ -44,6 +116,17 @@ echo "Security: SSH password authentication and sudo password prompts are not di
 if [[ "${DRY_RUN}" == "1" ]]; then
   echo "Dry run only; no desktop packages or xrdp config changed"
   exit 0
+fi
+
+if [[ -n "${RDP_PASSWORD_FILE}" ]]; then
+  read_rdp_password_file_once
+elif [[ -n "${RDP_PASSWORD}" ]]; then
+  (( ${#RDP_PASSWORD} <= 4096 )) || fail "legacy RDP password exceeds 4096 bytes"
+  [[ "${RDP_PASSWORD}" != *$'\r'* && "${RDP_PASSWORD}" != *$'\n'* ]] \
+    || fail "legacy RDP password contains a forbidden byte"
+fi
+if [[ "${RDP_AUTH}" == "passwordless" && -z "${RDP_PASSWORD}" ]]; then
+  fail "RDP passwordless requires a non-empty password source; SSH and sudo remain password-protected"
 fi
 
 [[ "${EUID}" -eq 0 ]] || fail "Please run as root"
