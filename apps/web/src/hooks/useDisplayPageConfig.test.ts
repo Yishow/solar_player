@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import test from "node:test";
-import { defaultFallbackPolicy } from "@solar-display/shared";
+import test, { type TestContext } from "node:test";
+import { JSDOM } from "jsdom";
+import React, { act } from "react";
+import { createRoot } from "react-dom/client";
+import { defaultFallbackPolicy, type ConfigStage, type DisplayPageConfigEnvelope, type DisplayPageId } from "@solar-display/shared";
+import { getSocketClient } from "../services/socket";
 import { createImagesDisplayPageSeedConfig } from "../pages/Images/displayPageConfig";
 import { createOverviewDisplayPageSeedConfig } from "../pages/Overview/displayPageConfig";
 import { createSustainabilityDisplayPageSeedConfig } from "../pages/Sustainability/displayPageConfig";
@@ -23,7 +27,8 @@ import {
   resolveDisplayPageSaveConflictMessage,
   shouldDeferDisplayPageRuntimeRender,
   shouldHydrateDisplayPageSession,
-  shouldReloadDisplayPageConfigOnSync
+  shouldReloadDisplayPageConfigOnSync,
+  useDisplayPageConfig
 } from "./useDisplayPageConfig";
 import {
   applyDraftConfigUpdate,
@@ -882,4 +887,608 @@ test("resolveDisplayPageSaveConflictMessage gives the operator a reload-first co
 
   assert.match(message, /v5/);
   assert.match(message, /重新同步/);
+});
+
+// ---------------------------------------------------------------------------
+// Mounted hook harness: the hook runs in a real React root and talks to the
+// real api module through a deferred fetch, so save/reload/remount ordering is
+// exercised end to end rather than through the cache helpers alone.
+
+const hookSeed = { hero: { title: "種子標題" } };
+type HookSeed = typeof hookSeed;
+type HookResult = ReturnType<typeof useDisplayPageConfig<HookSeed>>;
+
+let hookDom: JSDOM | null = null;
+
+function ensureHookDom() {
+  if (hookDom) {
+    return;
+  }
+
+  hookDom = new JSDOM("<!doctype html><html><body></body></html>", {
+    pretendToBeVisual: true,
+    url: "http://127.0.0.1/settings/display-pages/editor"
+  });
+  for (const [key, value] of Object.entries({
+    document: hookDom.window.document,
+    HTMLElement: hookDom.window.HTMLElement,
+    navigator: hookDom.window.navigator,
+    window: hookDom.window
+  })) {
+    Object.defineProperty(globalThis, key, { configurable: true, value, writable: true });
+  }
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+}
+
+test.after(() => {
+  if (hookDom) {
+    getSocketClient().disconnect();
+    hookDom.window.close();
+  }
+});
+
+async function flushAsync() {
+  for (let index = 0; index < 5; index += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
+async function settle(action: () => unknown) {
+  await act(async () => {
+    action();
+    await flushAsync();
+  });
+}
+
+async function mountConfigHook(t: TestContext, pageId: DisplayPageId, stage: ConfigStage = "draft") {
+  ensureHookDom();
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const latest: { current: HookResult | null } = { current: null };
+  let mounted = true;
+
+  function Probe({ pageId: probePageId }: { pageId: DisplayPageId }) {
+    latest.current = useDisplayPageConfig(probePageId, hookSeed, { stage });
+    return null;
+  }
+
+  const unmount = async () => {
+    if (!mounted) {
+      return;
+    }
+
+    mounted = false;
+    await act(async () => root.unmount());
+    container.remove();
+  };
+  t.after(unmount);
+  await settle(() => root.render(React.createElement(Probe, { pageId })));
+
+  return {
+    get result() {
+      assert.ok(latest.current);
+      return latest.current;
+    },
+    switchPage: (nextPageId: DisplayPageId) => settle(() => root.render(React.createElement(Probe, { pageId: nextPageId }))),
+    unmount
+  };
+}
+
+type HookHandle = Awaited<ReturnType<typeof mountConfigHook>>;
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  reject: (error: unknown) => void;
+  resolve: (value: T) => void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
+// Every GET is a read and every PUT a save; each answers only when the test
+// resolves its deferred response.
+function installDisplayPageApi(t: TestContext) {
+  const reads: Array<Deferred<Response>> = [];
+  const saves: Array<{ body: { baseVersion?: number }; response: Deferred<Response> }> = [];
+  t.mock.method(globalThis, "fetch", (_input: unknown, init?: RequestInit) => {
+    const response = createDeferred<Response>();
+    if (init?.method === "PUT") {
+      saves.push({ body: JSON.parse(String(init.body)) as { baseVersion?: number }, response });
+    } else {
+      reads.push(response);
+    }
+    return response.promise;
+  });
+  return { reads, saves };
+}
+
+function hookEnvelope(pageId: DisplayPageId, version: number, title: string, stage: ConfigStage = "draft"): DisplayPageConfigEnvelope {
+  return {
+    fallbackPolicy: defaultFallbackPolicy,
+    pageId,
+    publishedAt: null,
+    publishedBy: null,
+    regions: { hero: { title } },
+    stage,
+    updatedAt: `2026-09-10T00:00:${String(version).padStart(2, "0")}.000Z`,
+    version
+  };
+}
+
+function jsonResponse(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" }, status });
+}
+
+const configResponse = (envelope: DisplayPageConfigEnvelope) => jsonResponse(200, { config: envelope });
+const conflictResponse = (latestEnvelope: DisplayPageConfigEnvelope, baseVersion: number) => jsonResponse(409, {
+  code: "management_draft_conflict",
+  conflict: {
+    baseVersion,
+    currentVersion: latestEnvelope.version,
+    latestEnvelope,
+    resourceId: latestEnvelope.pageId,
+    resourceType: "display-page-draft"
+  },
+  error: "draft conflict",
+  success: false,
+  timestamp: "2026-09-10T00:00:00.000Z"
+});
+
+function cachedVersion(pageId: DisplayPageId, stage: ConfigStage) {
+  return resolveCachedDisplayPageConfigSession(pageId, stage, hookSeed)?.lastLoadedEnvelope.version ?? null;
+}
+
+async function editTitle(hook: HookHandle, title: string) {
+  await settle(() => hook.result.setConfig((current) => ({ ...current, hero: { title } })));
+}
+
+// These return a holder instead of the operation's promise: an async function
+// returning a pending promise would adopt it, so the caller could never reach
+// the step that answers the request the operation is waiting on.
+async function startSave(hook: HookHandle) {
+  const operation = { finished: Promise.resolve() };
+  await settle(() => {
+    operation.finished = hook.result.save();
+  });
+  return operation;
+}
+
+async function startReload(hook: HookHandle) {
+  const operation = { finished: Promise.resolve() };
+  await settle(() => {
+    operation.finished = hook.result.reload();
+  });
+  return operation;
+}
+
+test("a successful draft save publishes its envelope to the stage-page cache and survives remount", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const first = await mountConfigHook(t, "overview");
+  assert.equal(first.result.lastLoadedEnvelope?.version, 4);
+  await editTitle(first, "本地標題");
+  const saving = await startSave(first);
+  assert.equal(api.saves[0]?.body.baseVersion, 4);
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
+  await saving.finished;
+
+  assert.equal(first.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(first.result.dirty, false);
+  assert.equal(cachedVersion("overview", "draft"), 5);
+  await first.unmount();
+
+  const second = await mountConfigHook(t, "overview");
+  assert.equal(second.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(second.result.config.hero.title, "本地標題");
+  assert.equal(api.reads.length, 0, "remount initializes from the committed cache without a read");
+  await editTitle(second, "再次編輯");
+  const savingAgain = await startSave(second);
+  assert.equal(api.saves[1]?.body.baseVersion, 5);
+  await settle(() => api.saves[1]!.response.resolve(configResponse(hookEnvelope("overview", 6, "再次編輯"))));
+  await savingAgain.finished;
+});
+
+test("a save that settles after unmount still commits its envelope for the next mount", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const first = await mountConfigHook(t, "overview");
+  await editTitle(first, "本地標題");
+  const saving = await startSave(first);
+  await first.unmount();
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
+  await saving.finished;
+
+  assert.equal(cachedVersion("overview", "draft"), 5);
+  const second = await mountConfigHook(t, "overview");
+  assert.equal(second.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(api.reads.length, 0);
+});
+
+test("a save that settles after the owner switched pages leaves the new page's loading and message alone", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "本地標題");
+  const saving = await startSave(hook);
+  await hook.switchPage("solar");
+  assert.equal(hook.result.isLoading, true);
+  assert.equal(api.reads.length, 1);
+
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
+  await saving.finished;
+  assert.equal(cachedVersion("overview", "draft"), 5);
+  assert.equal(hook.result.isLoading, true, "the overview save must not settle solar's hydration");
+  assert.notEqual(hook.result.message, "展示頁設定已儲存。");
+
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("solar", 3, "太陽能 v3"))));
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 3);
+  assert.equal(hook.result.isLoading, false);
+
+  await hook.switchPage("overview");
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.config.hero.title, "本地標題");
+});
+
+test("a late save from the previous page cannot clear the current page's newer saving state", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "overview v4"));
+  primeDisplayPageConfigCache("solar", "draft", hookEnvelope("solar", 3, "solar v3"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "overview local");
+  const overviewSave = await startSave(hook);
+
+  await hook.switchPage("solar");
+  assert.equal(hook.result.isSaving, false, "switching owners resets the previous page's saving state");
+  await editTitle(hook, "solar local");
+  const solarSave = await startSave(hook);
+  assert.equal(hook.result.isSaving, true);
+
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "overview local"))));
+  await overviewSave.finished;
+  assert.equal(hook.result.isSaving, true, "the obsolete overview finally must not clear solar's save state");
+
+  await settle(() => api.saves[1]!.response.resolve(configResponse(hookEnvelope("solar", 4, "solar local"))));
+  await solarSave.finished;
+  assert.equal(hook.result.isSaving, false);
+});
+
+test("a save from an earlier visit cannot overwrite a newer lifecycle on the same page", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "overview v4"));
+  primeDisplayPageConfigCache("solar", "draft", hookEnvelope("solar", 3, "solar v3"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "old visit edit");
+  const oldSave = await startSave(hook);
+  await hook.switchPage("solar");
+  await hook.switchPage("overview");
+  await editTitle(hook, "new visit edit");
+  const newSave = await startSave(hook);
+
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "old visit edit"))));
+  await oldSave.finished;
+  assert.equal(cachedVersion("overview", "draft"), 5);
+  assert.equal(hook.result.config.hero.title, "new visit edit");
+  assert.equal(hook.result.dirty, true);
+  assert.equal(hook.result.isSaving, true, "the earlier lifecycle must not settle the current save");
+
+  await settle(() => api.saves[1]!.response.resolve(conflictResponse(hookEnvelope("overview", 5, "old visit edit"), 4)));
+  await newSave.finished;
+  assert.equal(hook.result.config.hero.title, "new visit edit");
+  assert.equal(hook.result.dirty, true);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.isSaving, false);
+});
+
+test("a failed draft save without an authoritative envelope leaves the cache and baseline for retry", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "本地標題");
+  const saving = await startSave(hook);
+  await settle(() => api.saves[0]!.response.resolve(jsonResponse(500, { error: "server unavailable", success: false })));
+  await saving.finished;
+
+  assert.equal(cachedVersion("overview", "draft"), 4);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 4);
+  assert.equal(hook.result.config.hero.title, "本地標題");
+  assert.equal(hook.result.dirty, true);
+  assert.notEqual(hook.result.errorMessage, "");
+
+  const retry = await startSave(hook);
+  assert.equal(api.saves[1]?.body.baseVersion, 4);
+  await settle(() => api.saves[1]!.response.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
+  await retry.finished;
+});
+
+test("a save conflict publishes the latest envelope while keeping local edits for a newest-baseVersion retry", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "本地標題");
+  const saving = await startSave(hook);
+  await settle(() => api.saves[0]!.response.resolve(conflictResponse(hookEnvelope("overview", 6, "伺服器 v6 標題"), 4)));
+  await saving.finished;
+
+  assert.equal(cachedVersion("overview", "draft"), 6);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 6);
+  assert.equal(hook.result.config.hero.title, "本地標題");
+  assert.equal(hook.result.dirty, true);
+  assert.match(hook.result.errorMessage, /v6/);
+  assert.notEqual(hook.result.message, "展示頁設定已儲存。");
+
+  const retry = await startSave(hook);
+  assert.equal(api.saves[1]?.body.baseVersion, 6);
+  await settle(() => api.saves[1]!.response.resolve(configResponse(hookEnvelope("overview", 7, "本地標題"))));
+  await retry.finished;
+});
+
+test("only the committed stage-page cache entry changes when a draft save succeeds", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "總覽草稿"));
+  primeDisplayPageConfigCache("overview", "live", hookEnvelope("overview", 2, "總覽正式", "live"));
+  primeDisplayPageConfigCache("solar", "draft", hookEnvelope("solar", 3, "太陽能草稿"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "總覽新草稿");
+  const saving = await startSave(hook);
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 6, "總覽新草稿"))));
+  await saving.finished;
+
+  assert.equal(cachedVersion("overview", "draft"), 6);
+  assert.equal(cachedVersion("overview", "live"), 2);
+  assert.equal(cachedVersion("solar", "draft"), 3);
+});
+
+test("a reload that resolves after a save cannot downgrade the saved envelope or hold loading", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "本地標題");
+  const reloading = await startReload(hook);
+  assert.equal(hook.result.isLoading, true);
+  assert.equal(api.reads.length, 1);
+
+  const saving = await startSave(hook);
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
+  await saving.finished;
+  assert.equal(hook.result.isLoading, false, "the save commit settles the loading it took over");
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 4, "v4 標題"))));
+  await reloading.finished;
+  assert.equal(cachedVersion("overview", "draft"), 5);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.config.hero.title, "本地標題");
+  assert.equal(hook.result.errorMessage, "");
+  assert.equal(hook.result.isLoading, false);
+});
+
+test("an obsolete reload rejection cannot change the saved session or a newer reload's loading", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "本地標題");
+  const obsoleteReload = await startReload(hook);
+  const saving = await startSave(hook);
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
+  await saving.finished;
+  const currentReload = await startReload(hook);
+  assert.equal(api.reads.length, 2);
+  assert.equal(hook.result.isLoading, true);
+
+  // The superseded read joins the newer one, so its reload settles only with it.
+  await settle(() => api.reads[0]!.reject(new Error("obsolete read failed")));
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.errorMessage, "");
+  assert.equal(hook.result.isLoading, true, "the obsolete read must not clear the newer reload's loading");
+
+  await settle(() => api.reads[1]!.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
+  await Promise.all([obsoleteReload.finished, currentReload.finished]);
+  assert.equal(hook.result.isLoading, false);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+});
+
+test("a reload that resolves after a save conflict cannot discard the kept local draft", async (t) => {
+  // A conflict keeps the session dirty, so nothing but the commit itself can
+  // retire the reload that was already in flight.
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "本地標題");
+  const reloading = await startReload(hook);
+  const saving = await startSave(hook);
+  await settle(() => api.saves[0]!.response.resolve(conflictResponse(hookEnvelope("overview", 6, "伺服器 v6 標題"), 4)));
+  await saving.finished;
+  assert.equal(hook.result.isLoading, false, "the conflict commit settles the loading it took over");
+
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 4, "v4 標題"))));
+  await reloading.finished;
+  assert.equal(hook.result.config.hero.title, "本地標題");
+  assert.equal(hook.result.dirty, true);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 6);
+  assert.equal(cachedVersion("overview", "draft"), 6);
+});
+
+test("hydration adopts an envelope committed after its read settled but before it resumed", async (t) => {
+  clearDisplayPageConfigCache();
+  ensureHookDom();
+  const api = installDisplayPageApi(t);
+  // Registered before the hook joins the same read, so this commit lands after
+  // the read settles as current and before hydration resumes.
+  const sharedRead = loadDisplayPageConfigEnvelope("overview", "draft");
+  const committed = sharedRead.then(() => {
+    primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "v5 標題"));
+  });
+
+  const hook = await mountConfigHook(t, "overview");
+  assert.equal(api.reads.length, 1, "the hook joins the pending read");
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 4, "v4 標題"))));
+  await committed;
+
+  assert.equal(cachedVersion("overview", "draft"), 5);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.isLoading, false);
+});
+
+test("hydration adopts an envelope committed after its read failed but before it resumed", async (t) => {
+  clearDisplayPageConfigCache();
+  ensureHookDom();
+  const api = installDisplayPageApi(t);
+  const sharedRead = loadDisplayPageConfigEnvelope("overview", "draft");
+  const committed = sharedRead.catch(() => {
+    primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "v5 標題"));
+  });
+
+  const hook = await mountConfigHook(t, "overview");
+  await settle(() => api.reads[0]!.reject(new Error("draft read failed")));
+  await committed;
+
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.errorMessage, "");
+  assert.equal(hook.result.isLoading, false);
+});
+
+test("hydration awaiting a read superseded by an external prime adopts the committed envelope", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+
+  const hook = await mountConfigHook(t, "overview");
+  assert.equal(hook.result.isLoading, true);
+  assert.equal(api.reads.length, 1);
+
+  await settle(() => primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "v5 標題")));
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 4, "v4 標題"))));
+
+  assert.equal(cachedVersion("overview", "draft"), 5);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.isLoading, false);
+});
+
+test("hydration whose read fails after an external prime adopts the committed envelope without an error", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+
+  const hook = await mountConfigHook(t, "overview");
+  await settle(() => primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "v5 標題")));
+  await settle(() => api.reads[0]!.reject(new Error("obsolete read failed")));
+
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.errorMessage, "");
+  assert.equal(hook.result.isLoading, false);
+});
+
+test("a public loader caller receives the committed envelope instead of an obsolete read outcome", async () => {
+  clearDisplayPageConfigCache();
+  const staleRead = createDeferred<DisplayPageConfigEnvelope>();
+  const loading = loadDisplayPageConfigEnvelope("overview", "draft", { force: true, readConfig: () => staleRead.promise });
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "v5 標題"));
+  staleRead.resolve(hookEnvelope("overview", 4, "v4 標題"));
+  assert.equal((await loading).version, 5);
+  assert.equal(cachedVersion("overview", "draft"), 5);
+
+  const failedRead = createDeferred<DisplayPageConfigEnvelope>();
+  const failing = loadDisplayPageConfigEnvelope("overview", "draft", { force: true, readConfig: () => failedRead.promise });
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 6, "v6 標題"));
+  failedRead.reject(new Error("obsolete read failed"));
+  assert.equal((await failing).version, 6);
+});
+
+test("a superseded read joins the newer pending read and its finalizer keeps that pending entry", async () => {
+  clearDisplayPageConfigCache();
+  const olderRead = createDeferred<DisplayPageConfigEnvelope>();
+  const newerRead = createDeferred<DisplayPageConfigEnvelope>();
+  let readCount = 0;
+  const readConfig = () => {
+    readCount += 1;
+    return readCount === 1 ? olderRead.promise : newerRead.promise;
+  };
+
+  const older = loadDisplayPageConfigEnvelope("overview", "draft", { readConfig });
+  const newer = loadDisplayPageConfigEnvelope("overview", "draft", { force: true, readConfig });
+  olderRead.reject(new Error("obsolete read failed"));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const joined = loadDisplayPageConfigEnvelope("overview", "draft", { readConfig });
+  assert.equal(readCount, 2, "a later consumer joins the newer pending read instead of starting another");
+  newerRead.resolve(hookEnvelope("overview", 7, "v7 標題"));
+
+  const [olderOutcome, newerOutcome, joinedOutcome] = await Promise.all([older, newer, joined]);
+  assert.equal(olderOutcome.version, 7);
+  assert.equal(newerOutcome.version, 7);
+  assert.equal(joinedOutcome.version, 7);
+});
+
+test("a superseded read adopts the newer read failure without starting a third request or using warm cache", async () => {
+  clearDisplayPageConfigCache();
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+  const olderRead = createDeferred<DisplayPageConfigEnvelope>();
+  const newerRead = createDeferred<DisplayPageConfigEnvelope>();
+  const currentError = new Error("current read failed");
+  let readCount = 0;
+  const readConfig = () => {
+    readCount += 1;
+    return readCount === 1 ? olderRead.promise : newerRead.promise;
+  };
+
+  const older = loadDisplayPageConfigEnvelope("overview", "draft", { force: true, readConfig });
+  const newer = loadDisplayPageConfigEnvelope("overview", "draft", { force: true, readConfig });
+  newerRead.reject(currentError);
+  await assert.rejects(newer, (error) => error === currentError);
+  olderRead.resolve(hookEnvelope("overview", 3, "obsolete v3"));
+  await assert.rejects(older, (error) => error === currentError);
+
+  assert.equal(readCount, 2);
+  assert.equal(cachedVersion("overview", "draft"), 4);
+});
+
+test("a current read keeps its own result and an external prime only invalidates its own key", async () => {
+  clearDisplayPageConfigCache();
+  assert.equal(
+    (await loadDisplayPageConfigEnvelope("overview", "draft", { readConfig: async () => hookEnvelope("overview", 4, "v4 標題") })).version,
+    4
+  );
+  assert.equal(cachedVersion("overview", "draft"), 4);
+
+  const overviewRead = createDeferred<DisplayPageConfigEnvelope>();
+  const solarRead = createDeferred<DisplayPageConfigEnvelope>();
+  const overviewLoading = loadDisplayPageConfigEnvelope("overview", "draft", { force: true, readConfig: () => overviewRead.promise });
+  const solarLoading = loadDisplayPageConfigEnvelope("solar", "draft", { readConfig: () => solarRead.promise });
+
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "v5 標題"));
+  overviewRead.resolve(hookEnvelope("overview", 4, "v4 重讀"));
+  solarRead.resolve(hookEnvelope("solar", 3, "太陽能 v3"));
+
+  assert.equal((await overviewLoading).version, 5);
+  assert.equal((await solarLoading).version, 3);
+  assert.equal(cachedVersion("overview", "draft"), 5);
+  assert.equal(cachedVersion("solar", "draft"), 3);
 });
