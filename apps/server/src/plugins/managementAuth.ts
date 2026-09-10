@@ -221,39 +221,44 @@ function isSameHostReferer(
 /**
  * The single place a presented management access token is compared. A second
  * implementation elsewhere could admit a caller this one would reject, so every
- * examination of the header routes through here. The comparison is constant
- * time: the token is high-entropy, but a divergent-timing compare costs nothing
- * to avoid and the password path already uses `timingSafeEqual`.
+ * transport only extracts its value and hands it here. The comparison is
+ * constant time: the token is high-entropy, but a divergent-timing compare costs
+ * nothing to avoid and the password path already uses `timingSafeEqual`. Byte
+ * lengths are checked first because `timingSafeEqual` throws on a mismatch, and
+ * character counts can agree while UTF-8 byte lengths do not.
  */
-export function matchesManagementAccessTokenHeader(
-  headers: IncomingHttpHeaders,
-  managementAccessToken: string | null
+function matchesManagementAccessTokenValue(
+  presented: string | null,
+  configured: string | null
 ): boolean {
-  if (!managementAccessToken) {
-    return false;
-  }
-
-  const presented = readHeaderValue(headers[MANAGEMENT_ACCESS_TOKEN_HEADER]);
-  if (presented === null) {
+  if (!configured || !presented) {
     return false;
   }
 
   const presentedBytes = Buffer.from(presented, "utf8");
-  const expectedBytes = Buffer.from(managementAccessToken, "utf8");
-  return presentedBytes.length === expectedBytes.length
-    && timingSafeEqual(presentedBytes, expectedBytes);
+  const configuredBytes = Buffer.from(configured, "utf8");
+  return presentedBytes.length === configuredBytes.length
+    && timingSafeEqual(presentedBytes, configuredBytes);
 }
 
+export function matchesManagementAccessTokenHeader(
+  headers: IncomingHttpHeaders,
+  managementAccessToken: string | null
+): boolean {
+  return matchesManagementAccessTokenValue(
+    readHeaderValue(headers[MANAGEMENT_ACCESS_TOKEN_HEADER]),
+    managementAccessToken
+  );
+}
+
+// Only a string is a token here; coercing an array or object could turn it into
+// the configured value.
 function matchesSocketAuthAccessToken(
   auth: Record<string, unknown> | undefined,
   managementAccessToken: string | null
-) {
-  if (!managementAccessToken) {
-    return false;
-  }
-
-  const token = typeof auth?.managementAccessToken === "string" ? auth.managementAccessToken.trim() : "";
-  return token.length > 0 && token === managementAccessToken;
+): boolean {
+  const presented = typeof auth?.managementAccessToken === "string" ? auth.managementAccessToken.trim() : null;
+  return matchesManagementAccessTokenValue(presented, managementAccessToken);
 }
 
 function isManagementMutationRequest(request: FastifyRequest): boolean {
