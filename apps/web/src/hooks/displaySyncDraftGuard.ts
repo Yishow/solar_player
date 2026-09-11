@@ -164,15 +164,16 @@ export function useDisplaySyncDraftGuard({
   }, []);
 
   useEffect(() => {
-    if (
-      !externalReloadResult
-      || externalReloadResult.outcome === "stale"
-      || externalReloadResult.outcome === "failed"
-      || externalReloadResult.operationToken < externalOperationTokenRef.current
-    ) {
+    // Each external reload outcome is consumed once per guard lifecycle, so a
+    // dirty-state rerun cannot replay an already handled commit to acknowledge
+    // a notice raised after it.
+    if (!externalReloadResult || externalReloadResult.operationToken <= externalOperationTokenRef.current) {
       return;
     }
     externalOperationTokenRef.current = externalReloadResult.operationToken;
+    if (externalReloadResult.outcome === "stale" || externalReloadResult.outcome === "failed") {
+      return;
+    }
     const nextState = externalReloadResult.outcome === "deferred"
       ? { hasPendingRemoteChange: true }
       : isDirty

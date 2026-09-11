@@ -1040,3 +1040,68 @@ test("discard authorizes only the draft present at click and keep-editing does n
     await harness.unmount();
   }
 });
+
+test("a reverted Weather edit keeps the unread remote notice until a new committed discard reload", async () => {
+  const harness = await mountHarness();
+  const failedDiscard = deferred<WeatherSettings>();
+  const committedDiscard = deferred<WeatherSettings>();
+  let discardReload: Promise<void> | undefined;
+  // The failure is observed through discardAndReload; this keeps an early
+  // assertion from being masked by the rejection issued in `finally`.
+  failedDiscard.promise.catch(() => {});
+
+  try {
+    const bootstrapResult = harness.latest().data.weatherReloadResult;
+    assert.equal(bootstrapResult?.outcome, "committed", "bootstrap publishes its committed Weather outcome");
+
+    changeWeatherInterval(harness, 10);
+    await flushReact();
+    const readsBeforeEvent = harness.api.count("/api/weather/settings");
+    await harness.latest().remote.syncDraftGuard.handleDisplaySync(displaySyncEvent);
+    await flushReact();
+    assert.equal(harness.latest().remote.syncDraftGuard.hasPendingRemoteChange, true);
+
+    changeWeatherInterval(harness, 30);
+    await flushReact();
+    assert.equal(harness.latest().remote.draftSections.weather, false);
+    assert.equal(
+      harness.latest().remote.syncDraftGuard.hasPendingRemoteChange,
+      true,
+      "reverting to the baseline must not replay the bootstrap commit"
+    );
+    assert.equal(harness.api.count("/api/weather/settings"), readsBeforeEvent, "the deferred remote event must not fetch");
+    assert.equal(harness.latest().data.weatherReloadResult, bootstrapResult);
+
+    harness.latest().remote.syncDraftGuard.keepEditing();
+    await flushReact();
+    assert.equal(harness.latest().remote.syncDraftGuard.hasPendingRemoteChange, true);
+    assert.equal(harness.api.count("/api/weather/settings"), readsBeforeEvent, "keep-editing must not fetch");
+
+    harness.api.queueWeatherRead(failedDiscard.promise);
+    discardReload = harness.latest().remote.syncDraftGuard.discardAndReload();
+    failedDiscard.reject(new Error("discard Weather read failed"));
+    await assert.rejects(discardReload, /discard Weather read failed/);
+    await flushReact();
+    assert.equal(harness.latest().data.weatherReloadResult?.outcome, "failed");
+    assert.equal(harness.latest().remote.syncDraftGuard.hasPendingRemoteChange, true, "a failed discard keeps the notice");
+
+    harness.api.queueWeatherRead(committedDiscard.promise);
+    discardReload = harness.latest().remote.syncDraftGuard.discardAndReload();
+    committedDiscard.resolve(createWeatherSettings({ updateIntervalMinutes: 60 }));
+    await discardReload;
+    await flushReact();
+    assert.equal(harness.latest().data.weatherSettings.updateIntervalMinutes, 60);
+    assert.equal(harness.latest().data.weatherReloadResult?.outcome, "committed");
+    assert.notEqual(harness.latest().data.weatherReloadResult?.operationToken, bootstrapResult?.operationToken);
+    assert.equal(
+      harness.latest().remote.syncDraftGuard.hasPendingRemoteChange,
+      false,
+      "the new current committed discard reload acknowledges the notice"
+    );
+  } finally {
+    failedDiscard.reject(new Error("discard Weather read failed"));
+    committedDiscard.resolve(createWeatherSettings({ updateIntervalMinutes: 60 }));
+    await discardReload?.catch(() => {});
+    await harness.unmount();
+  }
+});
