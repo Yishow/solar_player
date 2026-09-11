@@ -319,12 +319,22 @@ func cmdOnce() int {
 	cfg := newConfig()
 	st := storage.Open(cfg.GetString("sqlite_path", "solar.db"), cfg.GetBool("sqlite_enabled", true))
 	defer st.Close()
+	zoneIDs, err := prepareCommandZoneIdentityStore(cfg, st)
+	if err != nil {
+		fmt.Printf("zone identity 初始化失敗：%v\n", err)
+		return 1
+	}
 
 	for _, facID := range cfg.FactoryIDs() {
 		sc := newFactoryScraper(cfg, facID)
 		summary, zones, err := sc.Fetch()
 		if err != nil {
 			fmt.Printf("[%s] 失敗: %v\n", facID, err)
+			continue
+		}
+		zones, err = zoneIDs.ResolveZones(facID, zones)
+		if err != nil {
+			fmt.Printf("[%s] zone identity 失敗: %v\n", facID, err)
 			continue
 		}
 		st.Record(facID, summary, zones, "")

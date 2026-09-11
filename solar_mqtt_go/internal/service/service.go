@@ -82,6 +82,7 @@ type FactoryService struct {
 	st        *storage.Storage
 
 	scraper   *scraper.Scraper
+	zoneIDs   zoneIdentityResolver
 	anomaly   *anomaly.Detector
 	heartbeat *heartbeat.Heartbeat
 	haTracker *discovery.Tracker
@@ -207,7 +208,7 @@ func (s *FactoryService) waitSeconds(n int) bool {
 	}
 }
 
-// runOnce 單輪：抓取 → 發佈 → 記錄 → 異常檢查 → discovery。
+// runOnce 單輪：抓取 → 身份解析 → 發佈 → 記錄 → 異常檢查 → discovery。
 func (s *FactoryService) runOnce() bool {
 	summary, zones, err := s.scraper.Fetch()
 	if err != nil {
@@ -215,6 +216,14 @@ func (s *FactoryService) runOnce() bool {
 		s.scraper.ResetSession()
 		s.publishStatus("error", err.Error())
 		return false
+	}
+	if s.zoneIDs != nil {
+		zones, err = s.zoneIDs.ResolveZones(s.factoryID, zones)
+		if err != nil {
+			fmt.Printf("[%s] zone identity 失敗: %v\n", s.factoryID, err)
+			s.publishStatus("error", "zone identity: "+err.Error())
+			return false
+		}
 	}
 
 	// 日間旗標（給異常偵測用）：night_pause 停用時一律視為白天
@@ -408,6 +417,7 @@ type FactoryServiceManager struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	services map[string]*FactoryService
+	zoneIDs  zoneIdentityResolver
 	reasonMu sync.Mutex
 	reason   StopReason
 
@@ -459,9 +469,19 @@ func (m *FactoryServiceManager) StartAll() error {
 		m.cancel()
 		return err
 	}
+	if m.zoneIDs == nil {
+		resolver, err := prepareZoneIdentityResolver(m.cfg, m.st)
+		if err != nil {
+			fmt.Printf("警告：zone identity 初始化失敗：%v，停止資料擷取\n", err)
+			m.cancel()
+			return err
+		}
+		m.zoneIDs = resolver
+	}
 	m.startLedgerPurge()
 	for _, fid := range m.cfg.FactoryIDs() {
 		svc := newFactoryService(fid, m.cfg, m.bus, m.st, m.ctx)
+		svc.zoneIDs = m.zoneIDs
 		svc.stageConfig = func(factoryID, requestID string) (*config.StagedSave, error) {
 			return m.cfg.StageRemoteSet(m.cfg.ConfigPath(), factoryID, requestID)
 		}
