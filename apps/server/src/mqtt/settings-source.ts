@@ -22,13 +22,29 @@ const defaultMqttSettings: Required<MqttSettingsRow> = {
   data_mode: "mqtt"
 };
 
-function readNumber(value: string | undefined): number | null {
-  if (!value) {
+function readInteger(
+  value: string | undefined,
+  options: { min: number; max?: number }
+): number | null {
+  if (value === undefined) {
     return null;
   }
 
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
+  const trimmed = value.trim();
+  if (!/^[0-9]+$/u.test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  if (
+    !Number.isSafeInteger(parsed)
+    || parsed < options.min
+    || (options.max !== undefined && parsed > options.max)
+  ) {
+    return null;
+  }
+
+  return parsed;
 }
 
 function readString(value: string | undefined): string | null {
@@ -56,13 +72,15 @@ export function getEnvMqttSettings(env: MqttEnv = process.env): Required<MqttSet
       readString(env.MQTT_BROKER) ??
       readString(env.MQTT_HOST) ??
       defaultMqttSettings.broker_host,
-    broker_port: readNumber(env.MQTT_PORT) ?? defaultMqttSettings.broker_port,
+    broker_port:
+      readInteger(env.MQTT_PORT, { min: 1, max: 65_535 }) ?? defaultMqttSettings.broker_port,
     username: readString(env.MQTT_USERNAME) ?? defaultMqttSettings.username,
     password: env.MQTT_PASSWORD ?? defaultMqttSettings.password,
     client_id: readString(env.MQTT_CLIENT_ID) ?? defaultMqttSettings.client_id,
     reconnect_interval:
-      readNumber(env.MQTT_RECONNECT_INTERVAL) ?? defaultMqttSettings.reconnect_interval,
-    message_timeout: readNumber(env.MQTT_MESSAGE_TIMEOUT) ?? defaultMqttSettings.message_timeout,
+      readInteger(env.MQTT_RECONNECT_INTERVAL, { min: 0 }) ?? defaultMqttSettings.reconnect_interval,
+    message_timeout:
+      readInteger(env.MQTT_MESSAGE_TIMEOUT, { min: 1 }) ?? defaultMqttSettings.message_timeout,
     data_mode: readDataMode(env.MQTT_DATA_MODE) ?? defaultMqttSettings.data_mode
   };
 }

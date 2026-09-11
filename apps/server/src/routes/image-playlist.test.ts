@@ -297,7 +297,9 @@ test("PUT /api/image-playlist/duration-all updates every duration without changi
     assert.equal(syncEvents.at(-1)?.reason, "image-playlist-duration-all-updated");
     assert.equal(syncEvents.at(-1)?.scope, "images");
 
-    const floorResponse = await app.inject({
+    const imageEventCount = imageEvents.length;
+    const syncEventCount = syncEvents.length;
+    const invalidResponse = await app.inject({
       method: "PUT",
       payload: {
         durationSeconds: 0
@@ -305,20 +307,22 @@ test("PUT /api/image-playlist/duration-all updates every duration without changi
       url: "/api/image-playlist/duration-all"
     });
 
-    assert.equal(floorResponse.statusCode, 200);
-    const floorGovernanceResponse = await app.inject({
+    assert.equal(invalidResponse.statusCode, 400);
+    const unchangedGovernanceResponse = await app.inject({
       method: "GET",
       url: "/api/image-playlist/governance"
     });
-    assert.equal(floorGovernanceResponse.statusCode, 200);
-    const floorGovernanceBody = floorGovernanceResponse.json() as {
+    assert.equal(unchangedGovernanceResponse.statusCode, 200);
+    const unchangedGovernanceBody = unchangedGovernanceResponse.json() as {
       playlist: {
         entries: Array<{
           durationSeconds: number;
         }>;
       };
     };
-    assert.deepEqual(floorGovernanceBody.playlist.entries.map((entry) => entry.durationSeconds), [1, 1, 1]);
+    assert.deepEqual(unchangedGovernanceBody.playlist.entries.map((entry) => entry.durationSeconds), [8, 8, 8]);
+    assert.equal(imageEvents.length, imageEventCount);
+    assert.equal(syncEvents.length, syncEventCount);
   } finally {
     app.socketService.emitImagesUpdated = originalEmitImagesUpdated;
     app.socketService.emitDisplaySync = originalEmitDisplaySync;

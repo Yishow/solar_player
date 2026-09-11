@@ -24,6 +24,7 @@ import managementAuthPlugin, {
 } from "./plugins/managementAuth.js";
 import { deviceContextPlugin } from "./plugins/deviceContext.js";
 import { managementInputValidationPlugin } from "./plugins/managementInputValidation.js";
+import { runtimeInputValidationPlugin } from "./plugins/runtimeInputValidation.js";
 import { type MqttStatus, SocketService } from "./realtime/SocketService.js";
 import { recordDeviceProfileRolloutHeartbeat } from "./services/deviceProfileRolloutService.js";
 import { createUnpairedDisplayAccessRegistry } from "./services/unpairedDisplayAccessRegistry.js";
@@ -213,6 +214,7 @@ export async function buildApp() {
 
   await managementAuthPlugin(app, { accessControl: managementAccess });
   await managementInputValidationPlugin(app);
+  await runtimeInputValidationPlugin(app);
   await app.register(managementAuthRoute);
   await deviceContextPlugin(app);
 

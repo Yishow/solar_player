@@ -52,15 +52,48 @@ export function rememberMqttConnectionModel(model: CachedMqttConnectionModel | n
   cachedMqttConnectionModel = model;
 }
 
+function requireText(value: string, label: string) {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error(`${label} 不可空白。`);
+  }
+  return trimmed;
+}
+
+function parseDecimalInteger(
+  value: string,
+  label: string,
+  options: { min: number; max?: number }
+) {
+  const trimmed = value.trim();
+  if (!/^[0-9]+$/u.test(trimmed)) {
+    throw new Error(`${label} 必須是完整整數。`);
+  }
+
+  const parsed = Number(trimmed);
+  if (
+    !Number.isSafeInteger(parsed)
+    || parsed < options.min
+    || (options.max !== undefined && parsed > options.max)
+  ) {
+    const range = options.max === undefined
+      ? `${options.min} 以上`
+      : `${options.min} 到 ${options.max}`;
+    throw new Error(`${label} 必須介於 ${range}。`);
+  }
+
+  return parsed;
+}
+
 export function buildSettingsPayload(settings: MqttSettingsForm) {
   return {
-    clientId: settings.clientId.trim(),
+    clientId: requireText(settings.clientId, "Client ID"),
     dataMode: settings.dataMode,
-    host: settings.host.trim(),
-    messageTimeout: Number.parseInt(settings.messageTimeout, 10) || 30,
+    host: requireText(settings.host, "Broker Host"),
+    messageTimeout: parseDecimalInteger(settings.messageTimeout, "Message Timeout", { min: 1 }),
     password: settings.password,
-    port: Number.parseInt(settings.port, 10) || 1883,
-    reconnectInterval: Number.parseInt(settings.reconnectInterval, 10) || 5000,
+    port: parseDecimalInteger(settings.port, "Port", { min: 1, max: 65_535 }),
+    reconnectInterval: parseDecimalInteger(settings.reconnectInterval, "Reconnect Interval", { min: 0 }),
     username: settings.username.trim()
   };
 }
