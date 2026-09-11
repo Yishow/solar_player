@@ -412,8 +412,10 @@ export async function managementInputValidationPlugin(app: FastifyInstance) {
       const key = pathname.includes("circuits") ? "circuits" : "images";
       const validation = validateReorderBody(request.body, key);
       if (validation.error) return sendBadRequest(reply, validation.error);
+      const items = validation.items;
+      if (!items) return sendBadRequest(reply, "Invalid reorder body");
       const table = key === "circuits" ? "circuit_configs" : "image_assets";
-      const missing = findMissingIds(table, validation.items.map((item) => item.id));
+      const missing = findMissingIds(table, items.map((item) => item.id));
       if (missing.length > 0) return sendBadRequest(reply, `Unknown ${key.slice(0, -1)} id: ${missing[0]}`);
     }
   });

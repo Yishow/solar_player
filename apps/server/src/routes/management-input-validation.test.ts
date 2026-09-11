@@ -24,7 +24,18 @@ function resetFixtures() {
   seedDatabase();
   const db = getDatabase();
   db.prepare("DELETE FROM circuit_configs").run();
-  db.prepare("DELETE FROM image_playlist_entries").run();
+  const playlistTable = db
+    .prepare(
+      `
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'image_playlist_entries'
+      `
+    )
+    .get();
+  if (playlistTable) {
+    db.prepare("DELETE FROM image_playlist_entries").run();
+  }
   db.prepare("DELETE FROM image_assets").run();
   db.prepare("DELETE FROM brand_profiles").run();
 
