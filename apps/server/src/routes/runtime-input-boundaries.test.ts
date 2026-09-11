@@ -98,7 +98,7 @@ test("playback settings reject malformed runtime values before persistence or so
     const initial = await app.inject({ method: "GET", url: "/api/playback/settings" });
     const before = (initial.json() as { settings: PlaybackSettings }).settings;
 
-    const invalidBodies: unknown[] = [
+    const invalidBodies: Array<Record<string, unknown>> = [
       { autoplay: "false" },
       { brightness: 101 },
       { idleTimeout: 0 },
@@ -180,7 +180,7 @@ test("MQTT partial updates preserve mock mode and invalid values never persist o
       `)
       .get();
 
-    const invalidBodies: unknown[] = [
+    const invalidBodies: Array<Record<string, unknown>> = [
       { dataMode: "invalid" },
       { host: "   " },
       { clientId: "" },

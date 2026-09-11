@@ -460,7 +460,9 @@ export async function runtimeInputValidationPlugin(app: FastifyInstance) {
     ) {
       const validation = validateAndHydrateMqttSettings(request.body);
       if (validation.error) return sendBadRequest(reply, validation.error);
-      replaceRequestBody(request, validation.body);
+      const body = validation.body;
+      if (!body) return sendBadRequest(reply, "Invalid MQTT settings body");
+      replaceRequestBody(request, body);
       return;
     }
 

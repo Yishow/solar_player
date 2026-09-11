@@ -51,7 +51,7 @@ test("image playlist entry mutations reject malformed values without writes or s
     const before = readEntry("IMG-01");
     assert.ok(before);
 
-    const invalidBodies: unknown[] = [
+    const invalidBodies: Array<Record<string, unknown>> = [
       { durationSeconds: 0 },
       { durationSeconds: -1 },
       { durationSeconds: 1.5 },
