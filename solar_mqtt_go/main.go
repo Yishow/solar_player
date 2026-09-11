@@ -50,7 +50,7 @@ func extractLegacyOnce(args []string) ([]string, bool) {
 // launch mode 與各入口可測試替換。
 var (
 	trayAvailableFn = tray.Available
-	runDefaultFn    = cmdRun
+	runDefaultFn    = runDataPlaneDefault
 	runTrayFn       = runTrayOrFail
 	defaultGOOS     = func() string { return runtime.GOOS }
 )
@@ -60,7 +60,7 @@ func runTrayOrFail() int {
 		fmt.Fprintln(os.Stderr, "tray：系統列不可用，請使用一般 run 子命令")
 		return 1
 	}
-	return cmdTray()
+	return runTrayWithConfigGate()
 }
 
 // runCLI 解析參數並分派子命令，回傳 process exit code。
@@ -69,7 +69,7 @@ func runCLI(args []string) int {
 
 	if len(args) == 0 {
 		if legacyOnce {
-			return cmdOnce()
+			return runDataPlaneOnce()
 		}
 		if defaultGOOS() == "windows" {
 			return runTrayFn()
@@ -81,15 +81,15 @@ func runCLI(args []string) int {
 	case "tray":
 		return runTrayFn()
 	case "run":
-		return cmdRun()
+		return runDataPlaneDefault()
 	case "once":
-		return cmdOnce()
+		return runDataPlaneOnce()
 	case "test-login":
-		return cmdTestLogin(firstArg(args[1:]))
+		return runDataPlaneTestLogin(firstArg(args[1:]))
 	case "test-mqtt":
 		return cmdTestMqtt()
 	case "dump-api":
-		return cmdDumpAPI(firstArg(args[1:]))
+		return runDataPlaneDumpAPI(firstArg(args[1:]))
 	case "history":
 		fs := flag.NewFlagSet("history", flag.ContinueOnError)
 		factory := fs.String("factory", "", "工廠 ID")
