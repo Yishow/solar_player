@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Serial-backed Solar zones keep a durable numeric identity across collector restarts
 

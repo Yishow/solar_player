@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Solar collector data plane requires explicit persisted factory configuration
 

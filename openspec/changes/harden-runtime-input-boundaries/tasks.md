@@ -29,5 +29,5 @@
 ## 5. Review 與驗證
 
 - [x] 5.1 主代理完成最終 code review；確認沒有把 freshness behavior、CI、offline architecture、image delete consistency、MQTT initial-connect cleanup 偷帶進本 change，無剩餘 blocker finding。
-- [ ] 5.2 受影響 server / web tests 與 root `pnpm verify`：NOT RUN。此執行環境無完整 workspace，且無法解析 `github.com` 取得 repo，因此不宣稱測試已通過。
-- [ ] 5.3 Spectra validate：NOT RUN；待有完整 workspace 的環境執行後，再決定是否進 archive。
+- [x] 5.2 受影響 server / web tests 與 root `pnpm verify`：已於完整 workspace 執行通過（server 1191 pass / 0 fail、shared 167 pass / 0 fail、build/bundle-budget/web/deploy/server-runner 全階段 passed）。
+- [x] 5.3 Spectra validate：`openspec validate harden-runtime-input-boundaries --type change` 通過；順手修正本 change delta 指向的 `management-api-input-validation` 等 3 個 main spec 誤用 `## ADDED Requirements` 標頭的結構問題（改為 `## Requirements`），archive 不再被拒。

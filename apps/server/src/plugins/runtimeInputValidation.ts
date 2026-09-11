@@ -441,7 +441,7 @@ export async function runtimeInputValidationPlugin(app: FastifyInstance) {
       && (pathname === "/api/playback/pages" || pathname === "/api/playback/rotation-plan")
     ) {
       const validation = validateAndHydratePlaybackPages(request.body);
-      if (validation.error) {
+      if (validation.error !== undefined) {
         if (/was not found$/u.test(validation.error)) {
           return sendNotFound(reply, validation.error);
         }
@@ -459,10 +459,8 @@ export async function runtimeInputValidationPlugin(app: FastifyInstance) {
       || (method === "POST" && pathname === "/api/settings/mqtt/test")
     ) {
       const validation = validateAndHydrateMqttSettings(request.body);
-      if (validation.error) return sendBadRequest(reply, validation.error);
-      const body = validation.body;
-      if (!body) return sendBadRequest(reply, "Invalid MQTT settings body");
-      replaceRequestBody(request, body);
+      if (validation.error !== undefined) return sendBadRequest(reply, validation.error);
+      replaceRequestBody(request, validation.body);
       return;
     }
 

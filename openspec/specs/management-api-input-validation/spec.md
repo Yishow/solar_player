@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Management numeric resource identifiers are parsed strictly
 
