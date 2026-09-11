@@ -210,6 +210,29 @@ function resolveNewerDisplayPageConfigEnvelope(
   return committed !== undefined && committed !== known ? committed : null;
 }
 
+type DisplayPageConfigEnvelopeAdmission = {
+  envelope: DisplayPageConfigEnvelope;
+  outcome: "published" | "rejected" | "unchanged";
+};
+
+// Admits a server-confirmed save or conflict envelope for one stage:page key.
+// Only a version above the one the key already holds is published; an equal or
+// older envelope leaves the cache, its generation and in-flight reads alone and
+// yields the confirmed envelope instead. Versions are never compared across keys.
+function admitDisplayPageConfigEnvelope(
+  pageId: DisplayPageId,
+  stage: ConfigStage,
+  candidate: DisplayPageConfigEnvelope
+): DisplayPageConfigEnvelopeAdmission {
+  const confirmed = displayPageConfigCache.get(resolveDisplayPageConfigCacheKey(pageId, stage));
+  if (confirmed && candidate.version <= confirmed.version) {
+    return { envelope: confirmed, outcome: candidate.version === confirmed.version ? "unchanged" : "rejected" };
+  }
+
+  primeDisplayPageConfigCache(pageId, stage, candidate);
+  return { envelope: candidate, outcome: "published" };
+}
+
 export async function loadDisplayPageConfigEnvelope(
   pageId: DisplayPageId,
   stage: ConfigStage,
@@ -620,23 +643,36 @@ export function useDisplayPageConfig<T>(
     saveRequestIdRef.current = saveRequestId;
     const ownsSaveOperation = () =>
       ownerRef.current === saveOwner && saveRequestIdRef.current === saveRequestId;
-    // A server-confirmed envelope (saved, or a conflict's latest) supersedes every
-    // earlier read of this page and stage. The cache always takes it. While the
-    // owner still serves this page, its earlier load is invalidated before the
-    // publish and the loading that load held is settled here, since that load's
-    // own finally no longer counts. Sessions are keyed by page, so the envelope
-    // still reaches this page's session after the owner switched pages, but
-    // never after it switched stage, was disabled, or unmounted.
+    // A server-confirmed envelope (saved, or a conflict's latest) is admitted
+    // against the version this page and stage already confirmed. A published
+    // envelope supersedes every earlier read of the key. While the owner still
+    // serves this page, its earlier load is invalidated with the publish and the
+    // loading that load held is settled here, since that load's own finally no
+    // longer counts. Sessions are keyed by page, so a published envelope still
+    // reaches this page's session after the owner switched pages, but never after
+    // it switched stage, was disabled, or unmounted. An equal or older envelope
+    // publishes nothing and fences no read; it only rebases the operation that
+    // still owns it onto the confirmed envelope.
     const commitServerEnvelope = (
-      envelope: DisplayPageConfigEnvelope,
-      nextSession: (session: DisplayPageDraftSession<T> | undefined) => DisplayPageDraftSession<T>
+      candidate: DisplayPageConfigEnvelope,
+      nextSession: (
+        envelope: DisplayPageConfigEnvelope,
+        session: DisplayPageDraftSession<T> | undefined
+      ) => DisplayPageDraftSession<T>
     ) => {
       const ownsOperation = ownsSaveOperation();
+      const admission = admitDisplayPageConfigEnvelope(pageId, stage, candidate);
+      if (admission.outcome !== "published") {
+        if (ownsOperation) {
+          setSessions((current) => ({ ...current, [pageId]: nextSession(admission.envelope, current[pageId]) }));
+        }
+        return;
+      }
+
       if (ownsOperation) {
         loadRequestIdRef.current += 1;
       }
 
-      primeDisplayPageConfigCache(pageId, stage, envelope);
       const currentOwner = ownerRef.current;
       if (!currentOwner || currentOwner.stage !== stage) {
         return;
@@ -645,7 +681,7 @@ export function useDisplayPageConfig<T>(
         return;
       }
 
-      setSessions((current) => ({ ...current, [pageId]: nextSession(current[pageId]) }));
+      setSessions((current) => ({ ...current, [pageId]: nextSession(admission.envelope, current[pageId]) }));
       if (ownsOperation) {
         setIsLoading(false);
       }
@@ -660,21 +696,20 @@ export function useDisplayPageConfig<T>(
         { baseVersion: lastLoadedEnvelope.version },
         payload.freeformObjects
       );
-      commitServerEnvelope(envelope, () => createDisplayPageConfigSessionFromEnvelope(seedConfig, envelope));
+      commitServerEnvelope(envelope, (confirmed) => createDisplayPageConfigSessionFromEnvelope(seedConfig, confirmed));
       if (ownsSaveOperation()) {
         setMessage("展示頁設定已儲存。");
       }
     } catch (error) {
       if (isManagementDraftConflictError(error)) {
         const latestEnvelope = error.conflict.latestEnvelope as DisplayPageConfigEnvelope;
-        const latestConfig = mergeDisplayPageConfigEnvelope(seedConfig, latestEnvelope);
-        // The cache takes the latest server envelope; the session only rebases its
-        // baseline onto it and keeps the local draft.
-        commitServerEnvelope(latestEnvelope, (session) => applyDisplayPageSaveConflict(
+        // The session only rebases its baseline onto the admitted envelope and
+        // keeps the local draft.
+        commitServerEnvelope(latestEnvelope, (confirmed, session) => applyDisplayPageSaveConflict(
           session ?? createDraftSession(deepClone(seedConfig), null, defaultFallbackPolicy),
-          latestConfig,
-          latestEnvelope,
-          resolveDisplayPageFallbackPolicy(latestEnvelope)
+          mergeDisplayPageConfigEnvelope(seedConfig, confirmed),
+          confirmed,
+          resolveDisplayPageFallbackPolicy(confirmed)
         ));
         if (ownsSaveOperation()) {
           setErrorMessage(

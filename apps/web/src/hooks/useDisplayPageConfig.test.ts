@@ -1492,3 +1492,198 @@ test("a current read keeps its own result and an external prime only invalidates
   assert.equal(cachedVersion("overview", "draft"), 5);
   assert.equal(cachedVersion("solar", "draft"), 3);
 });
+
+test("an earlier-visit save that returns after a newer confirmed save cannot downgrade cache, remount, or next baseVersion", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "overview v4"));
+  primeDisplayPageConfigCache("solar", "draft", hookEnvelope("solar", 3, "solar v3"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "R1 edit");
+  const r1 = await startSave(hook);
+  assert.equal(api.saves[0]?.body.baseVersion, 4);
+
+  await hook.switchPage("solar");
+  await hook.switchPage("overview");
+  await editTitle(hook, "R2 edit");
+  const r2 = await startSave(hook);
+  assert.equal(api.saves[1]?.body.baseVersion, 4);
+  await settle(() => api.saves[1]!.response.resolve(conflictResponse(hookEnvelope("overview", 5, "R1 edit"), 4)));
+  await r2.finished;
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
+  assert.equal(hook.result.config.hero.title, "R2 edit");
+
+  const retry = await startSave(hook);
+  assert.equal(api.saves[2]?.body.baseVersion, 5);
+  await settle(() => api.saves[2]!.response.resolve(configResponse(hookEnvelope("overview", 6, "R2 edit"))));
+  await retry.finished;
+  assert.equal(cachedVersion("overview", "draft"), 6);
+  const ownerStateBeforeR1 = {
+    errorMessage: hook.result.errorMessage,
+    isLoading: hook.result.isLoading,
+    isSaving: hook.result.isSaving,
+    message: hook.result.message
+  };
+
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "R1 edit"))));
+  await r1.finished;
+  assert.equal(cachedVersion("overview", "draft"), 6, "the earlier save must not downgrade the confirmed cache");
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 6);
+  assert.equal(hook.result.config.hero.title, "R2 edit");
+  assert.equal(hook.result.dirty, false);
+  assert.deepEqual(
+    {
+      errorMessage: hook.result.errorMessage,
+      isLoading: hook.result.isLoading,
+      isSaving: hook.result.isSaving,
+      message: hook.result.message
+    },
+    ownerStateBeforeR1,
+    "R1 must not alter the new owner's message or operation state"
+  );
+  await hook.unmount();
+
+  const remounted = await mountConfigHook(t, "overview");
+  assert.equal(remounted.result.lastLoadedEnvelope?.version, 6);
+  assert.equal(remounted.result.config.hero.title, "R2 edit");
+  assert.equal(api.reads.length, 0, "remount initializes from the confirmed cache without a read");
+  await editTitle(remounted, "after remount");
+  const next = await startSave(remounted);
+  assert.equal(api.saves[3]?.body.baseVersion, 6, "the next save must build on the confirmed version");
+  await settle(() => api.saves[3]!.response.resolve(configResponse(hookEnvelope("overview", 7, "after remount"))));
+  await next.finished;
+});
+
+test("an earlier save's older conflict envelope cannot downgrade the baseline, drop the draft, or retire a newer read", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "v4 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "first attempt");
+  const earlier = await startSave(hook);
+  await editTitle(hook, "second attempt");
+  const later = await startSave(hook);
+  await settle(() => api.saves[1]!.response.resolve(configResponse(hookEnvelope("overview", 6, "second attempt"))));
+  await later.finished;
+  assert.equal(cachedVersion("overview", "draft"), 6);
+
+  await editTitle(hook, "unsaved local draft");
+  const reloading = await startReload(hook);
+  assert.equal(api.reads.length, 1);
+  assert.equal(hook.result.isLoading, true);
+
+  await settle(() => api.saves[0]!.response.resolve(conflictResponse(hookEnvelope("overview", 5, "someone else v5"), 4)));
+  await earlier.finished;
+  assert.equal(cachedVersion("overview", "draft"), 6, "an older conflict must not replace the confirmed cache");
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 6);
+  assert.equal(hook.result.config.hero.title, "unsaved local draft");
+  assert.equal(hook.result.dirty, true);
+  assert.equal(hook.result.isLoading, true, "the rejected envelope must not settle the newer read's loading");
+
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 7, "server v7"))));
+  await reloading.finished;
+  assert.equal(cachedVersion("overview", "draft"), 7, "the newer read must still publish its own result");
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 7);
+  assert.equal(hook.result.isLoading, false);
+});
+
+test("a repeated same-version response reuses the confirmed envelope without retiring a newer read", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "v5 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "first attempt");
+  const earlier = await startSave(hook);
+  await editTitle(hook, "second attempt");
+  const later = await startSave(hook);
+  await settle(() => api.saves[1]!.response.resolve(configResponse(hookEnvelope("overview", 6, "second attempt"))));
+  await later.finished;
+
+  const reloading = await startReload(hook);
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 6, "stale copy of v6"))));
+  await earlier.finished;
+  assert.equal(cachedVersion("overview", "draft"), 6);
+  assert.equal(
+    resolveCachedDisplayPageConfigSession("overview", "draft", hookSeed)?.config.hero.title,
+    "second attempt",
+    "a same-version response must reuse the confirmed envelope"
+  );
+  assert.equal(hook.result.config.hero.title, "second attempt");
+  assert.equal(hook.result.isLoading, true, "repeating version 6 must not settle the newer read");
+
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 7, "server v7"))));
+  await reloading.finished;
+  assert.equal(cachedVersion("overview", "draft"), 7, "repeating version 6 must not obsolete the newer read");
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 7);
+  assert.equal(hook.result.isLoading, false);
+});
+
+test("an owned same-version save settles only its own operation and leaves a newer read to finish", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "v5 標題"));
+
+  const hook = await mountConfigHook(t, "overview");
+  // Saving the clean session keeps `dirty` unchanged, so only the admission
+  // decides whether the owner's newer read survives this response.
+  const saving = await startSave(hook);
+  assert.equal(api.saves[0]?.body.baseVersion, 5);
+  // Another reader confirms this save's version 6 before the save response arrives.
+  const confirmedByReader = await loadDisplayPageConfigEnvelope("overview", "draft", {
+    force: true,
+    readConfig: async () => hookEnvelope("overview", 6, "v5 標題")
+  });
+  assert.equal(confirmedByReader.version, 6);
+  const reloading = await startReload(hook);
+  assert.equal(hook.result.isLoading, true);
+
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 6, "v5 標題"))));
+  await saving.finished;
+  assert.equal(hook.result.isSaving, false, "the owned same-version response settles its own save");
+  assert.equal(hook.result.message, "展示頁設定已儲存。");
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 6);
+  assert.equal(hook.result.dirty, false);
+  assert.equal(hook.result.isLoading, true, "the same-version response must not settle the newer read's loading");
+
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 7, "server v7"))));
+  await reloading.finished;
+  assert.equal(cachedVersion("overview", "draft"), 7);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 7);
+  assert.equal(hook.result.isLoading, false);
+});
+
+test("after unmount a newer save still publishes its own key while an older sibling response is rejected", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "overview v4"));
+  primeDisplayPageConfigCache("overview", "live", hookEnvelope("overview", 2, "overview live", "live"));
+  primeDisplayPageConfigCache("solar", "draft", hookEnvelope("solar", 3, "solar v3"));
+
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "first attempt");
+  const earlier = await startSave(hook);
+  await editTitle(hook, "second attempt");
+  const later = await startSave(hook);
+  await hook.unmount();
+
+  await settle(() => api.saves[1]!.response.resolve(configResponse(hookEnvelope("overview", 6, "second attempt"))));
+  await later.finished;
+  assert.equal(cachedVersion("overview", "draft"), 6, "a newer save still publishes after unmount");
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "first attempt"))));
+  await earlier.finished;
+  assert.equal(cachedVersion("overview", "draft"), 6, "an older response after unmount is rejected");
+  assert.equal(cachedVersion("overview", "live"), 2);
+  assert.equal(cachedVersion("solar", "draft"), 3);
+
+  const remounted = await mountConfigHook(t, "overview");
+  assert.equal(remounted.result.config.hero.title, "second attempt");
+  assert.equal(remounted.result.dirty, false);
+  await editTitle(remounted, "next edit");
+  const next = await startSave(remounted);
+  assert.equal(api.saves[2]?.body.baseVersion, 6);
+  await settle(() => api.saves[2]!.response.resolve(configResponse(hookEnvelope("overview", 7, "next edit"))));
+  await next.finished;
+});
