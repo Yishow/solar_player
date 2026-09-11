@@ -12,6 +12,7 @@ import {
   findLatestAcceptedInstantMs,
   ingestMeterReading,
   listAcceptedReadingIdentities,
+  listCalculationEligibleIdentitiesAt,
   loadAcceptedMeterReadings,
   loadAcceptedMeterReadingsForIdentityWindow,
   loadAcceptedMeterReadingsInWindow,
@@ -476,6 +477,36 @@ test("the latest instant before a bound honours ties, identity and calculation e
     loadAcceptedMeterReadingsForIdentityWindow(database, "kn", "kn-main", identityA, Date.parse("2026-08-20T00:00:00Z"), bound)
       .some((row) => row.reading_id === "unsourced")
   );
+  database.close();
+});
+
+test("identities tied at one instant are exactly the calculation-eligible identities at that instant", () => {
+  const database = createCapacityDatabase();
+  const tieMs = Date.parse("2026-08-31T15:58:00Z");
+  insertRawReading(database, { id: "a-source", source: "2026-08-31T15:58:00Z" });
+  insertRawReading(database, { id: "a-offset-duplicate", source: "2026-08-31T23:58:00+08:00" });
+  insertRawReading(database, { id: "b-estimated", revision: 2, epoch: "epoch-2", source: null, quality: "receive-time-estimated", received: "2026-08-31T15:58:00Z" });
+  insertRawReading(database, { id: "c-unplaceable", revision: 3, epoch: "epoch-3", source: null, quality: "source", received: "2026-08-31T15:58:00Z" });
+  insertRawReading(database, { id: "d-replacement", meter: "kn-main-2", revision: 4, epoch: "epoch-4", source: "2026-08-31T15:58:00.000Z" });
+  insertRawReading(database, { id: "e-one-ms-earlier", revision: 5, epoch: "epoch-5", source: "2026-08-31T15:57:59.999Z" });
+  insertRawReading(database, { id: "f-in-span", revision: 6, epoch: "epoch-6", source: "2026-08-31T16:00:00Z" });
+  insertRawReading(database, { id: "other-channel", channel: "kn-other", source: "2026-08-31T15:58:00Z" });
+  insertRawReading(database, { id: "other-scope", scope: "cl", source: "2026-08-31T15:58:00Z" });
+
+  // The newest calculation-eligible instant strictly before a span opening at 16:00.
+  assert.equal(
+    findLatestAcceptedInstantMs(database, "kn", "kn-main", Date.parse("2026-08-31T16:00:00Z") - 1, { calculationEligible: true }),
+    tieMs
+  );
+  assert.deepStrictEqual(listCalculationEligibleIdentitiesAt(database, "kn", "kn-main", tieMs), [
+    { epochId: "epoch-1", meterId: "kn-main", sourceRevision: 1 },
+    { epochId: "epoch-2", meterId: "kn-main", sourceRevision: 2 },
+    { epochId: "epoch-4", meterId: "kn-main-2", sourceRevision: 4 }
+  ], "every eligible tie once, offsets included; an unplaceable reading at the same receive time is not a tie");
+  assert.deepStrictEqual(listCalculationEligibleIdentitiesAt(database, "kn", "kn-main", tieMs - 1), [
+    { epochId: "epoch-5", meterId: "kn-main", sourceRevision: 5 }
+  ]);
+  assert.deepStrictEqual(listCalculationEligibleIdentitiesAt(database, "kn", "kn-main", Date.parse("2026-08-01T00:00:00Z")), []);
   database.close();
 });
 

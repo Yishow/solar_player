@@ -418,7 +418,11 @@ test("bounded evidence reads seek the accepted-reading instant indexes instead o
   });
 
   const recorded = [...new Set(statements)];
-  assert.equal(recorded.length, 5, "window, eligible identity anchor, identity listing, fingerprint identity anchor, identity window");
+  assert.equal(
+    recorded.length,
+    7,
+    "window, eligible prior closing, closing ties, eligible identity anchor, identity listing, fingerprint identity anchor, identity window"
+  );
   for (const sql of recorded) {
     const access = acceptedReadingAccess(database, sql);
     assert.ok(access.length > 0, sql);
@@ -716,4 +720,93 @@ test("a timestamp SQLite cannot evaluate falls back to the full scope read", (t)
 
   assert.equal(selection.fullLoad, true);
   assert.equal(selection.rows.length, loadAcceptedMeterReadings(database, "kn").length);
+});
+
+// The reported regression: a retired January identity, the current identity's
+// August 31 opening just before the window, and two September readings whose
+// reference result is 75 kWh. Growth adds current-identity February history that
+// no September window needs.
+function seedRetiredIdentityFixture(database: Database.Database, februaryHistory: number) {
+  insertReading(database, { id: "retired-january", revision: 0, epoch: "epoch-0", source: "2026-01-15T00:00:00Z", value: "30" });
+  const insert = database.prepare(`
+    INSERT INTO meter_readings_accepted (
+      reading_id, metric_scope, meter_id, channel_id, source_revision, epoch_id, raw_value_decimal,
+      normalized_value_kwh, source_timestamp, received_at, timestamp_quality, origin, payload_hash, created_at, measurement_kind
+    ) VALUES (?, 'kn', 'kn-main', 'kn-main', 1, 'epoch-1', ?, ?, ?, ?, 'source', 'mqtt', ?, ?, 'cumulative-energy')
+  `);
+  const februaryStartMs = Date.parse("2026-02-01T00:00:00Z");
+  database.transaction(() => {
+    for (let index = 0; index < februaryHistory; index += 1) {
+      const instant = new Date(februaryStartMs + index * 20_000).toISOString();
+      const value = (60 + (39 * index) / februaryHistory).toFixed(6);
+      insert.run(`february-${index}`, value, value, instant, instant, `february-${index}`, instant);
+    }
+  })();
+  insertReading(database, { id: "current-opening", source: "2026-08-31T15:58:00Z", value: "100" });
+  insertReading(database, { id: "current-mid", source: "2026-09-05T00:00:00Z", value: "150" });
+  insertReading(database, { id: "current-close", source: "2026-09-14T23:59:00Z", value: "175" });
+}
+
+test("irrelevant retired identities do not expand calculation materialization as current history grows", () => {
+  const measure = (februaryHistory: number) => {
+    const database = createDatabase();
+    applyEvidenceIndexes(database);
+    seedRetiredIdentityFixture(database, februaryHistory);
+    const selection = selectCalculationEvidence(database, {
+      channelIds: ["kn-main"],
+      fromMs: Date.parse(SEPTEMBER_START),
+      scope: "kn",
+      throughMs: Date.parse(SEPTEMBER_AS_OF)
+    });
+    const resolveSeptember = periodResolver(database, SEPTEMBER, SEPTEMBER_AS_OF);
+    const bounded = toPeriodSamples(selection.rows);
+    assertEquivalentEvidence(database, bounded, resolveSeptember, `${februaryHistory} February readings`);
+    const result = resolveSeptember(bounded) as { valueKwh: string | null };
+    database.close();
+    return {
+      fullLoad: selection.fullLoad,
+      materializedRowCount: selection.materializedRowCount,
+      queryCount: selection.queryCount,
+      rows: selection.rows.map((row) => row.reading_id).sort(),
+      valueKwh: result.valueKwh
+    };
+  };
+
+  const baseline = measure(0);
+  assert.deepEqual(baseline.rows, ["current-close", "current-mid", "current-opening"], "the retired January identity closes nothing in September");
+  assert.equal(baseline.valueKwh, "75");
+  assert.equal(baseline.fullLoad, false);
+  assert.deepStrictEqual(measure(10_000), baseline, "10,000 February readings widen nothing");
+  assert.deepStrictEqual(measure(100_000), baseline, "100,000 February readings widen nothing");
+});
+
+test("an old opening and every intervening identity stay selected while an irrelevant retired identity does not", (t) => {
+  const database = createDatabase();
+  t.after(() => database.close());
+  applyEvidenceIndexes(database);
+  insertReading(database, { id: "retired-january", revision: 0, epoch: "epoch-0", source: "2026-01-15T00:00:00Z", value: "30" });
+  // The closing identity last reported in March; between then and September a
+  // replacement meter and two tied identities reported on the same channel.
+  insertReading(database, { id: "closing-opening-march", source: "2026-03-01T00:00:00Z", value: "100" });
+  insertReading(database, { id: "replacement-april", meter: "kn-main-2", revision: 2, epoch: "epoch-2", source: "2026-04-10T00:00:00Z", value: "5" });
+  insertReading(database, { id: "replacement-june", meter: "kn-main-2", revision: 2, epoch: "epoch-2", source: "2026-06-10T00:00:00Z", value: "25" });
+  insertReading(database, { id: "tie-a", revision: 3, epoch: "epoch-3", source: "2026-07-01T00:00:00Z", value: "40" });
+  insertReading(database, { id: "tie-b", revision: 4, epoch: "epoch-4", source: "2026-07-01T00:00:00Z", value: "41" });
+  insertReading(database, { id: "closing-september", source: "2026-09-14T23:59:00Z", value: "180" });
+
+  const selection = assertBoundedEquivalent(database, [
+    { asOf: SEPTEMBER_AS_OF, label: "september closed by an identity opened in March", meterIds: ["kn-main"], period: SEPTEMBER },
+    { asOf: SEPTEMBER_AS_OF, label: "august closed by the July ties", meterIds: ["kn-main"], period: { kind: "month", month: 8, year: 2026 } },
+    { asOf: "2026-06-30T00:00:00Z", label: "an as-of in June with no in-span closing", meterIds: ["kn-main"], period: { kind: "month", month: 7, year: 2026 } }
+  ]);
+
+  assert.deepEqual(selection.rows.map((row) => row.reading_id).sort(), [
+    "closing-opening-march",
+    "closing-september",
+    "replacement-april",
+    "replacement-june",
+    "tie-a",
+    "tie-b"
+  ]);
+  assert.equal(selection.fullLoad, false);
 });

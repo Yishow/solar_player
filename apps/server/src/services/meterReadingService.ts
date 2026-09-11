@@ -459,6 +459,40 @@ export function findLatestAcceptedInstantMs(
   return row?.instant_ms ?? null;
 }
 
+/**
+ * The distinct full identities with a calculation-eligible reading at exactly
+ * `instantMs` on a channel, in identity order — every identity tied at that
+ * instant, found by a seek on the instant index without reading the rows.
+ */
+export function listCalculationEligibleIdentitiesAt(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  channelId: string,
+  instantMs: number
+): AcceptedReadingIdentity[] {
+  const instant = acceptedReadingInstantMsSql();
+  // Deduplicated and ordered here rather than in SQL: a DISTINCT or ORDER BY on
+  // the identity columns lets the planner walk the identity index across the
+  // channel's whole history instead of seeking the one instant.
+  const rows = database.prepare(`
+    SELECT meter_id, source_revision, epoch_id FROM meter_readings_accepted
+    WHERE metric_scope = ? AND channel_id = ? AND ${instant} = ? AND ${CALCULATION_ELIGIBLE_SQL}
+  `).all(scope, channelId, instantMs) as Array<{ epoch_id: string; meter_id: string; source_revision: number }>;
+  const identities = new Map<string, AcceptedReadingIdentity>();
+  for (const row of rows) {
+    identities.set(`${row.meter_id}\u0000${row.source_revision}\u0000${row.epoch_id}`, {
+      epochId: row.epoch_id,
+      meterId: row.meter_id,
+      sourceRevision: row.source_revision
+    });
+  }
+  const byBinary = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0);
+  return [...identities.values()].sort((left, right) =>
+    byBinary(left.meterId, right.meterId)
+    || left.sourceRevision - right.sourceRevision
+    || byBinary(left.epochId, right.epochId));
+}
+
 /** Every full identity that has ever reported on a channel, in identity order. */
 export function listAcceptedReadingIdentities(
   database: Database.Database,

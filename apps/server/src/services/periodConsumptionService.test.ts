@@ -752,3 +752,105 @@ for (const range of ["week", "total"] as const) {
     assert.deepEqual(result?.issues, [`UNRESOLVED_ACCOUNTING_SPAN:${range}`, "SQLITE_BUSY"]);
   });
 }
+
+function insertAcceptedRow(
+  database: Database.Database,
+  row: { epoch: string; id: string; quality?: string; received?: string; revision: number; source: string | null; value: string }
+) {
+  const received = row.received ?? row.source!;
+  database.prepare(`
+    INSERT INTO meter_readings_accepted (
+      reading_id, metric_scope, meter_id, channel_id, source_revision, epoch_id, raw_value_decimal,
+      normalized_value_kwh, source_timestamp, received_at, timestamp_quality, origin, payload_hash, created_at, measurement_kind
+    ) VALUES (?, 'kn', 'kn-main', 'kn-main', ?, ?, ?, ?, ?, ?, ?, 'mqtt', ?, ?, 'cumulative-energy')
+  `).run(row.id, row.revision, row.epoch, row.value, row.value, row.source, received, row.quality ?? "source", row.id, received);
+}
+
+// A retired identity reported once in January; the current identity then
+// reported `count` times in February. None of it can close a September window.
+function seedRetiredIdentityHistory(database: Database.Database, count: number) {
+  insertAcceptedRow(database, { epoch: "epoch-retired", id: "retired-january", revision: 3, source: "2026-01-15T00:00:00Z", value: "10" });
+  const insert = database.prepare(`
+    INSERT INTO meter_readings_accepted (
+      reading_id, metric_scope, meter_id, channel_id, source_revision, epoch_id, raw_value_decimal,
+      normalized_value_kwh, source_timestamp, received_at, timestamp_quality, origin, payload_hash, created_at, measurement_kind
+    ) VALUES (?, 'kn', 'kn-main', 'kn-main', 1, 'epoch-1', ?, ?, ?, ?, 'source', 'mqtt', ?, ?, 'cumulative-energy')
+  `);
+  database.transaction(() => {
+    for (let index = 0; index < count; index += 1) {
+      const instant = new Date(Date.parse("2026-02-01T00:00:00Z") + index * 3_600_000).toISOString();
+      const value = String(1601 + index / count);
+      insert.run(`february-${index}`, value, value, instant, instant, `february-${index}`, instant);
+    }
+  })();
+}
+
+test("retired identity history leaves day, month and year results equal to the oracle without widening the read", (t) => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  t.after(() => database.close());
+  seedCrossYearRegister(database);
+  seedRetiredIdentityHistory(database, 300);
+  seedAcceptedReading(database, source(1, "epoch-1"), "1750", "2026-08-31T15:58:00Z", "2026-08-31T15:58:00Z");
+  seedAcceptedReading(database, source(2, "epoch-2"), "5", "2026-09-01T08:00:00Z", "2026-09-01T08:00:00Z");
+  const profiles = listPersistedProfiles(database, "kn");
+  const active = getActiveProfile(database, "kn")!;
+  const freshnessPolicy = readFreshnessPolicy(database).policy;
+  const full = loadAcceptedSamples(database, "kn");
+  const reads = recordAcceptedRowReads(database);
+
+  for (const range of ["day", "month"] as const) {
+    const period = periodSelectionFromRange(range, N4_AS_OF, active.siteTimeZone)!;
+    assert.deepStrictEqual(
+      resolvePersistedPeriodConsumption(database, "kn", period, N4_AS_OF),
+      resolvePeriodFromEvidence(profiles, full, period, N4_AS_OF, freshnessPolicy),
+      range
+    );
+  }
+  const september = { kind: "month" as const, month: 9, year: 2026 };
+  const earlyAsOf = "2026-08-15T00:00:00Z";
+  assert.deepStrictEqual(
+    resolvePersistedPeriodConsumption(database, "kn", september, earlyAsOf),
+    resolvePeriodFromEvidence(profiles, full, september, earlyAsOf, freshnessPolicy),
+    "an as-of before the window keeps its pre-span closing and unavailable diagnostics"
+  );
+  assert.ok(reads.rows < 300, `day, month and the early as-of read ${reads.rows} accepted rows; the 300 February readings must stay unread`);
+
+  const year = periodSelectionFromRange("year", N4_AS_OF, active.siteTimeZone)!;
+  assert.deepStrictEqual(
+    resolvePersistedPeriodConsumption(database, "kn", year, N4_AS_OF),
+    resolvePeriodFromEvidence(profiles, full, year, N4_AS_OF, freshnessPolicy),
+    "year spans the February history itself and still equals the oracle"
+  );
+});
+
+test("week, total and daily points around retired identities, estimates and late arrivals equal the oracle", (t) => {
+  const database = createDatabase("2025-01-01T00:00:00+08:00");
+  t.after(() => database.close());
+  seedCrossYearRegister(database);
+  seedRetiredIdentityHistory(database, 200);
+  insertAcceptedRow(database, { epoch: "epoch-1", id: "estimated-august", quality: "receive-time-estimated", received: "2026-08-25T00:00:00Z", revision: 1, source: null, value: "1780" });
+  insertAcceptedRow(database, { epoch: "epoch-1", id: "late-august", received: "2026-09-01T12:00:00Z", revision: 1, source: "2026-08-28T00:00:00Z", value: "1790" });
+  seedAcceptedReading(database, source(2, "epoch-2"), "5", "2026-09-01T08:00:00Z", "2026-09-01T08:00:00Z");
+  const profiles = listPersistedProfiles(database, "kn");
+  const active = getActiveProfile(database, "kn")!;
+  const freshnessPolicy = readFreshnessPolicy(database).policy;
+  const full = loadAcceptedSamples(database, "kn");
+  const dates = [...monthDateKeys("2026-08"), ...monthDateKeys("2026-09").slice(0, 3)];
+
+  // The second as-of precedes the late arrival's receipt, so it is not yet visible.
+  for (const asOf of [N4_AS_OF, "2026-09-01T10:00:00Z"]) {
+    for (const range of ["week", "total"] as const) {
+      const span = rangeSpanFromRange(range, asOf, active, active.siteTimeZone)!;
+      assert.deepStrictEqual(
+        tryResolvePersistedPeriodConsumption(database, "kn", range, asOf),
+        resolveSpanFromEvidence(profiles, full, span, asOf, freshnessPolicy),
+        `${range} at ${asOf}`
+      );
+    }
+    assert.deepStrictEqual(
+      resolveDailyConsumptionPoints(database, "kn", dates, asOf),
+      resolveDailyPointsFromEvidence(profiles, full, freshnessPolicy, dates, asOf),
+      `daily points at ${asOf}`
+    );
+  }
+});

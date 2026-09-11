@@ -3,6 +3,7 @@ import { meterIdentityKey, type PeriodConsumptionResult, type PeriodSample } fro
 import {
   findLatestAcceptedInstantMs,
   listAcceptedReadingIdentities,
+  listCalculationEligibleIdentitiesAt,
   loadAcceptedMeterReadings,
   loadAcceptedMeterReadingsForIdentityWindow,
   loadAcceptedMeterReadingsInWindow,
@@ -69,6 +70,10 @@ function calculationInstantMs(row: AcceptedMeterReadingRow) {
   return Date.parse(row.source_timestamp ?? (row.timestamp_quality === "receive-time-estimated" ? row.received_at : ""));
 }
 
+function identityKey(identity: AcceptedReadingIdentity) {
+  return `${identity.meterId}\u0000${identity.sourceRevision}\u0000${identity.epochId}`;
+}
+
 function hasIdentity(row: AcceptedMeterReadingRow, identity: AcceptedReadingIdentity) {
   return row.meter_id === identity.meterId && row.source_revision === identity.sourceRevision && row.epoch_id === identity.epochId;
 }
@@ -79,13 +84,16 @@ function hasIdentity(row: AcceptedMeterReadingRow, identity: AcceptedReadingIden
  * of the scope's history.
  *
  * One read covers the requested span. For each channel the resolver may also
- * need readings from before it: the newest reading at or before a window when
- * nothing inside the span precedes it, and the opening of an identity that could
- * close a window but has no reading there yet. Those are found by an index seek
- * and read from that instant onward, so a stale baseline is kept however old it
- * is, while history older than every needed baseline is never read. Readings
- * whose instant SQLite cannot evaluate make the bounds untrustworthy, so the
- * selection then falls back to the whole scope.
+ * need readings from before it, but only for identities that can close a
+ * requested window: one with a reading inside the span, or one tied at the
+ * newest eligible instant before it, which closes any window nothing in the span
+ * precedes. Each such identity's opening is found by an index seek and the
+ * channel is read from the earliest of them onward, whichever identity reported
+ * each reading, so a stale baseline and the continuity between it and the span
+ * are kept however old they are, while history no candidate needs — a retired
+ * identity's included — is never read. Readings whose instant SQLite cannot
+ * evaluate make the bounds untrustworthy, so the selection then falls back to
+ * the whole scope.
  */
 export function selectCalculationEvidence(
   database: Database.Database,
@@ -118,12 +126,21 @@ export function selectCalculationEvidence(
       const instant = calculationInstantMs(row);
       return row.channel_id === channelId && instant >= fromMs && instant <= throughMs;
     });
+    const candidates = new Map<string, AcceptedReadingIdentity>();
+    for (const row of trusted) {
+      const identity = { epochId: row.epoch_id, meterId: row.meter_id, sourceRevision: row.source_revision };
+      candidates.set(identityKey(identity), identity);
+    }
+    queryCount += 1;
+    const priorClosingMs = findLatestAcceptedInstantMs(database, scope, channelId, fromMs - 1, { calculationEligible: true });
+    if (priorClosingMs !== null) {
+      queryCount += 1;
+      for (const identity of listCalculationEligibleIdentitiesAt(database, scope, channelId, priorClosingMs)) {
+        candidates.set(identityKey(identity), identity);
+      }
+    }
     const anchors: number[] = [];
-    const identities = listAcceptedReadingIdentities(database, scope, channelId);
-    // listAcceptedReadingIdentities performs one index seek per identity plus
-    // the final seek that proves exhaustion.
-    queryCount += identities.length + 1;
-    for (const identity of identities) {
+    for (const identity of candidates.values()) {
       if (trusted.some((row) => hasIdentity(row, identity) && calculationInstantMs(row) <= fromMs)) {
         continue;
       }
