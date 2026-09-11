@@ -252,3 +252,191 @@ function domConfirm(result: boolean) {
     value: () => result
   });
 }
+
+function domPrompt(result: string) {
+  Object.defineProperty(window, "prompt", {
+    configurable: true,
+    value: () => result
+  });
+}
+
+async function settleProfiles() {
+  for (let index = 0; index < 5; index += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
+function sidebarProfileNames(document: Document) {
+  return [...document.querySelectorAll(".profile-list-sidebar strong")].map((element) => element.textContent);
+}
+
+const createdProfile: PlaybackProfileSummary = {
+  archivedAt: null,
+  id: 3,
+  isDefault: false,
+  name: "Night Shift",
+  profileKey: "night-shift"
+};
+
+// Renders the content with a scripted catalog: each Profile list read takes the
+// next entry of `catalogReads`, and `published` records what reached the
+// optional Fleet subscriber.
+async function withProfileCatalog(
+  run: (input: {
+    counts: { catalogReads: number; creates: number };
+    document: Document;
+    published: PlaybackProfileSummary[][];
+  }) => Promise<void>,
+  options: {
+    catalogReads: Array<() => Promise<PlaybackProfileSummary[]>>;
+    createPlaybackProfile: () => Promise<PlaybackProfileSummary>;
+    subscribe: boolean;
+  }
+) {
+  const dom = new JSDOM(
+    "<!doctype html><html><body><div id=\"root\"></div></body></html>",
+    { url: "http://127.0.0.1/", pretendToBeVisual: true }
+  );
+  for (const [key, value] of Object.entries({
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    navigator: dom.window.navigator,
+    window: dom.window
+  })) {
+    Object.defineProperty(globalThis, key, { configurable: true, value });
+  }
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const counts = { catalogReads: 0, creates: 0 };
+  const published: PlaybackProfileSummary[][] = [];
+  const profileApi = {
+    archivePlaybackProfile: async () => profile,
+    createPlaybackProfile: async () => {
+      counts.creates += 1;
+      return options.createPlaybackProfile();
+    },
+    getPlaybackProfileDraft: async () => draft,
+    getPlaybackProfiles: async () => {
+      const read = options.catalogReads[counts.catalogReads];
+      counts.catalogReads += 1;
+      assert.ok(read, "unexpected extra Profile catalog read");
+      return read();
+    },
+    getPlaybackProfileVersions: async () => [],
+    previewPlaybackProfile: async () => ({} as PlaybackProfilePreview),
+    publishPlaybackProfile: async () => ({} as never),
+    renamePlaybackProfile: async () => profile,
+    rollbackPlaybackProfile: async () => ({} as never),
+    savePlaybackProfileDraft: async () => draft
+  };
+  let root: Root | null = null;
+  try {
+    root = createRoot(dom.window.document.getElementById("root")!);
+    await act(async () => {
+      root!.render(createElement(PlaybackProfilesContent, {
+        loaderData: { loadError: "", profiles: [profile] },
+        ...(options.subscribe
+          ? { onProfilesRefreshed: (profiles: PlaybackProfileSummary[]) => published.push(profiles) }
+          : {}),
+        profileApi
+      }));
+      await settleProfiles();
+    });
+    await run({ counts, document: dom.window.document, published });
+  } finally {
+    await act(async () => root?.unmount());
+    dom.window.close();
+  }
+}
+
+async function clickAndSettle(button: HTMLButtonElement) {
+  await act(async () => {
+    button.click();
+    await settleProfiles();
+  });
+}
+
+test("a failed catalog refresh after a successful create keeps the last catalog and retries only the catalog read", async () => {
+  await withProfileCatalog(async ({ counts, document, published }) => {
+    domPrompt("Night Shift");
+    await clickAndSettle(findButton(document, "＋ 新增 Profile"));
+
+    assert.equal(counts.creates, 1);
+    assert.deepEqual(sidebarProfileNames(document), ["Operations"], "the last successful catalog stays visible");
+    assert.match(document.body.textContent ?? "", /catalog read failed/u);
+    assert.deepEqual(published, [], "a failed refresh publishes nothing");
+    const reload = findButton(document, "重新載入清單");
+    assert.ok(reload, "a reload-catalog action is offered after the refresh failure");
+
+    await clickAndSettle(reload);
+    assert.equal(counts.creates, 1, "the catalog retry must not repeat the successful create");
+    assert.equal(counts.catalogReads, 2);
+    assert.deepEqual(sidebarProfileNames(document), ["Operations", "Night Shift"]);
+    assert.deepEqual(published, [[profile, createdProfile]]);
+    assert.equal(findButton(document, "重新載入清單"), undefined, "a successful reload clears the retry state");
+  }, {
+    catalogReads: [
+      async () => {
+        throw new Error("catalog read failed");
+      },
+      async () => [profile, createdProfile]
+    ],
+    createPlaybackProfile: async () => createdProfile,
+    subscribe: true
+  });
+});
+
+test("a successful empty catalog reload is published as the authoritative catalog", async () => {
+  await withProfileCatalog(async ({ document, published }) => {
+    domPrompt("Night Shift");
+    await clickAndSettle(findButton(document, "＋ 新增 Profile"));
+    assert.deepEqual(published, []);
+
+    await clickAndSettle(findButton(document, "重新載入清單"));
+    assert.deepEqual(published, [[]], "a valid empty catalog is published, unlike a failed read");
+    assert.deepEqual(sidebarProfileNames(document), []);
+    assert.equal(findButton(document, "重新載入清單"), undefined);
+  }, {
+    catalogReads: [
+      async () => {
+        throw new Error("catalog read failed");
+      },
+      async () => []
+    ],
+    createPlaybackProfile: async () => createdProfile,
+    subscribe: true
+  });
+});
+
+test("a failed Profile mutation neither publishes a catalog nor offers a catalog reload", async () => {
+  await withProfileCatalog(async ({ counts, document, published }) => {
+    domPrompt("Night Shift");
+    await clickAndSettle(findButton(document, "＋ 新增 Profile"));
+
+    assert.match(document.body.textContent ?? "", /create failed/u);
+    assert.equal(counts.catalogReads, 0);
+    assert.deepEqual(published, []);
+    assert.deepEqual(sidebarProfileNames(document), ["Operations"]);
+    assert.equal(findButton(document, "重新載入清單"), undefined);
+  }, {
+    catalogReads: [],
+    createPlaybackProfile: async () => {
+      throw new Error("create failed");
+    },
+    subscribe: true
+  });
+});
+
+test("standalone Playback Profiles refreshes its own catalog without a Fleet subscriber", async () => {
+  await withProfileCatalog(async ({ document, published }) => {
+    domPrompt("Night Shift");
+    await clickAndSettle(findButton(document, "＋ 新增 Profile"));
+
+    assert.deepEqual(sidebarProfileNames(document), ["Operations", "Night Shift"]);
+    assert.deepEqual(published, []);
+    assert.equal(findButton(document, "重新載入清單"), undefined);
+  }, {
+    catalogReads: [async () => [profile, createdProfile]],
+    createPlaybackProfile: async () => createdProfile,
+    subscribe: false
+  });
+});

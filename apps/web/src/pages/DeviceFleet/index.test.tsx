@@ -1,13 +1,36 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { register } from "node:module";
 import React, { act } from "react";
 import type { Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { JSDOM } from "jsdom";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
+import type {
+  Device,
+  DeviceGroup,
+  PlaybackProfileDraft,
+  PlaybackProfileSummary
+} from "@solar-display/shared";
 import { DeviceFleetContent } from "./DeviceFleetContent";
 import { GroupEditDialog } from "./GroupEditDialog";
+import {
+  loadDeviceFleetRoute,
+  resetDeviceFleetRouteModelForTests,
+  setDeviceFleetLoadersForTests
+} from "./route";
 import type { DeviceFleetRow } from "./viewModel";
+
+// The Device Fleet route owner imports its stylesheets; stub them so the real
+// owner can mount under the Node test runner.
+register("data:text/javascript," + encodeURIComponent([
+  "export async function load(url, context, nextLoad) {",
+  "  if (url.endsWith('.css')) return { format: 'module', shortCircuit: true, source: '' };",
+  "  return nextLoad(url, context);",
+  "}"
+].join("\n")));
+const { DeviceFleet } = await import("./index");
 
 async function createTestRoot(container: Element) {
   const { createRoot } = await import("react-dom/client");
@@ -972,4 +995,356 @@ test("DeviceFleetContent supports external activeTab and notifies onTabChange", 
   }
 });
 
+// ---------------------------------------------------------------------------
+// Mounted Device Fleet owner: the real route component with its route model,
+// a memory router for the tab query, and a fetch-backed Profile API whose
+// catalog changes with create, rename, and archive.
 
+const fleetDefaultGroup: DeviceGroup = {
+  desiredVersion: 1,
+  enabled: true,
+  id: 7,
+  name: "CL Lobby",
+  playbackProfile: {
+    archivedAt: null,
+    id: 1,
+    isDefault: true,
+    name: "Default Profile",
+    profileKey: "default"
+  },
+  playbackProfileId: 1,
+  siteScope: "cl"
+};
+
+const fleetDevice: Device = {
+  appliedVersion: 1,
+  clientId: "cl-lobby-01",
+  displayName: "中壢大廳",
+  enabled: true,
+  group: fleetDefaultGroup,
+  groupId: 7,
+  id: 1,
+  paired: true,
+  profileUpdateError: null,
+  profileUpdateState: "applied"
+};
+
+const fleetDraft: PlaybackProfileDraft = {
+  pages: [{
+    displayOrder: 1,
+    durationSeconds: 15,
+    enabled: true,
+    id: 1,
+    labelEn: "Overview",
+    labelZh: "總覽",
+    pageKey: "overview",
+    route: "/overview",
+    templateKey: "overview"
+  }],
+  profileId: 1,
+  revision: 1,
+  settings: {
+    autoplay: true,
+    brightness: 100,
+    enforceFreshRuntimeData: true,
+    idleMode: "disabled",
+    idleTimeout: 300,
+    loop: true,
+    orientation: "landscape",
+    repeatDays: [1, 2, 3, 4, 5],
+    scheduleEnabled: false,
+    scheduleEnd: "18:00",
+    scheduleStart: "08:00",
+    startPage: 1,
+    transitionSpeed: 250,
+    transitionType: "fade",
+    updatedAt: "2026-09-11T00:00:00.000Z"
+  },
+  updatedAt: "2026-09-11T00:00:00.000Z"
+};
+
+async function settleFleet() {
+  for (let index = 0; index < 6; index += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
+function installFleetProfileApi(t: TestContext, initialCatalog: PlaybackProfileSummary[]) {
+  let catalog = initialCatalog.map((profile) => ({ ...profile }));
+  let nextId = Math.max(0, ...catalog.map((profile) => profile.id)) + 1;
+  let heldCatalogRead: Promise<void> | null = null;
+  const respond = (data: unknown) => new Response(JSON.stringify({ data, success: true }), {
+    headers: { "Content-Type": "application/json" },
+    status: 200
+  });
+  const readName = (init?: RequestInit) => (JSON.parse(String(init?.body)) as { name: string }).name;
+
+  t.mock.method(globalThis, "fetch", async (input: unknown, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : String(input), "http://127.0.0.1/");
+    const method = init?.method ?? "GET";
+    if (url.pathname === "/api/playback-profiles") {
+      if (method === "POST") {
+        const name = readName(init);
+        const created = {
+          archivedAt: null,
+          id: nextId++,
+          isDefault: false,
+          name,
+          profileKey: name.toLowerCase().replace(/\s+/gu, "-")
+        };
+        catalog = [...catalog, created];
+        return respond(created);
+      }
+      const held = heldCatalogRead;
+      heldCatalogRead = null;
+      if (held) {
+        await held;
+      }
+      return respond(catalog.map((profile) => ({ ...profile })));
+    }
+
+    const match = url.pathname.match(/^\/api\/playback-profiles\/(\d+)(?:\/(archive|draft|versions))?$/u);
+    if (match) {
+      const id = Number(match[1]);
+      switch (match[2]) {
+        case "draft":
+          return respond({ ...fleetDraft, profileId: id });
+        case "versions":
+          return respond([]);
+        case "archive":
+          catalog = catalog.map((profile) => profile.id === id
+            ? { ...profile, archivedAt: "2026-09-11T00:00:00.000Z" }
+            : profile);
+          return respond(catalog.find((profile) => profile.id === id));
+        default:
+          if (method === "PUT") {
+            const name = readName(init);
+            catalog = catalog.map((profile) => profile.id === id ? { ...profile, name } : profile);
+            return respond(catalog.find((profile) => profile.id === id));
+          }
+      }
+    }
+    throw new Error(`Unexpected Device Fleet request: ${method} ${url.pathname}`);
+  });
+
+  return {
+    holdNextCatalogRead: () => {
+      let release!: () => void;
+      heldCatalogRead = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return { release: () => release() };
+    }
+  };
+}
+
+async function mountDeviceFleet(
+  t: TestContext,
+  { catalog, groups }: { catalog: PlaybackProfileSummary[]; groups: DeviceGroup[] }
+) {
+  const dom = new JSDOM(
+    "<!doctype html><html><body><div id=\"root\"></div></body></html>",
+    { url: "http://127.0.0.1/device-fleet", pretendToBeVisual: true }
+  );
+  for (const [key, value] of Object.entries({
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    navigator: dom.window.navigator,
+    window: dom.window
+  })) {
+    Object.defineProperty(globalThis, key, { configurable: true, value });
+  }
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  let promptAnswer = "";
+  Object.defineProperty(dom.window, "prompt", { configurable: true, value: () => promptAnswer });
+  Object.defineProperty(dom.window, "confirm", { configurable: true, value: () => true });
+
+  const api = installFleetProfileApi(t, catalog);
+  resetDeviceFleetRouteModelForTests();
+  setDeviceFleetLoadersForTests({
+    getDevices: async () => [fleetDevice],
+    getGroups: async () => groups,
+    getLiveness: async () => ({
+      clients: [],
+      summary: { offline: 0, online: 0, stale: 0, total: 0 }
+    }),
+    getProfiles: async () => catalog
+  });
+  await loadDeviceFleetRoute();
+
+  const document = dom.window.document;
+  const root = await createTestRoot(document.getElementById("root")!);
+  await act(async () => {
+    root.render(
+      <MemoryRouter initialEntries={["/device-fleet?tab=profiles"]}>
+        <DeviceFleet />
+      </MemoryRouter>
+    );
+    await settleFleet();
+  });
+
+  const click = async (element: HTMLElement) => {
+    await act(async () => {
+      element.click();
+      await settleFleet();
+    });
+  };
+  const optionLabels = (selector: string) =>
+    [...document.querySelectorAll<HTMLOptionElement>(`${selector} option`)].map((option) => option.textContent ?? "");
+
+  return {
+    api,
+    answerPrompt: (answer: string) => {
+      promptAnswer = answer;
+    },
+    button: (label: string) => {
+      const found = [...document.querySelectorAll<HTMLButtonElement>("button")]
+        .find((candidate) => candidate.textContent?.trim() === label);
+      assert.ok(found, `button ${label} is rendered`);
+      return found;
+    },
+    click,
+    clickTab: (tab: "devices" | "profiles") =>
+      click(document.querySelectorAll<HTMLButtonElement>(".device-mgmt-tab")[tab === "devices" ? 0 : 1]!),
+    createGroupOptions: () => optionLabels("select[data-field=\"group-create-playback-profile\"]"),
+    document,
+    editGroupOptions: () => optionLabels("select[data-field=\"group-playback-profile\"]"),
+    selectProfile: async (name: string) => {
+      const item = [...document.querySelectorAll<HTMLButtonElement>(".profile-nav-item")]
+        .find((candidate) => candidate.querySelector("strong")?.textContent === name);
+      assert.ok(item, `${name} is listed on the Profile tab`);
+      await click(item);
+    },
+    setValue: async (element: HTMLInputElement | HTMLSelectElement, value: string) => {
+      await act(async () => {
+        if (element instanceof dom.window.HTMLSelectElement) {
+          element.value = value;
+          element.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+        } else {
+          Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")?.set?.call(element, value);
+          element.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+        }
+      });
+    },
+    sidebarNames: () =>
+      [...document.querySelectorAll(".profile-list-sidebar strong")].map((element) => element.textContent ?? ""),
+    unmount: async () => {
+      await act(async () => root.unmount());
+      resetDeviceFleetRouteModelForTests();
+      dom.window.close();
+    }
+  };
+}
+
+test("Device Fleet shares a created Profile with group controls across tab navigation", async (t) => {
+  const fleet = await mountDeviceFleet(t, { catalog: [defaultPlaybackProfile], groups: [fleetDefaultGroup] });
+
+  try {
+    assert.deepEqual(fleet.sidebarNames(), ["Default Profile"]);
+    fleet.answerPrompt("New Test Profile");
+    await fleet.click(fleet.button("＋ 新增 Profile"));
+    assert.deepEqual(fleet.sidebarNames(), ["Default Profile", "New Test Profile"]);
+
+    await fleet.clickTab("devices");
+    assert.deepEqual(fleet.createGroupOptions(), ["Default Profile (預設)", "New Test Profile"]);
+    await fleet.click(fleet.document.querySelector<HTMLButtonElement>("button[data-action=\"edit-group\"]")!);
+    assert.ok(fleet.editGroupOptions().includes("New Test Profile · new-test-profile"));
+    await fleet.click(fleet.document.querySelector<HTMLButtonElement>("button[data-action=\"cancel-group-edit\"]")!);
+
+    await fleet.clickTab("profiles");
+    assert.deepEqual(
+      fleet.sidebarNames(),
+      ["Default Profile", "New Test Profile"],
+      "the Profile tab remounts from the shared catalog without a page reload"
+    );
+  } finally {
+    await fleet.unmount();
+  }
+});
+
+test("a Profile catalog published after returning to Devices keeps the mounted group form and fleet state", async (t) => {
+  const fleet = await mountDeviceFleet(t, { catalog: [defaultPlaybackProfile], groups: [fleetDefaultGroup] });
+
+  try {
+    const heldCatalog = fleet.api.holdNextCatalogRead();
+    fleet.answerPrompt("New Test Profile");
+    await fleet.click(fleet.button("＋ 新增 Profile"));
+    await fleet.clickTab("devices");
+    assert.deepEqual(fleet.createGroupOptions(), ["Default Profile (預設)"], "the catalog request is still pending");
+
+    // Values entered into the group form that mounted after leaving the Profile tab.
+    const groupNameInput = [...fleet.document.querySelectorAll("#create-group-section label")]
+      .find((label) => label.textContent?.includes("群組名稱"))!
+      .querySelector<HTMLInputElement>("input")!;
+    const siteScopeSelect = fleet.document.querySelector<HTMLSelectElement>("select[data-field=\"group-create-site-scope\"]")!;
+    const filterInput = fleet.document.querySelector<HTMLInputElement>("input[placeholder=\"搜尋 Client ID、顯示名稱或群組…\"]")!;
+    await fleet.setValue(groupNameInput, "Pending Form Group");
+    await fleet.setValue(siteScopeSelect, "kn");
+    await fleet.setValue(filterInput, "cl-lobby");
+    const deviceTableBefore = fleet.document.querySelector(".fleet-table tbody")?.textContent;
+    const groupListBefore = fleet.document.querySelector("#group-list-section")?.textContent;
+    assert.match(deviceTableBefore ?? "", /cl-lobby-01/u);
+
+    await act(async () => {
+      heldCatalog.release();
+      await settleFleet();
+    });
+
+    assert.deepEqual(fleet.createGroupOptions(), ["Default Profile (預設)", "New Test Profile"]);
+    assert.equal(groupNameInput.value, "Pending Form Group");
+    assert.equal(siteScopeSelect.value, "kn");
+    assert.equal(filterInput.value, "cl-lobby");
+    assert.equal(fleet.document.querySelector(".fleet-table tbody")?.textContent, deviceTableBefore);
+    assert.equal(fleet.document.querySelector("#group-list-section")?.textContent, groupListBefore);
+  } finally {
+    await fleet.unmount();
+  }
+});
+
+test("Profile rename and archive refreshes reach group controls while resolved group context stays", async (t) => {
+  const lobbyProfile: PlaybackProfileSummary = {
+    archivedAt: null,
+    id: 9,
+    isDefault: false,
+    name: "Lobby Profile",
+    profileKey: "kn-lobby"
+  };
+  const fleet = await mountDeviceFleet(t, { catalog: [defaultPlaybackProfile, lobbyProfile], groups: [activeKnGroup] });
+  const editGroup = () => fleet.document.querySelector<HTMLButtonElement>("button[data-action=\"edit-group\"]")!;
+  const cancelGroupEdit = () => fleet.document.querySelector<HTMLButtonElement>("button[data-action=\"cancel-group-edit\"]")!;
+
+  try {
+    await fleet.selectProfile("Lobby Profile");
+    fleet.answerPrompt("Lobby Renamed");
+    await fleet.click(fleet.button("重新命名"));
+    assert.deepEqual(fleet.sidebarNames(), ["Default Profile", "Lobby Renamed"]);
+
+    await fleet.clickTab("devices");
+    assert.deepEqual(fleet.createGroupOptions(), ["Default Profile (預設)", "Lobby Renamed"]);
+    await fleet.click(editGroup());
+    assert.ok(fleet.editGroupOptions().includes("Lobby Renamed · kn-lobby"));
+    await fleet.click(cancelGroupEdit());
+
+    await fleet.clickTab("profiles");
+    await fleet.selectProfile("Lobby Renamed");
+    await fleet.click(fleet.button("封存"));
+    assert.match(fleet.document.querySelector(".profile-list-sidebar")?.textContent ?? "", /Lobby Renamed[\s\S]*已封存/u);
+
+    await fleet.clickTab("devices");
+    assert.deepEqual(
+      fleet.createGroupOptions(),
+      ["Default Profile (預設)"],
+      "an archived Profile is no longer offered for new assignment"
+    );
+    assert.match(
+      fleet.document.querySelector("#group-list-section")?.textContent ?? "",
+      /KN · Lobby Profile/u,
+      "the resolved group context keeps its established display"
+    );
+    await fleet.click(editGroup());
+    assert.match(fleet.document.body.textContent ?? "", /目前 Playback Profile 已封存/u);
+    assert.equal(fleet.editGroupOptions().some((label) => label.startsWith("Lobby Renamed")), false);
+  } finally {
+    await fleet.unmount();
+  }
+});

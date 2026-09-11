@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { DeviceGroup } from "@solar-display/shared";
+import type { DeviceGroup, PlaybackProfileSummary } from "@solar-display/shared";
 import {
   createDeviceGroup,
   createFleetDevice,
@@ -51,6 +51,16 @@ export function DeviceFleet() {
   });
   const [pairingPreparation, setPairingPreparation] = useState<DeviceFleetRow | null>(null);
 
+  // A successful catalog read replaces only the profiles slice, so fleet data,
+  // filters, and mounted group forms survive the publication.
+  const applyProfiles = (profiles: PlaybackProfileSummary[]) => {
+    setModel((current) => ({
+      ...current,
+      profiles,
+      unavailable: current.unavailable.filter((item) => item !== "profiles")
+    }));
+  };
+
   const refreshers: Partial<
     Record<DeviceFleetResource, () => Promise<void>>
   > = {
@@ -79,12 +89,7 @@ export function DeviceFleet() {
       }));
     },
     profiles: async () => {
-      const profiles = await routeLoaders.getProfiles();
-      setModel((current) => ({
-        ...current,
-        profiles,
-        unavailable: current.unavailable.filter((item) => item !== "profiles")
-      }));
+      applyProfiles(await routeLoaders.getProfiles());
     }
   };
 
@@ -158,6 +163,7 @@ export function DeviceFleet() {
         setPairing((current) => closePairingDialog(current));
       }}
       onTabChange={handleTabChange}
+      onProfilesRefreshed={applyProfiles}
       profiles={model.profiles}
       onCreateDevice={async (input) => {
         const result = await mutate(() => createFleetDevice(input), ["devices"]);

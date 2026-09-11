@@ -64,6 +64,7 @@ export type DeviceFleetContentProps = {
   onFilterChange: (value: string) => void;
   onIssuePairing: (row: DeviceFleetRow) => Promise<void>;
   onPreparePairing: (row: DeviceFleetRow) => void;
+  onProfilesRefreshed?: (profiles: PlaybackProfileSummary[]) => void;
   onTabChange?: (tab: "devices" | "profiles") => void;
   onToggleDevice: (row: DeviceFleetRow) => Promise<void>;
   onToggleGroup: (group: DeviceGroup) => Promise<void>;
@@ -87,6 +88,7 @@ export function DeviceFleetContent({
   onFilterChange,
   onIssuePairing,
   onPreparePairing,
+  onProfilesRefreshed,
   onTabChange,
   onToggleDevice,
   onToggleGroup,
@@ -272,6 +274,7 @@ export function DeviceFleetContent({
             devices={model.rows}
             groups={model.groups}
             loaderData={{ loadError: "", profiles }}
+            onProfilesRefreshed={onProfilesRefreshed}
           />
         </section>
       )}

@@ -53,11 +53,13 @@ export function PlaybackProfilesContent({
   devices = [],
   groups = [],
   loaderData,
+  onProfilesRefreshed,
   profileApi = defaultProfileApi
 }: {
   devices?: DeviceFleetRow[];
   groups?: DeviceGroup[];
   loaderData: PlaybackProfilesLoaderData;
+  onProfilesRefreshed?: (profiles: PlaybackProfileSummary[]) => void;
   profileApi?: typeof defaultProfileApi;
 }) {
   const initialProfileId =
@@ -73,11 +75,21 @@ export function PlaybackProfilesContent({
   const [preview, setPreview] = useState<PlaybackProfilePreview | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState(loaderData.loadError);
+  const [catalogReloadNeeded, setCatalogReloadNeeded] = useState(false);
   const requestGuard = useRef(createProfileRequestGuard());
   const selected = profiles.find((profile) => profile.id === selectedId) ?? null;
 
+  // Only a successfully read catalog is published; a failed read keeps the last
+  // successful list and leaves a catalog-only reload for the operator.
   const refreshProfiles = async (preferredId?: number) => {
-    const next = await profileApi.getPlaybackProfiles();
+    let next: PlaybackProfileSummary[];
+    try {
+      next = await profileApi.getPlaybackProfiles();
+    } catch (error) {
+      setCatalogReloadNeeded(true);
+      throw error;
+    }
+    setCatalogReloadNeeded(false);
     setProfiles(next);
     setSelectedId((current) => {
       if (preferredId && next.some((profile) => profile.id === preferredId)) {
@@ -88,6 +100,7 @@ export function PlaybackProfilesContent({
       }
       return next.find((profile) => !profile.archivedAt)?.id ?? null;
     });
+    onProfilesRefreshed?.(next);
   };
 
   const refreshSelected = async (
@@ -150,6 +163,10 @@ export function PlaybackProfilesContent({
     } finally {
       setPending(false);
     }
+  };
+
+  const handleReloadCatalog = () => {
+    void mutate(() => refreshProfiles());
   };
 
   const handleCreateProfile = () => {
@@ -243,6 +260,16 @@ export function PlaybackProfilesContent({
       </header>
 
       {message && <p className="playback-profiles-message" role="status">{message}</p>}
+      {catalogReloadNeeded ? (
+        <button
+          className="device-fleet-btn-action"
+          disabled={pending}
+          onClick={handleReloadCatalog}
+          type="button"
+        >
+          重新載入清單
+        </button>
+      ) : null}
 
       <div className="playback-profiles-layout">
         <ProfileListSidebar
