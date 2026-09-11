@@ -22,6 +22,7 @@ if [[ "${SOLAR_DEPLOY_MAIN:-0}" != "1" ]]; then
   receiver_sudo_command="${SOLAR_SECRET_RECEIVER_SUDO_CMD:-${SOLAR_SECRET_RECEIVER_SUDO:-sudo}}"
   receiver_stat_command="${SOLAR_SECRET_RECEIVER_STAT_CMD:-stat}"
   receiver_parent=""
+  receiver_parent_state="none"
   receiver_file=""
   receiver_marker=""
   receiver_owner_uid=""
@@ -30,6 +31,7 @@ if [[ "${SOLAR_DEPLOY_MAIN:-0}" != "1" ]]; then
   receiver_cleanup_running=0
   receiver_cleanup_result=0
   receiver_frame_fd=""
+  receiver_payload_fd=""
 
   command -v perl >/dev/null 2>&1 || receiver_fail "perl is required for byte-safe secret frame parsing"
   exec {receiver_frame_fd}< <(perl -e '
@@ -219,47 +221,60 @@ if [[ "${SOLAR_DEPLOY_MAIN:-0}" != "1" ]]; then
 
   receiver_cleanup() {
     local cleanup_status=0
+    local cleanup_reason=""
     local exit_status="${1:-1}"
     if [[ "${receiver_cleanup_running}" == "1" ]]; then
-      return 0
+      # Re-entry never re-deletes and never lets a success exit hide an unconfirmed cleanup.
+      if [[ "${exit_status}" == "0" && "${receiver_cleanup_result}" != "0" ]]; then
+        return 1
+      fi
+      return "${exit_status}"
     fi
     receiver_cleanup_running=1
+    receiver_cleanup_result=1
+
     if [[ -n "${receiver_frame_fd}" ]]; then
       exec {receiver_frame_fd}<&- || cleanup_status=1
       receiver_frame_fd=""
     fi
-
-    if [[ -n "${receiver_parent}" ]]; then
-      if receiver_validate_owned_paths; then
-        rm -f -- "${receiver_file}" "${receiver_marker}" || cleanup_status=1
-        rmdir -- "${receiver_parent}" 2>/dev/null || cleanup_status=1
-      elif receiver_validate_parent_shape; then
-        if [[ -e "${receiver_file}" ]]; then
-          if [[ "${receiver_file}" == "${receiver_parent}/rdp-password" && -f "${receiver_file}" && ! -L "${receiver_file}" ]] \
-            && receiver_has_mode "${receiver_file}" 600 && receiver_owner_uid "${receiver_file}" \
-            && [[ "${receiver_owner_uid}" == "${receiver_file_owner_uid}" || "${receiver_owner_uid}" == "0" ]]; then
-            rm -f -- "${receiver_file}" || cleanup_status=1
-          else
-            cleanup_status=1
-          fi
-        fi
-        if [[ -e "${receiver_marker}" ]]; then
-          if [[ "${receiver_marker}" == "${receiver_parent}/.solar-deploy-secret-marker" && -f "${receiver_marker}" && ! -L "${receiver_marker}" ]]; then
-            rm -f -- "${receiver_marker}" || cleanup_status=1
-          else
-            cleanup_status=1
-          fi
-        fi
-        rmdir -- "${receiver_parent}" 2>/dev/null || cleanup_status=1
-      else
-        cleanup_status=1
-      fi
+    if [[ -n "${receiver_payload_fd}" ]]; then
+      exec {receiver_payload_fd}>&- || cleanup_status=1
+      receiver_payload_fd=""
     fi
+    if [[ "${cleanup_status}" != "0" ]]; then
+      cleanup_reason="descriptor close failed"
+    fi
+
+    case "${receiver_parent_state}" in
+      created)
+        # Full validation is the only deletion gate; on failure keep parent, payload, and marker.
+        if receiver_validate_owned_paths; then
+          rm -f -- "${receiver_file}" "${receiver_marker}" || cleanup_status=1
+          rmdir -- "${receiver_parent}" 2>/dev/null || cleanup_status=1
+          if [[ -e "${receiver_parent}" || -L "${receiver_parent}" ]]; then
+            cleanup_status=1
+          fi
+          if [[ "${cleanup_status}" != "0" && -z "${cleanup_reason}" ]]; then
+            cleanup_reason="removal of validated paths was not confirmed"
+          fi
+        else
+          cleanup_status=1
+          cleanup_reason="owner, mode, marker, type, or containment validation failed"
+        fi
+        ;;
+      creating)
+        cleanup_status=1
+        cleanup_reason="secret parent creation was interrupted before ownership was recorded"
+        ;;
+    esac
 
     if [[ "${cleanup_status}" == "0" ]]; then
       printf 'RDP secret cleanup: ok\n' >&2
+    elif [[ "${receiver_parent_state}" == "created" ]]; then
+      printf 'RDP secret cleanup: unknown; %s; revalidate owner, marker, type, and containment before removing exact invocation-owned path: %s\n' \
+        "${cleanup_reason}" "${receiver_parent}" >&2
     else
-      printf 'RDP secret cleanup: unknown\n' >&2
+      printf 'RDP secret cleanup: unknown; %s\n' "${cleanup_reason}" >&2
     fi
     receiver_cleanup_result="${cleanup_status}"
     if [[ "${cleanup_status}" != "0" && "${exit_status}" == "0" ]]; then
@@ -275,9 +290,13 @@ if [[ "${SOLAR_DEPLOY_MAIN:-0}" != "1" ]]; then
   receiver_validate_root
   [[ "${receiver_invocation_id}" =~ ^[A-Za-z0-9._-]+$ ]] || receiver_fail "secret invocation id is invalid"
   receiver_parent="${receiver_root%/}/.solar-deploy-${receiver_invocation_id}"
+  # Ownership starts only after mkdir succeeds; a pre-existing candidate is never acquired.
+  receiver_parent_state="creating"
   if ! mkdir -m 700 -- "${receiver_parent}"; then
+    receiver_parent_state="none"
     receiver_fail "cannot create invocation-owned secret parent"
   fi
+  receiver_parent_state="created"
   receiver_file="${receiver_parent}/rdp-password"
   receiver_marker="${receiver_parent}/.solar-deploy-secret-marker"
   receiver_validate_parent_shape || receiver_fail "secret parent failed ownership or mode validation"
@@ -292,6 +311,7 @@ if [[ "${SOLAR_DEPLOY_MAIN:-0}" != "1" ]]; then
   fi
   printf '%s' "${receiver_rdp_password}" >&"${receiver_payload_fd}" || receiver_fail "cannot write invocation-owned RDP file"
   exec {receiver_payload_fd}>&- || receiver_fail "cannot close invocation-owned RDP file"
+  receiver_payload_fd=""
   [[ -f "${receiver_file}" && ! -L "${receiver_file}" ]] || receiver_fail "RDP file is not a regular non-symlink"
   receiver_has_mode "${receiver_file}" 600 || receiver_fail "RDP file is not mode 600"
   receiver_owner_uid "${receiver_file}" || receiver_fail "cannot verify RDP file owner"

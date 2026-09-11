@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, closeSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, lstatSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -775,6 +775,179 @@ function secureDeployBaseArgs({ dryRun = false, passwordless = false } = {}) {
   ];
 }
 
+const receiverCleanupSecret = "rdp cleanup secret 'quoted' $dollar;semi\\backslash";
+
+function extractSecretReceiverSource() {
+  const source = readFileSync(raspiDeployScriptPath, "utf8");
+  const receiver = source.match(/# BEGIN SOLAR DEPLOY SECRET RECEIVER\n([\s\S]*?)# END SOLAR DEPLOY SECRET RECEIVER/u)?.[1];
+  assert.ok(receiver, "inline receiver must have extractable boundary markers");
+  return receiver;
+}
+
+function validReceiverMarker(ownerUid) {
+  return `SOLAR-DEPLOY-SECRET-MARKER/1\nowner=${ownerUid}\nfile=rdp-password\n`;
+}
+
+function receiverRecoveryLinePattern(exactPath) {
+  return new RegExp(
+    `^RDP secret cleanup: unknown; [^\\n]*revalidate owner, marker, type, and containment before removing exact invocation-owned path: ${escapeRegExp(exactPath)}$`,
+    "mu"
+  );
+}
+
+function receiverCleanupLines(output) {
+  return String(output).split("\n").filter((line) => line.startsWith("RDP secret cleanup"));
+}
+
+function assertReceiverCleanupUnknown(run, exactPath, label, secrets = [receiverCleanupSecret]) {
+  const stderr = String(run.stderr);
+  assert.match(stderr, receiverRecoveryLinePattern(exactPath), `${label}: ${stderr}`);
+  assert.doesNotMatch(stderr, /RDP secret cleanup: ok/u, label);
+  for (const line of receiverCleanupLines(stderr)) {
+    assert.equal(line.includes("*"), false, `${label}: recovery guidance must not suggest wildcard removal`);
+  }
+  assertSecretRepresentationsAbsent(`${run.stdout}\n${stderr}`, secrets);
+}
+
+function createReceiverCleanupFixture(label) {
+  const root = mkdtempSync(path.join(tmpdir(), `solar-secret-cleanup-${label}-`));
+  const fixture = {
+    root,
+    receiverRoot: path.join(root, "receiver-root"),
+    outsideDir: path.join(root, "outside"),
+    toolsDir: path.join(root, "tools"),
+    tamperFlag: path.join(root, "tamper-done"),
+    sentinelPath: path.join(root, "outside", "sentinel"),
+    sentinelBytes: "outside sentinel bytes\n"
+  };
+  fixture.bootstrapPath = path.join(fixture.toolsDir, "fixture-bootstrap");
+  fixture.sudoPath = path.join(fixture.toolsDir, "fixture-sudo");
+  fixture.statPath = path.join(fixture.toolsDir, "fixture-stat");
+  mkdirSync(fixture.receiverRoot, { mode: 0o700 });
+  mkdirSync(fixture.outsideDir);
+  mkdirSync(fixture.toolsDir);
+  writeFileSync(fixture.sentinelPath, fixture.sentinelBytes);
+  writeExecutableFixture(fixture.sudoPath, ["#!/bin/bash", "set -euo pipefail", "exec \"$@\""].join("\n"));
+  // The bootstrap stand-in tampers only after the receiver validated its channel.
+  writeExecutableFixture(fixture.bootstrapPath, [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    "RDP_FILE=",
+    "while [[ $# -gt 0 ]]; do",
+    "  if [[ \"$1\" == \"--rdp-password-file\" ]]; then RDP_FILE=\"${2:-}\"; shift 2; else shift; fi",
+    "done",
+    "[[ -n \"$RDP_FILE\" ]] || exit 64",
+    "PARENT=\"${RDP_FILE%/*}\"",
+    "MARKER=\"$PARENT/.solar-deploy-secret-marker\"",
+    "source \"$FIXTURE_TAMPER_SCRIPT\"",
+    ": > \"$FIXTURE_TAMPER_FLAG\"",
+    "if [[ -n \"${FIXTURE_READY_PATH:-}\" ]]; then",
+    "  trap 'exit 143' HUP INT TERM",
+    "  : > \"$FIXTURE_READY_PATH\"",
+    "  while :; do sleep 1; done",
+    "fi",
+    "exit \"${FIXTURE_BOOTSTRAP_STATUS:-0}\""
+  ].join("\n"));
+  // The stat stand-in misreports marker owner/mode after tampering or fails parent stat; other paths use real stat.
+  writeExecutableFixture(fixture.statPath, [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    "format_value=${2:-}",
+    "path_value=${@: -1}",
+    "case \"$path_value\" in",
+    "  */.solar-deploy-secret-marker)",
+    "    if [[ -e \"$FIXTURE_TAMPER_FLAG\" ]]; then",
+    "      case \"${FIXTURE_MARKER_STAT:-}:$format_value\" in",
+    "        foreign-owner:%u) printf '4242\\n'; exit 0 ;;",
+    "        mode-600:%a|mode-600:%Lp) printf '600\\n'; exit 0 ;;",
+    "      esac",
+    "    fi",
+    "    ;;",
+    "  */.solar-deploy-*/*) ;;",
+    "  */.solar-deploy-*)",
+    "    [[ \"${FIXTURE_PARENT_STAT:-}\" != fail ]] || exit 70",
+    "    ;;",
+    "esac",
+    "exec stat \"$@\""
+  ].join("\n"));
+  return fixture;
+}
+
+function writeReceiverTamperScript(fixture, invocationId, tamper = ":") {
+  const tamperScript = path.join(fixture.toolsDir, `tamper-${invocationId}.sh`);
+  writeFileSync(tamperScript, `${tamper}\n`);
+  rmSync(fixture.tamperFlag, { force: true });
+  return tamperScript;
+}
+
+function receiverCleanupEnvironment(fixture, {
+  invocationId, tamperScript, markerStat, parentStat, bootstrapStatus = 0, readyPath
+}) {
+  return {
+    ...process.env,
+    SOLAR_SECRET_RECEIVER_ROOT: fixture.receiverRoot,
+    SOLAR_SECRET_RECEIVER_BOOTSTRAP_CMD: fixture.bootstrapPath,
+    SOLAR_SECRET_RECEIVER_SUDO_CMD: fixture.sudoPath,
+    SOLAR_SECRET_INVOCATION_ID: invocationId,
+    FIXTURE_TAMPER_SCRIPT: tamperScript,
+    FIXTURE_TAMPER_FLAG: fixture.tamperFlag,
+    FIXTURE_OUTSIDE_DIR: fixture.outsideDir,
+    FIXTURE_SENTINEL: fixture.sentinelPath,
+    FIXTURE_BOOTSTRAP_STATUS: String(bootstrapStatus),
+    ...(readyPath ? { FIXTURE_READY_PATH: readyPath } : {}),
+    ...(markerStat || parentStat ? {
+      SOLAR_SECRET_RECEIVER_STAT_CMD: fixture.statPath,
+      FIXTURE_MARKER_STAT: markerStat ?? "",
+      FIXTURE_PARENT_STAT: parentStat ?? ""
+    } : {})
+  };
+}
+
+function runReceiverCleanupFixture(fixture, { invocationId, tamper, markerStat, parentStat, bootstrapStatus } = {}) {
+  const tamperScript = writeReceiverTamperScript(fixture, invocationId, tamper);
+  const result = spawnSync(bashCommand, ["-c", extractSecretReceiverSource(), "bash", "fixture-bootstrap-arg"], {
+    input: encodeSecretFrame("", receiverCleanupSecret),
+    env: receiverCleanupEnvironment(fixture, { invocationId, tamperScript, markerStat, parentStat, bootstrapStatus }),
+    encoding: "utf8"
+  });
+  return { ...result, parent: path.join(fixture.receiverRoot, `.solar-deploy-${invocationId}`) };
+}
+
+function runReceiverCleanupHarness(receiverRoot, scenarioLines) {
+  const receiver = extractSecretReceiverSource();
+  const start = receiver.indexOf("  receiver_stat_value=\"\"");
+  const end = receiver.indexOf("  trap 'receiver_cleanup $?' EXIT");
+  assert.ok(start >= 0 && end > start, "receiver helper definitions must stay extractable for cleanup harness tests");
+  return spawnSync(bashCommand, ["-c", [
+    "set -euo pipefail",
+    "LC_ALL=C",
+    `receiver_root=${quoteForBash(toBashPathValue(receiverRoot))}`,
+    "receiver_parent=\"${receiver_root}/.solar-deploy-harness\"",
+    "receiver_file=\"${receiver_parent}/rdp-password\"",
+    "receiver_marker=\"${receiver_parent}/.solar-deploy-secret-marker\"",
+    "receiver_stat_command=stat",
+    "receiver_owner_uid=",
+    "receiver_file_owner_uid=\"$(id -u)\"",
+    "receiver_marker_owner_uid=",
+    "receiver_parent_state=none",
+    "receiver_cleanup_running=0",
+    "receiver_cleanup_result=0",
+    "receiver_frame_fd=",
+    "receiver_payload_fd=",
+    receiver.slice(start, end),
+    "fd_state() { if [[ -e \"/dev/fd/$1\" ]]; then printf open; else printf closed; fi; }",
+    "create_validated_material() {",
+    "  mkdir -m 700 -- \"${receiver_parent}\"",
+    "  receiver_parent_state=created",
+    "  printf 'harness secret' > \"${receiver_file}\"",
+    "  chmod 600 \"${receiver_file}\"",
+    "  printf 'SOLAR-DEPLOY-SECRET-MARKER/1\\nowner=%s\\nfile=rdp-password\\n' \"${receiver_file_owner_uid}\" > \"${receiver_marker}\"",
+    "  chmod 600 \"${receiver_marker}\"",
+    "}",
+    ...scenarioLines
+  ].join("\n")], { encoding: "utf8" });
+}
+
 function secretFrameBoundaryFixtures() {
   const special = Buffer.from("with spaces 'single' $dollar;semi\\backslash", "utf8");
   const max = Buffer.alloc(4096, "x");
@@ -1113,11 +1286,15 @@ test("secret transport frame uses exact bytes and a fresh SSH auth descriptor fo
         encoding: "buffer"
       });
       assert.notEqual(failed.status, 0);
+      const partialParent = path.join(partialFailureRoot, ".solar-deploy-partial-failure");
       assert.deepEqual(
         readdirSync(partialFailureRoot).filter((name) => name !== "fixture-stat"),
-        [],
-        "partial marker validation failure must remove exact owned secret material"
+        [".solar-deploy-partial-failure"],
+        "partial marker validation failure must keep the exact invocation-owned parent"
       );
+      assert.deepEqual(readdirSync(partialParent).sort(), [".solar-deploy-secret-marker", "rdp-password"]);
+      assert.equal(readFileSync(path.join(partialParent, "rdp-password"), "utf8"), "rdp fixture");
+      assertReceiverCleanupUnknown(failed, partialParent, "partial marker stat failure", ["rdp fixture"]);
     } finally {
       removeTempDir(partialFailureRoot);
     }
@@ -1361,6 +1538,422 @@ test("secret transport catchable signal cleans exact receiver-owned material", a
       await childClosed;
     }
     removeTempDir(fixtureRoot);
+  }
+});
+
+test("secret receiver cleanup preserves every transient path when full marker validation fails", (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX ownership and mode semantics");
+    return;
+  }
+  const uid = process.getuid();
+  const validMarker = validReceiverMarker(uid);
+  // Each case breaks one full-validation point; any weaker fallback deletion fails under that case's label.
+  const scenarios = [
+    {
+      id: "content-mode-644",
+      point: "marker magic/owner/file content together with mode 600",
+      tamper: "printf 'tampered marker\\n' > \"$MARKER\"; chmod 644 \"$MARKER\"",
+      marker: { kind: "file", bytes: "tampered marker\n", mode: 0o644 }
+    },
+    {
+      id: "magic",
+      point: "marker magic line",
+      tamper: "printf 'SOLAR-DEPLOY-SECRET-MARKER/0\\nowner=%s\\nfile=rdp-password\\n' \"$(id -u)\" > \"$MARKER\"",
+      marker: { kind: "file", bytes: `SOLAR-DEPLOY-SECRET-MARKER/0\nowner=${uid}\nfile=rdp-password\n`, mode: 0o600 }
+    },
+    {
+      id: "mode",
+      point: "marker mode 600",
+      tamper: "chmod 644 \"$MARKER\"",
+      marker: { kind: "file", bytes: validMarker, mode: 0o644 }
+    },
+    {
+      id: "owner",
+      point: "marker owner uid (stat reports a foreign owner)",
+      markerStat: "foreign-owner",
+      marker: { kind: "file", bytes: validMarker, mode: 0o600 }
+    },
+    {
+      id: "owner-binding",
+      point: "marker owner= binding to the payload owner",
+      tamper: "printf 'SOLAR-DEPLOY-SECRET-MARKER/1\\nowner=4242\\nfile=rdp-password\\n' > \"$MARKER\"",
+      marker: { kind: "file", bytes: "SOLAR-DEPLOY-SECRET-MARKER/1\nowner=4242\nfile=rdp-password\n", mode: 0o600 }
+    },
+    {
+      id: "file-binding",
+      point: "marker file= binding to rdp-password",
+      tamper: "printf 'SOLAR-DEPLOY-SECRET-MARKER/1\\nowner=%s\\nfile=other-secret\\n' \"$(id -u)\" > \"$MARKER\"",
+      marker: { kind: "file", bytes: `SOLAR-DEPLOY-SECRET-MARKER/1\nowner=${uid}\nfile=other-secret\n`, mode: 0o600 }
+    },
+    {
+      id: "extra-line",
+      point: "marker exact three-line content",
+      tamper: "printf 'extra\\n' >> \"$MARKER\"",
+      marker: { kind: "file", bytes: `${validMarker}extra\n`, mode: 0o600 }
+    },
+    {
+      id: "symlink",
+      point: "marker regular non-symlink type",
+      tamper: "rm -f \"$MARKER\"; ln -s \"$FIXTURE_SENTINEL\" \"$MARKER\"",
+      marker: { kind: "symlink" }
+    },
+    {
+      id: "directory",
+      point: "marker regular file type",
+      tamper: "rm -f \"$MARKER\"; mkdir -m 700 \"$MARKER\"",
+      marker: { kind: "directory" }
+    },
+    {
+      id: "containment",
+      point: "parent containment (parent swapped for a symlink outside the receiver root)",
+      tamper: "mv \"$PARENT\" \"$FIXTURE_OUTSIDE_DIR/moved-parent\"; ln -s \"$FIXTURE_OUTSIDE_DIR/moved-parent\" \"$PARENT\"",
+      parentEscape: true
+    },
+    {
+      id: "unreadable",
+      point: "marker readability (stat still reports mode 600)",
+      markerStat: "mode-600",
+      tamper: "chmod 000 \"$MARKER\"",
+      marker: { kind: "file", bytes: validMarker, mode: 0o000 },
+      nonRootOnly: true
+    }
+  ];
+
+  const fixture = createReceiverCleanupFixture("marker");
+  try {
+    for (const scenario of scenarios) {
+      if (scenario.nonRootOnly && uid === 0) continue;
+      const label = `${scenario.id}: ${scenario.point}`;
+      const run = runReceiverCleanupFixture(fixture, {
+        invocationId: `marker-${scenario.id}`,
+        tamper: scenario.tamper,
+        markerStat: scenario.markerStat
+      });
+      assert.equal(existsSync(fixture.tamperFlag), true, `${label}: bootstrap must run after the channel validated\n${run.stderr}`);
+      assert.equal(run.status, 121, `${label}: bootstrap success with unknown cleanup must fail\n${run.stderr}`);
+      assertReceiverCleanupUnknown(run, run.parent, label);
+
+      const materialDir = scenario.parentEscape ? path.join(fixture.outsideDir, "moved-parent") : run.parent;
+      if (scenario.parentEscape) {
+        assert.equal(lstatSync(run.parent).isSymbolicLink(), true, `${label}: swapped parent symlink must remain`);
+        assert.equal(readlinkSync(run.parent), materialDir, `${label}: swapped parent target must remain`);
+      } else {
+        assert.equal(lstatSync(run.parent).isDirectory(), true, `${label}: parent must be preserved`);
+      }
+      assert.equal(
+        readFileSync(path.join(materialDir, "rdp-password"), "utf8"),
+        receiverCleanupSecret,
+        `${label}: payload must be preserved byte-for-byte`
+      );
+      const markerPath = path.join(materialDir, ".solar-deploy-secret-marker");
+      const expectedMarker = scenario.marker ?? { kind: "file", bytes: validMarker, mode: 0o600 };
+      const markerEntry = lstatSync(markerPath);
+      if (expectedMarker.kind === "symlink") {
+        assert.equal(markerEntry.isSymbolicLink(), true, `${label}: marker symlink must be preserved`);
+        assert.equal(readlinkSync(markerPath), fixture.sentinelPath, `${label}: marker symlink target must be preserved`);
+      } else if (expectedMarker.kind === "directory") {
+        assert.equal(markerEntry.isDirectory(), true, `${label}: marker directory must be preserved`);
+      } else {
+        assert.equal(markerEntry.isFile(), true, `${label}: marker must be preserved`);
+        assert.equal(markerEntry.mode & 0o777, expectedMarker.mode, `${label}: marker mode must be unchanged`);
+        if (expectedMarker.mode === 0o000) chmodSync(markerPath, 0o600);
+        assert.equal(readFileSync(markerPath, "utf8"), expectedMarker.bytes, `${label}: marker bytes must be unchanged`);
+      }
+      assert.equal(readFileSync(fixture.sentinelPath, "utf8"), fixture.sentinelBytes, `${label}: outside sentinel must be unchanged`);
+    }
+  } finally {
+    removeTempDir(fixture.root);
+  }
+});
+
+test("secret receiver never acquires a pre-existing candidate parent", (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX ownership and mode semantics");
+    return;
+  }
+  const fixture = createReceiverCleanupFixture("candidate");
+  const assertCandidateNotClaimed = (run, candidate, label) => {
+    assert.notEqual(run.status, 0, `${label}: creation failure must stay nonzero`);
+    assert.match(run.stderr, /cannot create invocation-owned secret parent/u, label);
+    assert.equal(existsSync(fixture.tamperFlag), false, `${label}: bootstrap must not run`);
+    assert.deepEqual(receiverCleanupLines(run.stderr), ["RDP secret cleanup: ok"], `${label}: no owned material was created`);
+    for (const line of receiverCleanupLines(run.stderr)) {
+      assert.equal(line.includes(candidate), false, `${label}: cleanup must not name the candidate as owned`);
+    }
+  };
+  try {
+    const emptyCandidate = path.join(fixture.receiverRoot, ".solar-deploy-candidate-empty");
+    mkdirSync(emptyCandidate, { mode: 0o700 });
+    chmodSync(emptyCandidate, 0o700);
+    const emptyRun = runReceiverCleanupFixture(fixture, { invocationId: "candidate-empty" });
+    assertCandidateNotClaimed(emptyRun, emptyCandidate, "empty candidate");
+    assert.equal(lstatSync(emptyCandidate).isDirectory(), true, "an empty pre-existing candidate must not be removed");
+    assert.deepEqual(readdirSync(emptyCandidate), []);
+
+    const populatedCandidate = path.join(fixture.receiverRoot, ".solar-deploy-candidate-populated");
+    mkdirSync(populatedCandidate, { mode: 0o700 });
+    chmodSync(populatedCandidate, 0o700);
+    const candidateFiles = {
+      ".solar-deploy-secret-marker": validReceiverMarker(process.getuid()),
+      "rdp-password": "caller-owned payload bytes",
+      sentinel: "caller sentinel bytes\n"
+    };
+    for (const [name, bytes] of Object.entries(candidateFiles)) {
+      const filePath = path.join(populatedCandidate, name);
+      writeFileSync(filePath, bytes, { mode: 0o600 });
+      chmodSync(filePath, 0o600);
+    }
+    const populatedRun = runReceiverCleanupFixture(fixture, { invocationId: "candidate-populated" });
+    assertCandidateNotClaimed(populatedRun, populatedCandidate, "populated candidate");
+    assert.deepEqual(readdirSync(populatedCandidate).sort(), Object.keys(candidateFiles).sort());
+    for (const [name, bytes] of Object.entries(candidateFiles)) {
+      assert.equal(readFileSync(path.join(populatedCandidate, name), "utf8"), bytes, `candidate ${name} must be byte-for-byte unchanged`);
+    }
+  } finally {
+    removeTempDir(fixture.root);
+  }
+});
+
+test("secret receiver partial initialization keeps its created parent and reports unknown", (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX ownership and mode semantics");
+    return;
+  }
+  const fixture = createReceiverCleanupFixture("partial");
+  try {
+    const run = runReceiverCleanupFixture(fixture, { invocationId: "partial-parent", parentStat: "fail" });
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, /secret parent failed ownership or mode validation/u);
+    assert.equal(existsSync(fixture.tamperFlag), false, "bootstrap must not run after failed initialization");
+    assert.equal(lstatSync(run.parent).isDirectory(), true, "the created parent must be kept for revalidated recovery");
+    assert.deepEqual(readdirSync(run.parent), []);
+    assertReceiverCleanupUnknown(run, run.parent, "partial parent validation");
+  } finally {
+    removeTempDir(fixture.root);
+  }
+});
+
+test("secret receiver reports cleanup ok only after confirmed removal of validated paths", (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX ownership and mode semantics");
+    return;
+  }
+  const fixture = createReceiverCleanupFixture("validated");
+  try {
+    const normal = runReceiverCleanupFixture(fixture, { invocationId: "normal" });
+    assert.equal(normal.status, 0, normal.stderr);
+    assert.deepEqual(receiverCleanupLines(normal.stderr), ["RDP secret cleanup: ok"]);
+    assert.equal(existsSync(normal.parent), false, "validated normal cleanup must remove the exact parent");
+
+    const bootstrapFailed = runReceiverCleanupFixture(fixture, { invocationId: "bootstrap-failed", bootstrapStatus: 7 });
+    assert.equal(bootstrapFailed.status, 120, bootstrapFailed.stderr);
+    assert.deepEqual(receiverCleanupLines(bootstrapFailed.stderr), ["RDP secret cleanup: ok"]);
+    assert.match(bootstrapFailed.stderr, /Remote bootstrap failed with status 7 after confirmed secret cleanup/u);
+    assert.equal(existsSync(bootstrapFailed.parent), false);
+
+    const blocked = runReceiverCleanupFixture(fixture, {
+      invocationId: "removal-blocked",
+      tamper: "printf 'bootstrap residue\\n' > \"$PARENT/residue\""
+    });
+    assert.equal(blocked.status, 121, blocked.stderr);
+    assertReceiverCleanupUnknown(blocked, blocked.parent, "unconfirmed parent removal");
+    assert.deepEqual(readdirSync(blocked.parent), ["residue"], "only validated exact paths may be removed");
+    assert.equal(readFileSync(path.join(blocked.parent, "residue"), "utf8"), "bootstrap residue\n");
+
+    const failedAndUnknown = runReceiverCleanupFixture(fixture, {
+      invocationId: "failed-and-unknown",
+      bootstrapStatus: 7,
+      tamper: "chmod 644 \"$MARKER\""
+    });
+    assert.equal(failedAndUnknown.status, 121, failedAndUnknown.stderr);
+    assertReceiverCleanupUnknown(failedAndUnknown, failedAndUnknown.parent, "bootstrap failure with unknown cleanup");
+    assert.deepEqual(readdirSync(failedAndUnknown.parent).sort(), [".solar-deploy-secret-marker", "rdp-password"]);
+    assert.equal(readFileSync(fixture.sentinelPath, "utf8"), fixture.sentinelBytes);
+  } finally {
+    removeTempDir(fixture.root);
+  }
+});
+
+test("secret receiver cleanup closes descriptors, confirms removal, and stays re-entrant", (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX descriptors and modes");
+    return;
+  }
+  const root = mkdtempSync(path.join(tmpdir(), "solar-secret-cleanup-harness-"));
+  const scenarioRoot = (name) => {
+    const receiverRoot = path.join(root, name);
+    mkdirSync(receiverRoot, { mode: 0o700 });
+    return { receiverRoot, parent: path.join(receiverRoot, ".solar-deploy-harness") };
+  };
+  try {
+    const partial = scenarioRoot("partial");
+    const partialRun = runReceiverCleanupHarness(partial.receiverRoot, [
+      "mkdir -m 700 -- \"${receiver_parent}\"",
+      "receiver_parent_state=created",
+      "exec {receiver_frame_fd}</dev/null",
+      "exec {receiver_payload_fd}>\"${receiver_file}\"",
+      "frame_fd=\"${receiver_frame_fd}\"",
+      "payload_fd=\"${receiver_payload_fd}\"",
+      "set +e",
+      "receiver_cleanup 0",
+      "first_status=$?",
+      "receiver_cleanup 0",
+      "second_status=$?",
+      "set -e",
+      "printf 'first=%s second=%s frame=%s payload=%s\\n' \"${first_status}\" \"${second_status}\" \"$(fd_state \"${frame_fd}\")\" \"$(fd_state \"${payload_fd}\")\""
+    ]);
+    assert.equal(partialRun.status, 0, partialRun.stderr);
+    assert.equal(partialRun.stdout.trim(), "first=1 second=1 frame=closed payload=closed");
+    assert.deepEqual(readdirSync(partial.parent), ["rdp-password"], "partial setup must keep the created parent and payload");
+    assert.equal(receiverCleanupLines(partialRun.stderr).length, 1, "re-entry must not emit a second cleanup verdict");
+    assertReceiverCleanupUnknown(partialRun, partial.parent, "partial setup with open descriptors");
+
+    const unconfirmed = scenarioRoot("unconfirmed");
+    const unconfirmedRun = runReceiverCleanupHarness(unconfirmed.receiverRoot, [
+      "create_validated_material",
+      "rmdir() { return 0; }",
+      "set +e",
+      "receiver_cleanup 0",
+      "cleanup_status=$?",
+      "set -e",
+      "printf 'status=%s result=%s\\n' \"${cleanup_status}\" \"${receiver_cleanup_result}\""
+    ]);
+    assert.equal(unconfirmedRun.status, 0, unconfirmedRun.stderr);
+    assert.equal(unconfirmedRun.stdout.trim(), "status=1 result=1");
+    assert.deepEqual(readdirSync(unconfirmed.parent), [], "validated exact paths are removed before the parent check");
+    assertReceiverCleanupUnknown(unconfirmedRun, unconfirmed.parent, "unconfirmed parent removal", ["harness secret"]);
+
+    const validated = scenarioRoot("validated");
+    const validatedRun = runReceiverCleanupHarness(validated.receiverRoot, [
+      "create_validated_material",
+      "exec {receiver_frame_fd}</dev/null",
+      "frame_fd=\"${receiver_frame_fd}\"",
+      "set +e",
+      "receiver_cleanup 0",
+      "first_status=$?",
+      "receiver_cleanup 7",
+      "second_status=$?",
+      "set -e",
+      "printf 'first=%s second=%s frame=%s\\n' \"${first_status}\" \"${second_status}\" \"$(fd_state \"${frame_fd}\")\""
+    ]);
+    assert.equal(validatedRun.status, 0, validatedRun.stderr);
+    assert.equal(validatedRun.stdout.trim(), "first=0 second=7 frame=closed");
+    assert.deepEqual(readdirSync(validated.receiverRoot), [], "validated cleanup must remove the exact parent");
+    assert.deepEqual(receiverCleanupLines(validatedRun.stderr), ["RDP secret cleanup: ok"]);
+  } finally {
+    removeTempDir(root);
+  }
+});
+
+test("secret receiver signal cleanup fails closed when the marker no longer validates", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("requires POSIX process-group signals");
+    return;
+  }
+  const fixture = createReceiverCleanupFixture("signal");
+  const readyPath = path.join(fixture.root, "ready");
+  const invocationId = "signal-tampered";
+  const parent = path.join(fixture.receiverRoot, `.solar-deploy-${invocationId}`);
+  const tamperScript = writeReceiverTamperScript(fixture, invocationId, "chmod 644 \"$MARKER\"");
+  const child = spawn(bashCommand, ["-c", extractSecretReceiverSource(), "bash", "fixture-bootstrap-arg"], {
+    detached: true,
+    env: receiverCleanupEnvironment(fixture, { invocationId, tamperScript, readyPath }),
+    stdio: ["pipe", "ignore", "pipe"]
+  });
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const childClosed = new Promise((resolve) => {
+    child.once("close", (code, signal) => resolve({ code, signal }));
+  });
+
+  try {
+    child.stdin.end(encodeSecretFrame("", receiverCleanupSecret));
+    const readyDeadline = Date.now() + 2_000;
+    while (!existsSync(readyPath) && child.exitCode === null && Date.now() < readyDeadline) {
+      await delay(20);
+    }
+    assert.equal(existsSync(readyPath), true, stderr);
+    process.kill(-child.pid, "SIGTERM");
+    const exit = await Promise.race([
+      childClosed,
+      delay(3_000).then(() => { throw new Error(`receiver did not exit after TERM: ${stderr}`); })
+    ]);
+    assert.notEqual(exit.code, 0);
+    assertReceiverCleanupUnknown({ stdout: "", stderr }, parent, "TERM with invalid marker");
+    assert.deepEqual(readdirSync(parent).sort(), [".solar-deploy-secret-marker", "rdp-password"]);
+    assert.equal(readFileSync(path.join(parent, "rdp-password"), "utf8"), receiverCleanupSecret);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch (error) {
+        if (error?.code !== "ESRCH") throw error;
+      }
+      await childClosed;
+    }
+    removeTempDir(fixture.root);
+  }
+});
+
+test("secret transport local handoff keeps receiver cleanup unknown as a failure with an exact recovery path", () => {
+  const sshSecret = "handoff ssh secret";
+  const sudoSecret = "handoff sudo secret";
+  const rdpSecret = "handoff rdp secret";
+  const scenarios = [
+    {
+      name: "bootstrap success with receiver cleanup unknown",
+      sshStatus: "121",
+      receiverOutput: "RDP secret cleanup: unknown; owner, mode, marker, type, or containment validation failed",
+      expectedStatus: 121,
+      expectRecovery: true
+    },
+    {
+      name: "bootstrap failure after confirmed receiver cleanup",
+      sshStatus: "120",
+      receiverOutput: "RDP secret cleanup: ok\nRemote bootstrap failed with status 7 after confirmed secret cleanup",
+      expectedStatus: 120,
+      expectRecovery: false
+    }
+  ];
+
+  for (const scenario of scenarios) {
+    const fixture = createSecretTransportFixture();
+    try {
+      const result = runSecretTransportEntrypoint(fixture, {
+        args: secureDeployBaseArgs(),
+        env: {
+          SSH_PASSWORD: sshSecret,
+          SUDO_PASSWORD: sudoSecret,
+          RDP_PASSWORD: rdpSecret,
+          FAKE_BOOTSTRAP_SSH_STATUS: scenario.sshStatus,
+          FAKE_BOOTSTRAP_OUTPUT: scenario.receiverOutput
+        }
+      });
+      assert.equal(result.status, scenario.expectedStatus, `${scenario.name}: ${result.stderr}`);
+      assert.doesNotMatch(result.stdout, /\[5\/5\] Done\./u, scenario.name);
+      const capture = readSecretFixtureCapture(fixture);
+      const receiverRoot = capture.match(/SOLAR_SECRET_RECEIVER_ROOT=([^\s>]+)/u)?.[1];
+      const invocationId = capture.match(/SOLAR_SECRET_INVOCATION_ID=([^\s>]+)/u)?.[1];
+      assert.ok(receiverRoot && invocationId, `${scenario.name}: remote receiver command must carry its exact root and invocation`);
+      const exactParent = `${receiverRoot}/.solar-deploy-${invocationId}`;
+      const localRecovery = new RegExp(
+        `^RDP secret cleanup: unknown; reconnect and validate owner, marker, type, and containment before removing exact path: ${escapeRegExp(exactParent)}$`,
+        "mu"
+      );
+      if (scenario.expectRecovery) {
+        assert.match(result.stderr, localRecovery, scenario.name);
+      } else {
+        assert.doesNotMatch(result.stderr, /RDP secret cleanup: unknown/u, scenario.name);
+      }
+      for (const line of receiverCleanupLines(`${result.stdout}\n${result.stderr}`)) {
+        assert.equal(line.includes("*"), false, `${scenario.name}: recovery guidance must not suggest wildcard removal`);
+      }
+      assertSecretRepresentationsAbsent(`${result.stdout}\n${result.stderr}`, [sshSecret, sudoSecret, rdpSecret]);
+    } finally {
+      removeTempDir(fixture.root);
+    }
   }
 });
 
