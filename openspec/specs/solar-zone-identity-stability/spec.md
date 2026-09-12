@@ -25,6 +25,7 @@ The Go Solar collector SHALL maintain a versioned collector-owned identity state
 - **THEN** identity resolution fails for that batch instead of assigning one numeric id to multiple rows
 - **AND** the affected batch is not published or recorded as canonical zone data
 
+---
 ### Requirement: New zone identity aliases become durable before canonical data use
 
 When one or more identity keys require new numeric ids, the collector SHALL persist the complete updated sidecar state before returning those resolved ids to MQTT publication or local history recording. If persistence fails, the allocation SHALL be rolled back in memory and the affected round SHALL NOT use the unpersisted ids for canonical data.
@@ -36,6 +37,7 @@ When one or more identity keys require new numeric ids, the collector SHALL pers
 - **AND** the service does not publish or record the unpersisted numeric alias
 - **AND** a later successful retry may allocate from the last durable state without inheriting the failed in-memory allocation
 
+---
 ### Requirement: Existing sidecar is authoritative and missing sidecar may bootstrap from recent history
 
 A factory already present in valid sidecar state SHALL use that state without allowing SQLite history to overwrite or gate it. When no sidecar state exists for a factory and SQLite history is available, the collector SHALL bootstrap from the newest single-timestamp snapshot whose non-empty serials and positive zone ids are one-to-one. The next allocation SHALL also be greater than every numeric zone id previously recorded for that factory. When storage is disabled or no usable history exists, first-fetch allocation SHALL still persist to sidecar and provide stability from then on.
@@ -63,9 +65,12 @@ A factory already present in valid sidecar state SHALL use that state without al
 - **THEN** their mapping is persisted to sidecar before canonical use
 - **AND** a later process restart uses that sidecar regardless of API ordering
 
+---
 ### Requirement: Corrupt identity state fails explicitly instead of silently renumbering
 
 An existing identity sidecar with invalid JSON, unsupported version, invalid identity keys, non-positive ids, duplicate identity keys, or one numeric id bound to multiple identity keys SHALL be rejected. The collector SHALL NOT delete or reset the state and continue from 1.
+
+Identity keys SHALL use exactly `serial:<non-empty trimmed serial>` or `position:<canonical positive decimal integer>`. Noncanonical keys SHALL be rejected without changing the sidecar bytes; the collector SHALL NOT silently normalize keys, merge identities, or allocate replacement aliases.
 
 #### Scenario: Existing sidecar contains collision
 
@@ -73,6 +78,33 @@ An existing identity sidecar with invalid JSON, unsupported version, invalid ide
 - **THEN** startup or identity preparation fails with an observable identity-state error
 - **AND** no automatic renumbering is performed
 
+#### Scenario: Noncanonical serial key is rejected without renumbering
+
+- **GIVEN** KN sidecar binds `serial: A ` to zone 7 and next_zone_id is 8
+- **WHEN** the collector loads that sidecar
+- **THEN** loading SHALL fail with an observable identity-state error
+- **AND** the sidecar bytes SHALL remain unchanged and no replacement zone 8 SHALL be returned
+
+#### Scenario: Noncanonical position or normalized duplicate keys are rejected
+
+- **WHEN** the sidecar contains `position:01`, `position:+1`, or both `serial:A` and `serial: A `
+- **THEN** loading SHALL fail without modifying the file or returning a canonical identity resolver
+
+
+<!-- @trace
+source: fix-reviewed-input-boundary-regressions
+updated: 2026-09-12
+code:
+  - solar_mqtt_go/internal/zoneidentity/store.go
+  - solar_mqtt_go/internal/zoneidentity/prepare.go
+  - solar_mqtt_go/internal/service/service.go
+  - solar_mqtt_go/commands.go
+tests:
+  - solar_mqtt_go/internal/zoneidentity/store_test.go
+  - solar_mqtt_go/internal/zoneidentity/prepare_test.go
+-->
+
+---
 ### Requirement: Serial-less zones remain outside the durable hardware identity guarantee
 
 A zone whose trimmed serial is empty SHALL use only a positive position-based fallback and SHALL produce an observable warning indicating that cross-restart hardware identity is not guaranteed. The collector SHALL NOT infer a durable identity from mutable name, capacity, or measurement values.

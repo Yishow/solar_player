@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
+import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
@@ -16,6 +24,44 @@ const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }] = a
   import("../db/seed.js"),
   import("../db/index.js")
 ]);
+
+type RawRequestOptions = {
+  body?: Buffer | string | Record<string, unknown>;
+  contentType?: string;
+  method: string;
+  path: string;
+};
+
+async function sendRaw(port: number, options: RawRequestOptions) {
+  const payload = options.body === undefined
+    ? undefined
+    : Buffer.isBuffer(options.body)
+      ? options.body
+      : Buffer.from(typeof options.body === "string" ? options.body : JSON.stringify(options.body));
+  const headers: Record<string, number | string> = {};
+  if (payload) {
+    headers["content-length"] = payload.length;
+    headers["content-type"] = options.contentType ?? "application/json";
+  }
+  return new Promise<{ body: string; statusCode?: number }>((resolve, reject) => {
+    const request = http.request({
+      host: "127.0.0.1",
+      method: options.method,
+      path: options.path,
+      port,
+      headers
+    }, (incoming) => {
+      let responseBody = "";
+      incoming.setEncoding("utf8");
+      incoming.on("data", (chunk: string) => {
+        responseBody += chunk;
+      });
+      incoming.on("end", () => resolve({ body: responseBody, statusCode: incoming.statusCode }));
+    });
+    request.on("error", reject);
+    request.end(payload);
+  });
+}
 
 after(() => rmSync(tempDir, { force: true, recursive: true }));
 
@@ -63,6 +109,168 @@ function resetFixtures() {
 }
 
 const malformedIds = ["12abc", "12.0", "+12", "0", "-1", "9007199254740992"];
+
+test("raw HTTP backslash cannot bypass any covered management id validator", async () => {
+  resetFixtures();
+  const db = getDatabase();
+  mkdirSync(process.env.UPLOADS_DIR!, { recursive: true });
+  mkdirSync(process.env.BRAND_UPLOADS_DIR!, { recursive: true });
+  writeFileSync(join(process.env.UPLOADS_DIR!, "fixture.png"), "image fixture");
+  const logoBody = Buffer.from("<svg xmlns=\"http://www.w3.org/2000/svg\" />");
+  writeFileSync(join(process.env.BRAND_UPLOADS_DIR!, "fixture-logo.svg"), logoBody);
+  db.prepare(`
+    INSERT INTO brand_profiles (
+      id, name, brand_name_zh, brand_name_en, product_title_zh, product_title_en,
+      slogan_zh, slogan_en, logo_filename, logo_mime_type, logo_file_size,
+      is_active, created_at, updated_at
+    ) VALUES (13, 'second-fixture', '', '', '', '', '', '', 'fixture-logo.svg', 'image/svg+xml', ?, 0,
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run(logoBody.length);
+  db.prepare(`
+    UPDATE brand_profiles
+    SET logo_filename = 'fixture-logo.svg', logo_mime_type = 'image/svg+xml', logo_file_size = ?
+    WHERE id = 12
+  `).run(logoBody.length);
+  const app = await buildApp();
+  const readPlaylist = () => {
+    const exists = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'image_playlist_entries'")
+      .get();
+    return exists
+      ? db.prepare("SELECT * FROM image_playlist_entries ORDER BY entry_id").all()
+      : [];
+  };
+  const before = {
+    brandProfiles: db.prepare("SELECT * FROM brand_profiles ORDER BY id").all(),
+    circuit: db.prepare("SELECT * FROM circuit_configs WHERE id = 12").get(),
+    image: db.prepare("SELECT * FROM image_assets WHERE id = 12").get(),
+    imageBytes: readFileSync(join(process.env.UPLOADS_DIR!, "fixture.png")),
+    imageFiles: readdirSync(process.env.UPLOADS_DIR!).sort(),
+    logoBytes: readFileSync(join(process.env.BRAND_UPLOADS_DIR!, "fixture-logo.svg")),
+    logoFiles: readdirSync(process.env.BRAND_UPLOADS_DIR!).sort(),
+    playlist: readPlaylist()
+  };
+  let circuitEvents = 0;
+  let imageEvents = 0;
+  let displaySyncEvents = 0;
+  const originalCircuitEmit = app.socketService.emitCircuitSettingsUpdated.bind(app.socketService);
+  const originalImageEmit = app.socketService.emitImagesUpdated.bind(app.socketService);
+  const originalDisplaySyncEmit = app.socketService.emitDisplaySync.bind(app.socketService);
+  app.socketService.emitCircuitSettingsUpdated = (payload) => {
+    circuitEvents += 1;
+    originalCircuitEmit(payload);
+  };
+  app.socketService.emitImagesUpdated = (payload) => {
+    imageEvents += 1;
+    originalImageEmit(payload);
+  };
+  app.socketService.emitDisplaySync = (payload) => {
+    displaySyncEvents += 1;
+    originalDisplaySyncEmit(payload);
+  };
+
+  try {
+    await app.listen({ host: "127.0.0.1", port: 0 });
+    const address = app.server.address();
+    assert.ok(address && typeof address !== "string");
+    const boundary = "solar-display-management-validation";
+    const logoMultipart = Buffer.from([
+      `--${boundary}\r\n`,
+      "Content-Disposition: form-data; name=\"file\"; filename=\"replacement.svg\"\r\n",
+      "Content-Type: image/svg+xml\r\n\r\n",
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" />\r\n",
+      `--${boundary}--\r\n`
+    ].join(""));
+    const malformedRequests = [
+      { body: { nameZh: "不該寫入" }, method: "PUT", path: "/api/circuits/12\\abc" },
+      { method: "DELETE", path: "/api/circuits/12\\abc" },
+      { body: { title: "不該寫入" }, method: "PUT", path: "/api/images/12\\abc" },
+      { method: "DELETE", path: "/api/images/12\\abc" },
+      { body: { name: "不該寫入" }, method: "PUT", path: "/api/brand/profiles/12\\abc" },
+      { method: "DELETE", path: "/api/brand/profiles/12\\abc" },
+      { method: "POST", path: "/api/brand/profiles/12\\abc/activate" },
+      {
+        body: logoMultipart,
+        contentType: `multipart/form-data; boundary=${boundary}`,
+        method: "POST",
+        path: "/api/brand/profiles/12\\abc/logo"
+      },
+      { method: "DELETE", path: "/api/brand/profiles/12\\abc/logo" },
+      { method: "GET", path: "/api/display-ops/assets/12\\abc/references" }
+    ];
+    for (const request of malformedRequests) {
+      const response = await sendRaw(address.port, request);
+      assert.equal(response.statusCode, 400, `${request.method} ${request.path}: ${response.body}`);
+      assert.deepEqual(db.prepare("SELECT * FROM brand_profiles ORDER BY id").all(), before.brandProfiles);
+      assert.deepEqual(db.prepare("SELECT * FROM circuit_configs WHERE id = 12").get(), before.circuit);
+      assert.deepEqual(db.prepare("SELECT * FROM image_assets WHERE id = 12").get(), before.image);
+      assert.deepEqual(readFileSync(join(process.env.UPLOADS_DIR!, "fixture.png")), before.imageBytes);
+      assert.deepEqual(readdirSync(process.env.UPLOADS_DIR!).sort(), before.imageFiles);
+      assert.deepEqual(readFileSync(join(process.env.BRAND_UPLOADS_DIR!, "fixture-logo.svg")), before.logoBytes);
+      assert.deepEqual(readdirSync(process.env.BRAND_UPLOADS_DIR!).sort(), before.logoFiles);
+      assert.deepEqual(readPlaylist(), before.playlist);
+    }
+    assert.equal(circuitEvents, 0);
+    assert.equal(imageEvents, 0);
+    assert.equal(displaySyncEvents, 0);
+  } finally {
+    app.socketService.emitCircuitSettingsUpdated = originalCircuitEmit;
+    app.socketService.emitImagesUpdated = originalImageEmit;
+    app.socketService.emitDisplaySync = originalDisplaySyncEmit;
+    await app.close();
+  }
+});
+
+test("raw HTTP playlist entry validation uses the matched entryId parameter", async () => {
+  resetFixtures();
+  const app = await buildApp();
+  let imageEvents = 0;
+  let displaySyncEvents = 0;
+  const originalImageEmit = app.socketService.emitImagesUpdated.bind(app.socketService);
+  const originalDisplaySyncEmit = app.socketService.emitDisplaySync.bind(app.socketService);
+  app.socketService.emitImagesUpdated = (payload) => {
+    imageEvents += 1;
+    originalImageEmit(payload);
+  };
+  app.socketService.emitDisplaySync = (payload) => {
+    displaySyncEvents += 1;
+    originalDisplaySyncEmit(payload);
+  };
+
+  try {
+    const bootstrap = await app.inject({
+      method: "POST",
+      url: "/api/image-playlist/governance/bootstrap"
+    });
+    assert.equal(bootstrap.statusCode, 200);
+    imageEvents = 0;
+    displaySyncEvents = 0;
+    const before = getDatabase()
+      .prepare("SELECT * FROM image_playlist_entries ORDER BY entry_id")
+      .all();
+
+    await app.listen({ host: "127.0.0.1", port: 0 });
+    const address = app.server.address();
+    assert.ok(address && typeof address !== "string");
+    const response = await sendRaw(address.port, {
+      body: { durationSeconds: 20 },
+      method: "PUT",
+      path: "/api/image-playlist/IMG-01\\abc"
+    });
+
+    assert.equal(response.statusCode, 404, response.body);
+    assert.deepEqual(
+      getDatabase().prepare("SELECT * FROM image_playlist_entries ORDER BY entry_id").all(),
+      before
+    );
+    assert.equal(imageEvents, 0);
+    assert.equal(displaySyncEvents, 0);
+  } finally {
+    app.socketService.emitImagesUpdated = originalImageEmit;
+    app.socketService.emitDisplaySync = originalDisplaySyncEmit;
+    await app.close();
+  }
+});
 
 test("covered management routes reject non-canonical numeric ids with 400", async () => {
   resetFixtures();

@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { getDatabase } from "../db/index.js";
 import {
   readPlaybackPages,
@@ -6,12 +6,16 @@ import {
   type PlaybackPageUpdateInput
 } from "../services/displayRotationService.js";
 import type { MqttSettingsRow } from "../mqtt/settings-source.js";
+import {
+  isFiniteNumber,
+  isRecord,
+  sendBadRequest,
+  sendNotFound,
+  type RecordLike
+} from "./inputValidationSupport.js";
 
 const CLOCK_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/u;
 const PLAYLIST_FALLBACK_MODES = new Set(["display-placeholder", "skip", "use-cover"]);
-const PLAYLIST_RESERVED_PATHS = new Set(["settings", "duration-all", "reorder", "governance"]);
-
-type RecordLike = Record<string, unknown>;
 
 type PlaylistEntryRef = {
   asset_id: number | null;
@@ -24,10 +28,6 @@ type PlaylistAssetRef = {
   included_in_slideshow: number;
   original_name: string | null;
 };
-
-function isRecord(value: unknown): value is RecordLike {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function hasOwn(body: RecordLike, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(body, key);
@@ -43,26 +43,6 @@ function isPositiveSafeInteger(value: unknown): value is number {
 
 function isNonNegativeSafeInteger(value: unknown): value is number {
   return isSafeInteger(value) && value >= 0;
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function sendBadRequest(reply: FastifyReply, error: string) {
-  return reply.status(400).send({
-    success: false,
-    error,
-    timestamp: new Date().toISOString()
-  });
-}
-
-function sendNotFound(reply: FastifyReply, error: string) {
-  return reply.status(404).send({
-    success: false,
-    error,
-    timestamp: new Date().toISOString()
-  });
 }
 
 function replaceRequestBody(request: FastifyRequest, body: RecordLike) {
@@ -427,10 +407,10 @@ function validatePlaylistReorderBody(body: unknown): string | null {
 
 export async function runtimeInputValidationPlugin(app: FastifyInstance) {
   app.addHook("preValidation", async (request, reply) => {
-    const pathname = new URL(request.url, "http://localhost").pathname;
     const method = request.method.toUpperCase();
+    const routeUrl = request.routeOptions.url;
 
-    if (method === "PUT" && pathname === "/api/playback/settings") {
+    if (method === "PUT" && routeUrl === "/api/playback/settings") {
       const error = validatePlaybackSettingsBody(request.body);
       if (error) return sendBadRequest(reply, error);
       return;
@@ -438,7 +418,7 @@ export async function runtimeInputValidationPlugin(app: FastifyInstance) {
 
     if (
       method === "PUT"
-      && (pathname === "/api/playback/pages" || pathname === "/api/playback/rotation-plan")
+      && (routeUrl === "/api/playback/pages" || routeUrl === "/api/playback/rotation-plan")
     ) {
       const validation = validateAndHydratePlaybackPages(request.body);
       if (validation.error !== undefined) {
@@ -455,8 +435,8 @@ export async function runtimeInputValidationPlugin(app: FastifyInstance) {
     }
 
     if (
-      (method === "PUT" && pathname === "/api/settings/mqtt")
-      || (method === "POST" && pathname === "/api/settings/mqtt/test")
+      (method === "PUT" && routeUrl === "/api/settings/mqtt")
+      || (method === "POST" && routeUrl === "/api/settings/mqtt/test")
     ) {
       const validation = validateAndHydrateMqttSettings(request.body);
       if (validation.error !== undefined) return sendBadRequest(reply, validation.error);
@@ -464,12 +444,11 @@ export async function runtimeInputValidationPlugin(app: FastifyInstance) {
       return;
     }
 
-    if (method !== "PUT" || !pathname.startsWith("/api/image-playlist/")) {
+    if (method !== "PUT") {
       return;
     }
 
-    const suffix = pathname.slice("/api/image-playlist/".length);
-    if (suffix === "settings") {
+    if (routeUrl === "/api/image-playlist/settings") {
       if (!isRecord(request.body)) return sendBadRequest(reply, "Image playlist settings body must be an object");
       if (hasOwn(request.body, "shuffle") && typeof request.body.shuffle !== "boolean") {
         return sendBadRequest(reply, "shuffle must be a boolean");
@@ -477,24 +456,26 @@ export async function runtimeInputValidationPlugin(app: FastifyInstance) {
       return;
     }
 
-    if (suffix === "duration-all") {
+    if (routeUrl === "/api/image-playlist/duration-all") {
       if (!isRecord(request.body) || !isPositiveSafeInteger(request.body.durationSeconds)) {
         return sendBadRequest(reply, "durationSeconds must be a positive safe integer");
       }
       return;
     }
 
-    if (suffix === "reorder") {
+    if (routeUrl === "/api/image-playlist/reorder") {
       const error = validatePlaylistReorderBody(request.body);
       if (error) return sendBadRequest(reply, error);
       return;
     }
 
-    if (PLAYLIST_RESERVED_PATHS.has(suffix) || suffix.includes("/")) {
+    if (routeUrl !== "/api/image-playlist/:entryId") {
       return;
     }
 
-    if (!readAvailablePlaylistEntryIds().has(suffix)) {
+    const params = isRecord(request.params) ? request.params : {};
+    const entryId = typeof params.entryId === "string" ? params.entryId : "";
+    if (!readAvailablePlaylistEntryIds().has(entryId)) {
       return sendNotFound(reply, "Image playlist entry not found");
     }
     const error = validatePlaylistEntryBody(request.body ?? {});

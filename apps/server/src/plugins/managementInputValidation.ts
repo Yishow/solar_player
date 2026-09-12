@@ -1,18 +1,23 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   displayCircuitSlotKeys,
   managedAssetCategories,
   managedAssetUsageScopes
 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
+import {
+  isFiniteNumber,
+  isRecord,
+  sendBadRequest,
+  sendNotFound,
+  type RecordLike
+} from "./inputValidationSupport.js";
 
 const POSITIVE_INTEGER_PATH_ID = /^[1-9][0-9]*$/;
 const CIRCUIT_SLOT_SET = new Set<string>(displayCircuitSlotKeys);
 const MANAGED_ASSET_CATEGORY_SET = new Set<string>(managedAssetCategories);
 const MANAGED_ASSET_USAGE_SCOPE_SET = new Set<string>(managedAssetUsageScopes);
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
-type RecordLike = Record<string, unknown>;
 
 type CircuitRow = {
   id: number;
@@ -34,30 +39,6 @@ type CircuitRow = {
   enabled: number;
 };
 
-function isRecord(value: unknown): value is RecordLike {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function sendBadRequest(reply: FastifyReply, error: string) {
-  return reply.status(400).send({
-    success: false,
-    error,
-    timestamp: new Date().toISOString()
-  });
-}
-
-function sendNotFound(reply: FastifyReply, error: string) {
-  return reply.status(404).send({
-    success: false,
-    error,
-    timestamp: new Date().toISOString()
-  });
-}
-
 export function parsePositiveIntegerPathId(value: unknown): number | null {
   if (typeof value !== "string" || !POSITIVE_INTEGER_PATH_ID.test(value)) {
     return null;
@@ -67,40 +48,34 @@ export function parsePositiveIntegerPathId(value: unknown): number | null {
 }
 
 function matchPathId(request: FastifyRequest): { idText: string; label: string } | null {
-  const pathname = new URL(request.url, "http://localhost").pathname;
   const method = request.method.toUpperCase();
+  const routeUrl = request.routeOptions.url;
+  const params = isRecord(request.params) ? request.params : {};
 
-  if ((method === "PUT" || method === "DELETE") && pathname.startsWith("/api/circuits/")) {
-    const suffix = pathname.slice("/api/circuits/".length);
-    if (!suffix.includes("/") && suffix !== "reorder") {
-      return { idText: suffix, label: "circuit" };
-    }
+  if (
+    (method === "PUT" || method === "DELETE")
+    && routeUrl === "/api/circuits/:id"
+  ) {
+    return { idText: typeof params.id === "string" ? params.id : "", label: "circuit" };
   }
 
-  if ((method === "PUT" || method === "DELETE") && pathname.startsWith("/api/images/")) {
-    const suffix = pathname.slice("/api/images/".length);
-    if (!suffix.includes("/") && suffix !== "reorder" && suffix !== "storage-usage") {
-      return { idText: suffix, label: "image" };
-    }
+  if (
+    (method === "PUT" || method === "DELETE")
+    && routeUrl === "/api/images/:id"
+  ) {
+    return { idText: typeof params.id === "string" ? params.id : "", label: "image" };
   }
 
-  const brandMatch = pathname.match(/^\/api\/brand\/profiles\/([^/]+)(?:\/(activate|logo))?$/);
-  if (brandMatch) {
-    const action = brandMatch[2];
-    const isMutation =
-      (method === "PUT" && action === undefined)
-      || (method === "DELETE" && (action === undefined || action === "logo"))
-      || (method === "POST" && (action === "activate" || action === "logo"));
-    if (isMutation) {
-      return { idText: brandMatch[1] ?? "", label: "profile" };
-    }
+  const brandMutation =
+    (routeUrl === "/api/brand/profiles/:id" && (method === "PUT" || method === "DELETE"))
+    || (routeUrl === "/api/brand/profiles/:id/activate" && method === "POST")
+    || (routeUrl === "/api/brand/profiles/:id/logo" && (method === "POST" || method === "DELETE"));
+  if (brandMutation) {
+    return { idText: typeof params.id === "string" ? params.id : "", label: "profile" };
   }
 
-  if (method === "GET") {
-    const displayOpsMatch = pathname.match(/^\/api\/display-ops\/assets\/([^/]+)\/references$/);
-    if (displayOpsMatch) {
-      return { idText: displayOpsMatch[1] ?? "", label: "image" };
-    }
+  if (method === "GET" && routeUrl === "/api/display-ops/assets/:id/references") {
+    return { idText: typeof params.id === "string" ? params.id : "", label: "image" };
   }
 
   return null;
@@ -371,8 +346,8 @@ function imageExists(id: number): boolean {
 
 export async function managementInputValidationPlugin(app: FastifyInstance) {
   app.addHook("preValidation", async (request, reply) => {
-    const pathname = new URL(request.url, "http://localhost").pathname;
     const method = request.method.toUpperCase();
+    const routeUrl = request.routeOptions.url;
 
     const pathId = matchPathId(request);
     if (pathId) {
@@ -381,7 +356,7 @@ export async function managementInputValidationPlugin(app: FastifyInstance) {
         return sendBadRequest(reply, `Invalid ${pathId.label} ID`);
       }
 
-      if (method === "PUT" && /^\/api\/circuits\/[^/]+$/.test(pathname)) {
+      if (method === "PUT" && routeUrl === "/api/circuits/:id") {
         const existing = readCircuit(id);
         if (!existing) return sendNotFound(reply, "Circuit not found");
         const rawBody = request.body;
@@ -391,25 +366,25 @@ export async function managementInputValidationPlugin(app: FastifyInstance) {
         if (candidateError) return sendBadRequest(reply, candidateError);
       }
 
-      if (method === "GET" && pathname.startsWith("/api/display-ops/assets/") && !imageExists(id)) {
+      if (method === "GET" && routeUrl === "/api/display-ops/assets/:id/references" && !imageExists(id)) {
         return sendNotFound(reply, "Image not found");
       }
     }
 
-    if (method === "POST" && pathname === "/api/circuits") {
+    if (method === "POST" && routeUrl === "/api/circuits") {
       const rawError = validateCircuitRawBody(request.body, "create");
       if (rawError) return sendBadRequest(reply, rawError);
       const candidateError = validateCircuitCandidate(buildCircuitCandidate(request.body as RecordLike));
       if (candidateError) return sendBadRequest(reply, candidateError);
     }
 
-    if (method === "PUT" && /^\/api\/images\/[^/]+$/.test(pathname) && pathname !== "/api/images/reorder") {
+    if (method === "PUT" && routeUrl === "/api/images/:id") {
       const error = validateImageUpdateBody(request.body ?? {});
       if (error) return sendBadRequest(reply, error);
     }
 
-    if (MUTATION_METHODS.has(method) && (pathname === "/api/circuits/reorder" || pathname === "/api/images/reorder")) {
-      const key = pathname.includes("circuits") ? "circuits" : "images";
+    if (MUTATION_METHODS.has(method) && (routeUrl === "/api/circuits/reorder" || routeUrl === "/api/images/reorder")) {
+      const key = routeUrl === "/api/circuits/reorder" ? "circuits" : "images";
       const validation = validateReorderBody(request.body, key);
       if (validation.error !== undefined) return sendBadRequest(reply, validation.error);
       const table = key === "circuits" ? "circuit_configs" : "image_assets";

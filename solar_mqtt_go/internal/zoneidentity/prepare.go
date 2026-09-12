@@ -1,15 +1,16 @@
-package main
+package zoneidentity
 
 import (
 	"fmt"
 
 	"solar_mqtt_go/internal/config"
 	"solar_mqtt_go/internal/storage"
-	"solar_mqtt_go/internal/zoneidentity"
 )
 
-func prepareCommandZoneIdentityStore(cfg *config.Config, st *storage.Storage) (*zoneidentity.Store, error) {
-	store, err := zoneidentity.Open(zoneidentity.PathForConfig(cfg.ConfigPath()))
+// Prepare opens the collector-owned identity state and bootstraps factories
+// that are not already authoritative in the sidecar from the latest history.
+func Prepare(cfg *config.Config, st *storage.Storage) (*Store, error) {
+	store, err := Open(PathForConfig(cfg.ConfigPath()))
 	if err != nil {
 		return nil, err
 	}

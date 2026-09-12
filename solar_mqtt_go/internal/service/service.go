@@ -25,6 +25,7 @@ import (
 	"solar_mqtt_go/internal/schedule"
 	"solar_mqtt_go/internal/scraper"
 	"solar_mqtt_go/internal/storage"
+	"solar_mqtt_go/internal/zoneidentity"
 )
 
 // JSONPublisher 服務層對 bus 的最小依賴（*mqttbus.Bus 滿足此介面）。
@@ -470,7 +471,7 @@ func (m *FactoryServiceManager) StartAll() error {
 		return err
 	}
 	if m.zoneIDs == nil {
-		resolver, err := prepareZoneIdentityResolver(m.cfg, m.st)
+		resolver, err := zoneidentity.Prepare(m.cfg, m.st)
 		if err != nil {
 			fmt.Printf("警告：zone identity 初始化失敗：%v，停止資料擷取\n", err)
 			m.cancel()

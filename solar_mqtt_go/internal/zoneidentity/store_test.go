@@ -170,6 +170,35 @@ func TestOpenRejectsCorruptUnsupportedAndCollidingState(t *testing.T) {
 	}
 }
 
+func TestOpenRejectsNoncanonicalIdentityKeysWithoutChangingBytes(t *testing.T) {
+	cases := map[string]string{
+		"serial whitespace":           `{"version":1,"factories":{"KN":{"next_zone_id":8,"bindings":[{"identity_key":"serial: A ","zone_id":7}]}}}`,
+		"serial normalized duplicate": `{"version":1,"factories":{"KN":{"next_zone_id":9,"bindings":[{"identity_key":"serial:A","zone_id":7},{"identity_key":"serial: A ","zone_id":8}]}}}`,
+		"position leading zero":       `{"version":1,"factories":{"KN":{"next_zone_id":2,"bindings":[{"identity_key":"position:01","zone_id":1}]}}}`,
+		"position plus":               `{"version":1,"factories":{"KN":{"next_zone_id":2,"bindings":[{"identity_key":"position:+1","zone_id":1}]}}}`,
+		"position whitespace":         `{"version":1,"factories":{"KN":{"next_zone_id":2,"bindings":[{"identity_key":"position:1 ","zone_id":1}]}}}`,
+		"position overflow":           `{"version":1,"factories":{"KN":{"next_zone_id":2,"bindings":[{"identity_key":"position:999999999999999999999999","zone_id":1}]}}}`,
+	}
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), stateFilename)
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Open(path); err == nil {
+				t.Fatal("expected noncanonical identity state to fail")
+			}
+			got, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != content {
+				t.Fatalf("sidecar bytes changed: got %q want %q", got, content)
+			}
+		})
+	}
+}
+
 func TestSeriallessZoneWarnsAndRemainsPositionFallback(t *testing.T) {
 	path := filepath.Join(t.TempDir(), stateFilename)
 	store, err := Open(path)

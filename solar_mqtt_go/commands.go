@@ -23,6 +23,7 @@ import (
 	"solar_mqtt_go/internal/storage"
 	"solar_mqtt_go/internal/tray"
 	"solar_mqtt_go/internal/webui"
+	"solar_mqtt_go/internal/zoneidentity"
 )
 
 // configPathFor 設定檔路徑（測試可替換；預設為 executable 目錄旁）。
@@ -319,7 +320,7 @@ func cmdOnce() int {
 	cfg := newConfig()
 	st := storage.Open(cfg.GetString("sqlite_path", "solar.db"), cfg.GetBool("sqlite_enabled", true))
 	defer st.Close()
-	zoneIDs, err := prepareCommandZoneIdentityStore(cfg, st)
+	zoneIDs, err := zoneidentity.Prepare(cfg, st)
 	if err != nil {
 		fmt.Printf("zone identity 初始化失敗：%v\n", err)
 		return 1

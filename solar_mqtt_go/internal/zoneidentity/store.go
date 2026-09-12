@@ -124,11 +124,12 @@ func validateFactoryState(factoryID string, fac factoryFileState) (*factoryState
 
 func validIdentityKey(key string) bool {
 	if strings.HasPrefix(key, "serial:") {
-		return strings.TrimSpace(strings.TrimPrefix(key, "serial:")) != ""
+		serial := strings.TrimSpace(strings.TrimPrefix(key, "serial:"))
+		return serial != "" && serialKey(serial) == key
 	}
 	if strings.HasPrefix(key, "position:") {
 		n, err := strconv.Atoi(strings.TrimPrefix(key, "position:"))
-		return err == nil && n > 0
+		return err == nil && n > 0 && positionKey(n) == key
 	}
 	return false
 }
