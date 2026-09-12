@@ -101,6 +101,7 @@ export function MqttWeatherPanel(props: MqttWeatherPanelProps) {
             <label className="text-field mqtt-weather-card__field">
               <span className="field-label">定位方式</span>
               <CustomSelect
+                aria-label="定位方式"
                 value={viewModel.weatherCard.locationMode}
                 onChange={(value) => handleWeatherSettingChange("locationMode", value as WeatherSettings["locationMode"])}
                 options={viewModel.weatherCard.locationOptions}
@@ -110,6 +111,7 @@ export function MqttWeatherPanel(props: MqttWeatherPanelProps) {
             <label className="text-field mqtt-weather-card__field">
               <span className="field-label">更新頻率</span>
               <CustomSelect
+                aria-label="更新頻率"
                 value={String(weatherSettings.updateIntervalMinutes ?? 30)}
                 onChange={(value) => handleWeatherSettingChange("updateIntervalMinutes", Number(value))}
                 options={[
@@ -129,6 +131,7 @@ export function MqttWeatherPanel(props: MqttWeatherPanelProps) {
             <label className="text-field mqtt-weather-card__field">
               <span className="field-label">縣市</span>
               <CustomSelect
+                aria-label="縣市"
                 value={weatherSettings.countyName ?? ""}
                 onChange={(value) => handleWeatherSettingChange("countyName", value || null)}
                 options={[
@@ -145,6 +148,7 @@ export function MqttWeatherPanel(props: MqttWeatherPanelProps) {
               <label className="text-field mqtt-weather-card__field">
                 <span className="field-label">測站</span>
                 <CustomSelect
+                  aria-label="測站"
                   value={weatherSettings.stationId ?? ""}
                   onChange={(value) => handleWeatherSettingChange("stationId", value || null)}
                   options={[

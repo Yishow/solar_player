@@ -1,27 +1,33 @@
 export function EditorToolbar({
+  canEdit,
   canRedo,
   canUndo,
   dirty,
   errorMessage,
   isPublishing,
+  isLoading,
   isSaving,
   onPreview,
   onPublishCheck,
   onRedo,
+  onReload,
   onSave,
   onUndo,
   pageLabel,
   publishBlocked
 }: {
+  canEdit: boolean;
   canRedo: boolean;
   canUndo: boolean;
   dirty: boolean;
   errorMessage: string;
   isPublishing: boolean;
+  isLoading: boolean;
   isSaving: boolean;
   onPreview: () => void;
   onPublishCheck: () => void;
   onRedo: () => void;
+  onReload: () => void;
   onSave: () => void;
   onUndo: () => void;
   pageLabel: string;
@@ -42,20 +48,21 @@ export function EditorToolbar({
           data-editor-toolbar-dirty={dirty}
           role="status"
         >
-          {errorMessage || (dirty ? "有未儲存的草稿" : "草稿已同步")}
+          {errorMessage || (isLoading ? "正在載入草稿，暫停編輯。" : !canEdit ? "草稿尚未就緒，請重新同步。" : dirty ? "有未儲存的草稿" : "草稿已同步")}
         </p>
       </div>
       <div className="flex flex-wrap gap-2" data-editor-toolbar-actions>
-        <button className="mgmt-action min-h-[40px]" disabled={!canUndo} onClick={onUndo} type="button">復原</button>
-        <button className="mgmt-action min-h-[40px]" disabled={!canRedo} onClick={onRedo} type="button">重做</button>
-        <button className="mgmt-action min-h-[40px]" disabled={isSaving || !dirty} onClick={onSave} type="button" data-editor-toolbar-save>
+        <button className="mgmt-action min-h-[40px]" disabled={!canEdit || !canUndo} onClick={onUndo} type="button">復原</button>
+        <button className="mgmt-action min-h-[40px]" disabled={!canEdit || !canRedo} onClick={onRedo} type="button">重做</button>
+        <button className="mgmt-action min-h-[40px]" disabled={!canEdit || isSaving || !dirty} onClick={onSave} type="button" data-editor-toolbar-save>
           {isSaving ? "儲存中..." : "儲存草稿"}
         </button>
+        <button className="mgmt-action min-h-[40px]" disabled={isLoading || isSaving} onClick={onReload} type="button">重新同步</button>
         <button className="mgmt-action min-h-[40px]" onClick={onPreview} type="button">預覽</button>
         <button
           className="mgmt-action primary min-h-[40px]"
           data-editor-toolbar-publish
-          disabled={isPublishing || publishBlocked || dirty}
+          disabled={!canEdit || isPublishing || publishBlocked || dirty}
           onClick={onPublishCheck}
           type="button"
         >

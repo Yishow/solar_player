@@ -28,7 +28,7 @@ test("U5 toolbar publish check opens review without publishing", () => {
   assert.match(editorSource, /setRightTab\("publish"\);\s*\n\s*void refresh\(\);/);
   assert.doesNotMatch(editorSource, /onPublishCheck=\{\(\) => \{\s*\n\s*setRightTab\("publish"\);\s*\n\s*void publish\(\);/);
   assert.match(editorSource, /PublishReviewDrawer/);
-  assert.match(editorSource, /onConfirmPublish=\{\(\) => void publish\(\)\}/);
+  assert.match(editorSource, /onConfirmPublish=\{\(\) => \{ if \(canEdit && !dirty\) void publish\(\); \}\}/);
 });
 
 test("display pages editor support panel refresh failures preserve warm state lanes", () => {

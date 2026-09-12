@@ -3,7 +3,7 @@ import type {
   PlaybackPage,
   PlaybackSettings
 } from "@solar-display/shared";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RemoteSyncBanner } from "../../components/management/RemoteSyncBanner";
 import {
   hasDisplaySyncDraftChanges,
@@ -60,6 +60,7 @@ export function PlaybackSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("正在同步播放設定...");
   const [errorMessage, setErrorMessage] = useState("");
+  const isSavingRef = useRef(false);
   const hasEditableModel = Boolean(lastSyncedSettings);
   // Preview rows depend only on the form pages, never on the per-second runtime
   // tick. Memoizing them separately keeps a stable reference so the memoized
@@ -137,6 +138,7 @@ export function PlaybackSettings() {
   }, [initialEditableModel]);
 
   const markDirty = useCallback(() => {
+    if (isSavingRef.current) return;
     setMessage("設定已變更，尚未儲存。");
     setErrorMessage("");
   }, []);
@@ -145,15 +147,22 @@ export function PlaybackSettings() {
     key: Key,
     value: PlaybackSettings[Key]
   ) => {
+    if (isSavingRef.current) return;
     markDirty();
     setSettings((current) => (current ? { ...current, [key]: value } : current));
   }, [markDirty]);
 
+  const setPagesSafely = useCallback((next: React.SetStateAction<PlaybackPage[]>) => {
+    if (isSavingRef.current) return;
+    setPages(next);
+  }, []);
+
   const handleSave = async () => {
-    if (!settings) return;
+    if (!settings || isSavingRef.current) return;
+    isSavingRef.current = true;
     setIsSaving(true);
     try {
-      const [savedSettings, savedPages] = await Promise.all([
+      const results = await Promise.allSettled([
         updatePlaybackSettings(settings),
         updatePlaybackPages(
           pages.map((page) => ({
@@ -164,6 +173,20 @@ export function PlaybackSettings() {
           }))
         )
       ]);
+      const settingsResult = results[0];
+      const pagesResult = results[1];
+      if (settingsResult.status === "rejected") {
+        throw settingsResult.reason instanceof Error
+          ? settingsResult.reason
+          : new Error("儲存播放設定失敗。");
+      }
+      if (pagesResult.status === "rejected") {
+        throw pagesResult.reason instanceof Error
+          ? pagesResult.reason
+          : new Error("儲存播放設定失敗。");
+      }
+      const savedSettings = settingsResult.value;
+      const savedPages = pagesResult.value;
       setSettings(savedSettings);
       setLastSyncedSettings(savedSettings);
       setPages(savedPages);
@@ -175,14 +198,15 @@ export function PlaybackSettings() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存播放設定失敗。");
     } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
   };
 
   const resyncPlaybackConfig = async () => {
+    if (isSavingRef.current) return;
     setMessage("正在重新同步播放設定...");
     setErrorMessage("");
-    setIsSaving(false);
     setIsLoading(true);
     try {
       const model = await loadPlaybackEditableModel({}, { force: true });
@@ -267,7 +291,7 @@ export function PlaybackSettings() {
         : "";
   const showPreviewAlert = Boolean(displayOpsErrorMessage || rotationPreviewErrorMessage) || previewAlertTone !== "";
 
-  const formDisabled = isLoading || !settings;
+  const formDisabled = isLoading || isSaving || !settings;
 
   return (
     <div className="playback-settings-page">
@@ -285,7 +309,7 @@ export function PlaybackSettings() {
         <button
           type="button"
           className="mgmt-action ps-resync"
-          disabled={isLoading}
+          disabled={isLoading || isSaving}
           onClick={() => {
             void resyncPlaybackConfig().catch(() => {});
           }}
@@ -357,7 +381,7 @@ export function PlaybackSettings() {
         markDirty={markDirty}
         pages={pages}
         reorderPlaybackPages={reorderPlaybackPages}
-        setPages={setPages}
+        setPages={setPagesSafely}
         settings={settings}
         updateSettingsField={updateSettingsField}
         viewModel={formViewModel}

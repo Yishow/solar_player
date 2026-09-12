@@ -7,6 +7,9 @@ import { EditorToolbar } from "./EditorToolbar";
 function renderToolbar(overrides: Partial<React.ComponentProps<typeof EditorToolbar>> = {}) {
   return renderToStaticMarkup(
     <EditorToolbar
+      canEdit={true}
+      isLoading={false}
+      onReload={() => undefined}
       canRedo={false}
       canUndo={true}
       dirty={true}

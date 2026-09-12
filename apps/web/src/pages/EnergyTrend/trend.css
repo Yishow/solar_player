@@ -190,15 +190,18 @@
 
 .et-page .et-axis-labels {
   position: absolute;
-  left: 18px;
-  bottom: 84px;
-  width: 36px;
-  height: 176px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  left: 6px;
+  bottom: 72px;
+  width: 52px;
   font: 400 11px/1 var(--font-family-en);
   color: #646963;
+}
+
+.et-page .et-axis-labels span {
+  position: absolute;
+  right: 0;
+  white-space: nowrap;
+  transform: translateY(-50%);
 }
 
 .et-page .et-axis-times {
@@ -217,7 +220,6 @@
   left: 62px;
   bottom: 72px;
   width: 272px;
-  height: 220px;
 }
 
 .et-page .et-chart-svg line {

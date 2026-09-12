@@ -749,7 +749,8 @@
   transition: all 0.15s ease;
 }
 
-.mgmt-select-option:hover:not(.is-disabled) {
+.mgmt-select-option:hover:not(.is-disabled),
+.mgmt-select-option[data-active="true"]:not(.is-disabled) {
   background: rgba(93, 119, 69, 0.08);
   color: #344039;
 }

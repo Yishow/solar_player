@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { JSDOM } from "jsdom";
 import type { WeatherDiagnostic, WeatherHeaderContract, WeatherOptionsResponse, WeatherSettings } from "@solar-display/shared";
 import { DataHubWeatherContent } from "./Weather";
 
@@ -74,6 +75,15 @@ function renderWeather(overrides: Partial<Parameters<typeof DataHubWeatherConten
     />
   );
 }
+
+test("select-labelled-at-use-sites: weather labels belong to its rendered combobox triggers", () => {
+  const dom = new JSDOM(renderWeather());
+  try {
+    assert.deepEqual([...dom.window.document.querySelectorAll("button[role=combobox]")].map((button) => button.getAttribute("aria-label")), ["定位方式", "更新頻率", "縣市", "測站"]);
+  } finally {
+    dom.window.close();
+  }
+});
 
 test("U1-R3-S02 weather with a site filter states shared non-applicability", () => {
   const html = renderWeather({ managementScope: "kn" });

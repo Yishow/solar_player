@@ -947,9 +947,11 @@ async function mountConfigHook(t: TestContext, pageId: DisplayPageId, stage: Con
   const root = createRoot(container);
   const latest: { current: HookResult | null } = { current: null };
   let mounted = true;
+  let activePageId = pageId;
+  let activeStage = stage;
 
-  function Probe({ pageId: probePageId }: { pageId: DisplayPageId }) {
-    latest.current = useDisplayPageConfig(probePageId, hookSeed, { stage });
+  function Probe({ pageId: probePageId, stage: probeStage }: { pageId: DisplayPageId; stage: ConfigStage }) {
+    latest.current = useDisplayPageConfig(probePageId, hookSeed, { stage: probeStage });
     return null;
   }
 
@@ -963,14 +965,21 @@ async function mountConfigHook(t: TestContext, pageId: DisplayPageId, stage: Con
     container.remove();
   };
   t.after(unmount);
-  await settle(() => root.render(React.createElement(Probe, { pageId })));
+  await settle(() => root.render(React.createElement(Probe, { pageId: activePageId, stage: activeStage })));
 
   return {
     get result() {
       assert.ok(latest.current);
       return latest.current;
     },
-    switchPage: (nextPageId: DisplayPageId) => settle(() => root.render(React.createElement(Probe, { pageId: nextPageId }))),
+    switchPage: (nextPageId: DisplayPageId) => settle(() => {
+      activePageId = nextPageId;
+      root.render(React.createElement(Probe, { pageId: activePageId, stage: activeStage }));
+    }),
+    switchStage: (nextStage: ConfigStage) => settle(() => {
+      activeStage = nextStage;
+      root.render(React.createElement(Probe, { pageId: activePageId, stage: activeStage }));
+    }),
     unmount
   };
 }
@@ -1061,10 +1070,13 @@ async function startSave(hook: HookHandle) {
   return operation;
 }
 
-async function startReload(hook: HookHandle) {
+async function startReload(
+  hook: HookHandle,
+  options: { discardLocalChanges?: boolean } = { discardLocalChanges: true }
+) {
   const operation = { finished: Promise.resolve() };
   await settle(() => {
-    operation.finished = hook.result.reload();
+    operation.finished = hook.result.reload(options);
   });
   return operation;
 }
@@ -1096,6 +1108,157 @@ test("a successful draft save publishes its envelope to the stage-page cache and
   assert.equal(api.saves[1]?.body.baseVersion, 5);
   await settle(() => api.saves[1]!.response.resolve(configResponse(hookEnvelope("overview", 6, "再次編輯"))));
   await savingAgain.finished;
+});
+
+test("draft-cold-edit-blocked keeps a pending draft read baseline-free", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  const hook = await mountConfigHook(t, "overview");
+  const initialConfig = hook.result.config;
+
+  assert.equal(api.reads.length, 1);
+  assert.equal(hook.result.isLoading, true);
+  assert.equal(hook.result.lastLoadedEnvelope, null);
+
+  await settle(() => {
+    hook.result.setConfig((current) => ({ ...current, hero: { title: "不應建立基線" } }));
+    hook.result.applyConfigUpdate((current) => ({ ...current, hero: { title: "不應建立歷程" } }));
+    hook.result.resetPaths([["hero", "title"]]);
+    hook.result.undo();
+    hook.result.redo();
+  });
+
+  assert.equal(hook.result.canEdit, false);
+  assert.deepEqual(hook.result.config, initialConfig);
+  assert.equal(hook.result.dirty, false);
+  assert.equal(hook.result.canUndo, false);
+  assert.equal(hook.result.canRedo, false);
+  assert.equal(hook.result.isLoading, true);
+
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 4, "伺服器基線"))));
+  const loadedEnvelope = hook.result.lastLoadedEnvelope as unknown as DisplayPageConfigEnvelope;
+  assert.equal(loadedEnvelope.version, 4);
+  assert.equal(hook.result.config.hero.title, "伺服器基線");
+  assert.equal(hook.result.canEdit, true);
+});
+
+test("draft-load-failure-retry keeps the seed read-only until an envelope arrives", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  const hook = await mountConfigHook(t, "overview");
+
+  await settle(() => api.reads[0]!.reject(new Error("draft read failed")));
+  assert.equal(hook.result.isLoading, false);
+  assert.equal(hook.result.lastLoadedEnvelope, null);
+  assert.equal(hook.result.canEdit, false);
+  assert.equal(hook.result.dirty, false);
+  assert.equal(hook.result.config.hero.title, hookSeed.hero.title);
+  assert.equal(hook.result.errorMessage, "draft read failed");
+
+  await settle(() => {
+    void hook.result.save();
+  });
+  assert.equal(api.saves.length, 0, "a failed initial read cannot save the seed fallback");
+
+  const retrying = await startReload(hook, { discardLocalChanges: false });
+  assert.equal(api.reads.length, 2);
+  assert.equal(hook.result.isLoading, true);
+  assert.equal(hook.result.canEdit, false);
+  await settle(() => api.reads[1]!.resolve(configResponse(hookEnvelope("overview", 7, "重試基線"))));
+  await retrying.finished;
+
+  const retriedEnvelope = hook.result.lastLoadedEnvelope as unknown as DisplayPageConfigEnvelope;
+  assert.equal(retriedEnvelope.version, 7);
+  assert.equal(hook.result.config.hero.title, "重試基線");
+  assert.equal(hook.result.canEdit, true);
+  await editTitle(hook, "重試後編輯");
+  const saving = await startSave(hook);
+  assert.equal(api.saves[0]?.body.baseVersion, 7);
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 8, "重試後編輯"))));
+  await saving.finished;
+});
+
+test("draft-page-stage-isolation prevents old responses from enabling the new owner", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  const hook = await mountConfigHook(t, "overview");
+  assert.equal(api.reads.length, 1);
+
+  await hook.switchPage("solar");
+  assert.equal(api.reads.length, 2);
+  await hook.switchStage("live");
+  assert.equal(api.reads.length, 3);
+
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 4, "舊頁面"))));
+  await settle(() => api.reads[1]!.resolve(configResponse(hookEnvelope("solar", 5, "舊階段"))));
+  assert.equal(hook.result.lastLoadedEnvelope, null);
+  assert.equal(hook.result.config.hero.title, hookSeed.hero.title);
+  assert.equal(hook.result.canEdit, true, "live keeps its existing editable contract");
+
+  await settle(() => api.reads[2]!.resolve(configResponse(hookEnvelope("solar", 6, "新 owner", "live"))));
+  const currentEnvelope = hook.result.lastLoadedEnvelope as unknown as DisplayPageConfigEnvelope;
+  assert.equal(currentEnvelope.pageId, "solar");
+  assert.equal(currentEnvelope.stage, "live");
+  assert.equal(currentEnvelope.version, 6);
+  assert.equal(hook.result.config.hero.title, "新 owner");
+});
+
+test("draft reload requires explicit discard and failed retry preserves local history", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "伺服器基線"));
+  const hook = await mountConfigHook(t, "overview");
+
+  await editTitle(hook, "本地草稿");
+  assert.equal(hook.result.dirty, true);
+  assert.equal(hook.result.canUndo, true);
+  const beforeCancel = {
+    config: hook.result.config,
+    lastLoadedEnvelope: hook.result.lastLoadedEnvelope,
+    dirty: hook.result.dirty,
+    canUndo: hook.result.canUndo
+  };
+
+  const cancelled = await startReload(hook, {});
+  await cancelled.finished;
+  assert.equal(api.reads.length, 0, "a dirty reload without discard permission is a no-op");
+  assert.deepEqual(
+    {
+      config: hook.result.config,
+      lastLoadedEnvelope: hook.result.lastLoadedEnvelope,
+      dirty: hook.result.dirty,
+      canUndo: hook.result.canUndo
+    },
+    beforeCancel
+  );
+
+  const failed = { finished: Promise.resolve() };
+  await settle(() => {
+    failed.finished = hook.result.reload({ discardLocalChanges: true });
+    hook.result.setConfig((current) => ({ ...current, hero: { title: "不可於重載中編輯" } }));
+  });
+  assert.equal(api.reads.length, 1);
+  assert.equal(hook.result.isLoading, true);
+  assert.equal(hook.result.canEdit, false);
+  assert.equal(hook.result.config.hero.title, "本地草稿");
+  assert.equal(hook.result.canUndo, true);
+  await settle(() => api.reads[0]!.reject(new Error("reload failed")));
+  await failed.finished;
+
+  assert.equal(hook.result.config.hero.title, "本地草稿");
+  assert.equal(hook.result.dirty, true);
+  assert.equal(hook.result.canUndo, true);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 4);
+  assert.equal(hook.result.canEdit, true);
+  assert.equal(hook.result.errorMessage, "reload failed");
+
+  const retry = await startReload(hook, { discardLocalChanges: true });
+  await settle(() => api.reads[1]!.resolve(configResponse(hookEnvelope("overview", 5, "伺服器重載"))));
+  await retry.finished;
+  assert.equal(hook.result.config.hero.title, "伺服器重載");
+  assert.equal(hook.result.dirty, false);
+  assert.equal(hook.result.canUndo, false);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 5);
 });
 
 test("a save that settles after unmount still commits its envelope for the next mount", async (t) => {
@@ -1269,11 +1432,10 @@ test("a reload that resolves after a save cannot downgrade the saved envelope or
 
   const hook = await mountConfigHook(t, "overview");
   await editTitle(hook, "本地標題");
+  const saving = await startSave(hook);
   const reloading = await startReload(hook);
   assert.equal(hook.result.isLoading, true);
   assert.equal(api.reads.length, 1);
-
-  const saving = await startSave(hook);
   await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
   await saving.finished;
   assert.equal(hook.result.isLoading, false, "the save commit settles the loading it took over");
@@ -1295,8 +1457,8 @@ test("an obsolete reload rejection cannot change the saved session or a newer re
 
   const hook = await mountConfigHook(t, "overview");
   await editTitle(hook, "本地標題");
-  const obsoleteReload = await startReload(hook);
   const saving = await startSave(hook);
+  const obsoleteReload = await startReload(hook);
   await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 5, "本地標題"))));
   await saving.finished;
   const currentReload = await startReload(hook);
@@ -1324,8 +1486,8 @@ test("a reload that resolves after a save conflict cannot discard the kept local
 
   const hook = await mountConfigHook(t, "overview");
   await editTitle(hook, "本地標題");
-  const reloading = await startReload(hook);
   const saving = await startSave(hook);
+  const reloading = await startReload(hook);
   await settle(() => api.saves[0]!.response.resolve(conflictResponse(hookEnvelope("overview", 6, "伺服器 v6 標題"), 4)));
   await saving.finished;
   assert.equal(hook.result.isLoading, false, "the conflict commit settles the loading it took over");
@@ -1686,4 +1848,47 @@ test("after unmount a newer save still publishes its own key while an older sibl
   assert.equal(api.saves[2]?.body.baseVersion, 6);
   await settle(() => api.saves[2]!.response.resolve(configResponse(hookEnvelope("overview", 7, "next edit"))));
   await next.finished;
+});
+
+
+test("confirmed reload blocks same-tick save until the read settles", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "基線"));
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "本地草稿");
+  let reloading: Promise<void> | undefined;
+  await settle(() => {
+    reloading = hook.result.reload({ discardLocalChanges: true });
+    void hook.result.save();
+  });
+  assert.equal(api.saves.length, 0);
+  await settle(() => api.reads[0]!.resolve(configResponse(hookEnvelope("overview", 5, "遠端草稿"))));
+  await reloading;
+  await editTitle(hook, "重載後編輯");
+  const saving = await startSave(hook);
+  assert.equal(api.saves[0]?.body.baseVersion, 5);
+  await settle(() => api.saves[0]!.response.resolve(configResponse(hookEnvelope("overview", 6, "重載後編輯"))));
+  await saving.finished;
+});
+
+test("failed dirty reload preserves local history despite an external cache commit", async (t) => {
+  clearDisplayPageConfigCache();
+  const api = installDisplayPageApi(t);
+  primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 4, "基線"));
+  const hook = await mountConfigHook(t, "overview");
+  await editTitle(hook, "本地草稿");
+  const reloading = await startReload(hook);
+  await settle(() => primeDisplayPageConfigCache("overview", "draft", hookEnvelope("overview", 5, "其他 owner 儲存")));
+  await settle(() => api.reads[0]!.reject(new Error("confirmed read failed")));
+  await reloading.finished;
+  assert.equal(hook.result.config.hero.title, "本地草稿");
+  assert.equal(hook.result.dirty, true);
+  assert.equal(hook.result.canUndo, true);
+  assert.equal(hook.result.lastLoadedEnvelope?.version, 4);
+  assert.equal(hook.result.errorMessage, "confirmed read failed");
+  assert.equal(hook.result.canEdit, true);
+  await settle(() => hook.result.undo());
+  assert.equal(hook.result.config.hero.title, "基線");
+  assert.equal(cachedVersion("overview", "draft"), 5);
 });

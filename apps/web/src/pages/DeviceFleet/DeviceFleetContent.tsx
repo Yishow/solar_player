@@ -152,7 +152,7 @@ export function DeviceFleetContent({
   const unpairedCount = model.rows.filter((row) => !row.paired && row.enabled).length;
 
   return (
-    <main className="device-fleet-page">
+    <main className="device-fleet-page" data-dialog-focus-fallback tabIndex={-1}>
       <header className="device-fleet-page__header">
         <div>
           <p className="device-fleet-page__kicker">DISPLAY DEVICE HUB</p>

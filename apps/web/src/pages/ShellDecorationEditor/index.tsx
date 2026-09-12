@@ -6,7 +6,7 @@ import type {
   ShellDecorationObject,
   ValidationResult
 } from "@solar-display/shared";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { ApiRequestError, buildApiUrl, getImages } from "../../services/api";
 import {
   getShellDecorationDraft,
@@ -26,13 +26,20 @@ import {
   duplicateShellDecorationObject,
   moveShellDecorationObject,
   moveShellDecorationObjectToBoundary,
-  resolveShellObjectSections,
   ShellDecorationObjectList,
   toggleShellDecorationObjectLocked,
   toggleShellDecorationObjectVisible,
   updateShellDecorationObject
 } from "./objectList";
 import { ShellDecorationPreviewCanvas } from "./previewCanvas";
+import {
+  commitShellWorkspaceDraft,
+  isShellDecorationChannelDirty,
+  isShellWorkspaceDirty,
+  type ShellWorkspaceState,
+  toShellDecorationChannel,
+  updateShellWorkspaceDraft
+} from "../DisplayPagesEditor/shellWorkspaceState";
 
 function createEmptyDraftEnvelope(): ShellDecorationEnvelope {
   return {
@@ -46,12 +53,7 @@ function createEmptyDraftEnvelope(): ShellDecorationEnvelope {
   };
 }
 
-export function toShellDecorationChannel(envelope: ShellDecorationEnvelope): ShellDecorationChannel {
-  return {
-    footerObjects: envelope.footerObjects,
-    headerObjects: envelope.headerObjects
-  };
-}
+export { toShellDecorationChannel } from "../DisplayPagesEditor/shellWorkspaceState";
 
 function findSelectedObject(channel: ShellDecorationChannel, selectedObjectId: string | null) {
   if (!selectedObjectId) {
@@ -69,10 +71,6 @@ function formatShellObjectTypeLabel(type: ShellDecorationObject["type"]) {
   if (type === "asset-image") return "圖片素材";
   if (type === "ornament-image") return "裝飾圖片";
   return "線條";
-}
-
-function isChannelDirty(draft: ShellDecorationChannel, baseline: ShellDecorationChannel) {
-  return JSON.stringify(resolveShellObjectSections(draft)) !== JSON.stringify(resolveShellObjectSections(baseline));
 }
 
 function resolveAssetFallbackSrc(asset: ImageAsset) {
@@ -141,6 +139,8 @@ export function ShellDecorationEditor({
   onImagesChange,
   onOpenAssetWorkspace,
   onSelectedObjectIdChange,
+  onWorkspaceStateChange,
+  workspaceState,
   renderPreview = true
 }: {
   embedded?: boolean;
@@ -151,8 +151,11 @@ export function ShellDecorationEditor({
   onImagesChange?: (images: ImageAsset[]) => void;
   onOpenAssetWorkspace?: (context: string | null) => void;
   onSelectedObjectIdChange?: (selectedObjectId: string | null) => void;
+  onWorkspaceStateChange?: Dispatch<SetStateAction<ShellWorkspaceState>>;
+  workspaceState?: ShellWorkspaceState;
   renderPreview?: boolean;
 }) {
+  const usesSharedWorkspace = workspaceState !== undefined && onWorkspaceStateChange !== undefined;
   const [draft, setDraft] = useState<ShellDecorationEnvelope>(initialDraft ?? createEmptyDraftEnvelope());
   const [lastSavedDraft, setLastSavedDraft] = useState<ShellDecorationEnvelope>(initialDraft ?? createEmptyDraftEnvelope());
   const [images, setImages] = useState<ImageAsset[]>(initialImages ?? []);
@@ -160,7 +163,8 @@ export function ShellDecorationEditor({
     initialSelectedObjectId ?? initialDraft?.headerObjects[0]?.id ?? initialDraft?.footerObjects[0]?.id ?? null
   );
   const [hasHydratedInitialData, setHasHydratedInitialData] = useState(
-    initialDraft !== undefined && initialImages !== undefined
+    initialDraft !== undefined && initialImages !== undefined &&
+      (!usesSharedWorkspace || workspaceState?.savedChannel !== null)
   );
   const [isLoading, setIsLoading] = useState(initialDraft === undefined || initialImages === undefined);
   const [isSaving, setIsSaving] = useState(false);
@@ -176,7 +180,10 @@ export function ShellDecorationEditor({
   const [addType, setAddType] = useState<ShellDecorationObject["type"]>("line");
 
   useEffect(() => {
-    if (initialDraft && initialImages) {
+    const hasInitialData = usesSharedWorkspace
+      ? workspaceState?.draft !== undefined && workspaceState.savedChannel !== null && initialImages !== undefined
+      : initialDraft !== undefined && initialImages !== undefined;
+    if (hasInitialData || hasHydratedInitialData) {
       return;
     }
 
@@ -188,8 +195,12 @@ export function ShellDecorationEditor({
           return;
         }
 
-        setDraft(nextDraft);
-        setLastSavedDraft(nextDraft);
+        if (usesSharedWorkspace) {
+          onWorkspaceStateChange?.((current) => commitShellWorkspaceDraft(current, nextDraft));
+        } else {
+          setDraft(nextDraft);
+          setLastSavedDraft(nextDraft);
+        }
         setImages(nextImages);
         setSelectedObjectId(nextDraft.headerObjects[0]?.id ?? nextDraft.footerObjects[0]?.id ?? null);
         setHasHydratedInitialData(true);
@@ -212,15 +223,15 @@ export function ShellDecorationEditor({
     return () => {
       active = false;
     };
-  }, [initialDraft, initialImages]);
+  }, [hasHydratedInitialData, initialDraft, initialImages, onWorkspaceStateChange, usesSharedWorkspace, workspaceState]);
 
   useEffect(() => {
-    if (!hasHydratedInitialData) {
+    if (!hasHydratedInitialData || usesSharedWorkspace) {
       return;
     }
 
     onDraftChange?.(draft);
-  }, [draft, hasHydratedInitialData, onDraftChange]);
+  }, [draft, hasHydratedInitialData, onDraftChange, usesSharedWorkspace]);
 
   useEffect(() => {
     if (!hasHydratedInitialData) {
@@ -238,24 +249,37 @@ export function ShellDecorationEditor({
     onSelectedObjectIdChange?.(selectedObjectId);
   }, [hasHydratedInitialData, onSelectedObjectIdChange, selectedObjectId]);
 
-  const channel = useMemo(() => toShellDecorationChannel(draft), [draft]);
+  const activeDraft = usesSharedWorkspace ? workspaceState?.draft ?? draft : draft;
+  const channel = useMemo(() => toShellDecorationChannel(activeDraft), [activeDraft]);
   const baselineChannel = useMemo(() => toShellDecorationChannel(lastSavedDraft), [lastSavedDraft]);
-  const dirty = useMemo(() => isChannelDirty(channel, baselineChannel), [baselineChannel, channel]);
+  const dirty = useMemo(() => usesSharedWorkspace
+    ? isShellWorkspaceDirty(workspaceState)
+    : isShellDecorationChannelDirty(channel, baselineChannel),
+  [usesSharedWorkspace, workspaceState, channel, baselineChannel]);
   const selectedObject = useMemo(() => findSelectedObject(channel, selectedObjectId), [channel, selectedObjectId]);
   const assetOptions = useMemo(() => resolveShellDecorationAssetOptions(images), [images]);
 
   const applyChannel = useCallback(
     (nextChannel: ShellDecorationChannel, nextSelectedObjectId = selectedObjectId) => {
-      setDraft((current) => ({
-        ...current,
+      if (!hasHydratedInitialData) {
+        return;
+      }
+
+      const nextDraft: ShellDecorationEnvelope = {
+        ...activeDraft,
         footerObjects: nextChannel.footerObjects,
         headerObjects: nextChannel.headerObjects
-      }));
+      };
+      if (usesSharedWorkspace) {
+        onWorkspaceStateChange?.((current) => updateShellWorkspaceDraft(current, nextDraft));
+      } else {
+        setDraft(nextDraft);
+      }
       setSelectedObjectId(nextSelectedObjectId);
       setMessage("共用殼層草稿尚未儲存。");
       setErrorMessage("");
     },
-    [selectedObjectId]
+    [activeDraft, hasHydratedInitialData, onWorkspaceStateChange, selectedObjectId, usesSharedWorkspace]
   );
 
   const handleAddObject = () => {
@@ -267,10 +291,14 @@ export function ShellDecorationEditor({
     setIsSaving(true);
     setErrorMessage("");
     try {
-      const saved = await saveShellDecorationEditorDraft(draft);
-      setDraft(saved);
-      setLastSavedDraft(saved);
-      setMessage("共用殼層草稿已儲存。");
+      const saved = await saveShellDecorationEditorDraft(activeDraft);
+      if (usesSharedWorkspace) {
+        onWorkspaceStateChange?.((current) => commitShellWorkspaceDraft(current, saved, activeDraft));
+      } else {
+        setDraft(saved);
+        setLastSavedDraft(saved);
+      }
+      setMessage("送出的共用殼層草稿已儲存。");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "儲存共用殼層草稿失敗。");
     } finally {
@@ -284,8 +312,12 @@ export function ShellDecorationEditor({
     try {
       const response = await publishShellDecorationEditorDraft();
       const refreshedDraft = response.draft;
-      setDraft(refreshedDraft);
-      setLastSavedDraft(refreshedDraft);
+      if (usesSharedWorkspace) {
+        onWorkspaceStateChange?.((current) => commitShellWorkspaceDraft(current, refreshedDraft, activeDraft));
+      } else {
+        setDraft(refreshedDraft);
+        setLastSavedDraft(refreshedDraft);
+      }
       setPublishValidation(response.validation);
       setMessage("共用殼層正式版已發布。");
     } catch (error) {
@@ -398,7 +430,7 @@ export function ShellDecorationEditor({
           </div>
           <div className="text-right text-[12px] text-[var(--shell-copy-ink)]">
             <div>{dirty ? "殼層尚未儲存" : "殼層已同步"}</div>
-            <div>version {draft.version}</div>
+            <div>version {activeDraft.version}</div>
           </div>
         </WorkspaceActionBar>
         <div className="flex min-h-0 flex-1 items-center justify-center">

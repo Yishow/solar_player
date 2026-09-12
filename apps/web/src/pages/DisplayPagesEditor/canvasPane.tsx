@@ -143,9 +143,9 @@ export const DisplayEditorCanvasPane = React.memo(function DisplayEditorCanvasPa
   );
   const multiSelectCount = selectedRegions.length;
   const alignDisabled =
-    multiSelectCount < 2 || selectedRegions.some((region) => lockedSelectionIds.includes(region.id));
+    !editMode || multiSelectCount < 2 || selectedRegions.some((region) => lockedSelectionIds.includes(region.id));
   const distributeDisabled =
-    multiSelectCount < 3 || selectedRegions.some((region) => lockedSelectionIds.includes(region.id));
+    !editMode || multiSelectCount < 3 || selectedRegions.some((region) => lockedSelectionIds.includes(region.id));
 
   const previewPlaybackEntries = useMemo(() => buildPlaybackFooterEntries([]), []);
   const previewRouteMeta = useMemo(

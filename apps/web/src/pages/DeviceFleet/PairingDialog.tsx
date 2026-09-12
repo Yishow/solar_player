@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useModalFocus } from "../../components/management/useModalFocus";
 import type { PairingTokenIssue } from "@solar-display/shared";
 import type { DeviceFleetRow } from "./viewModel";
 
@@ -38,6 +39,7 @@ export function PairingDialog({
   onClose,
   onConfirm
 }: PairingDialogProps) {
+  const dialogRef = useModalFocus(onClose, mutationPending);
   const [copied, setCopied] = useState(false);
   const contextMessage = resolveContextMessage(device);
 
@@ -56,6 +58,8 @@ export function PairingDialog({
   return (
     <div className="device-fleet-dialog-backdrop" role="presentation">
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         aria-labelledby="device-fleet-pairing-title"
         aria-modal="true"
         className="device-fleet-dialog"
@@ -116,6 +120,8 @@ export function PairingDialog({
               <button
                 type="button"
                 data-action="close-pairing"
+                data-dialog-initial-focus
+                disabled={mutationPending}
                 onClick={() => {
                   setCopied(false);
                   onClose();
@@ -138,6 +144,7 @@ export function PairingDialog({
             <button
               type="button"
               data-action="cancel-pairing"
+              data-dialog-initial-focus
               disabled={mutationPending}
               onClick={onClose}
             >

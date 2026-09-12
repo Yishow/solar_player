@@ -76,6 +76,12 @@ import {
   toggleCardRailCardVisibility
 } from "./cardRailAuthoring";
 import { CardRailInspectorActions } from "./cardRailInspectorActions";
+import {
+  createShellWorkspaceState,
+  isShellWorkspaceDirty,
+  updateShellWorkspaceDraft,
+  type ShellWorkspaceState
+} from "./shellWorkspaceState";
 import { DataInspectorPanel } from "./dataInspector";
 import {
   applyOverviewGroupStyleFieldUpdate,
@@ -396,14 +402,16 @@ export function DisplayPagesEditor({
   );
   const [images, setImages] = useState<ImageAsset[]>(initialImages ?? []);
   const [imagePickerError, setImagePickerError] = useState("");
-  const [shellDraftState, setShellDraftState] = useState<ShellDecorationEnvelope | undefined>(initialShellDecorationDraft);
+  const [shellWorkspaceState, setShellWorkspaceState] = useState<ShellWorkspaceState>(() =>
+    createShellWorkspaceState(initialShellDecorationDraft)
+  );
+  const shellDraftState = shellWorkspaceState.draft;
   const [shellImagesState, setShellImagesState] = useState<ImageAsset[] | undefined>(
     initialShellDecorationImages ?? initialImages
   );
   const [shellSelectedObjectId, setShellSelectedObjectId] = useState<string | null>(
     initialShellDecorationDraft?.headerObjects[0]?.id ?? initialShellDecorationDraft?.footerObjects[0]?.id ?? null
   );
-  const [shellBaseline] = useState(() => JSON.stringify(initialShellDecorationDraft ?? null));
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
@@ -418,7 +426,7 @@ export function DisplayPagesEditor({
       }),
     [leftCollapsed, rightCollapsed, rightPanelWidth]
   );
-  const shellDirty = JSON.stringify(shellDraftState ?? null) !== shellBaseline;
+  const shellDirty = useMemo(() => isShellWorkspaceDirty(shellWorkspaceState), [shellWorkspaceState]);
   const appliedEditorDeepLinkRef = useRef<string | null>(null);
   const editMode = controlledEditMode ?? internalEditMode;
   const [rightTab, setRightTab] = useState<DisplayEditorRightTab>(initialEditorState?.rightTab ?? "inspector");
@@ -431,6 +439,7 @@ export function DisplayPagesEditor({
   const seedConfig = useMemo(() => selectedPage.createSeedConfig(), [selectedPage]);
   const {
     applyConfigUpdate,
+    canEdit,
     canRedo,
     canUndo,
     config,
@@ -739,7 +748,9 @@ export function DisplayPagesEditor({
   useDisplayEditorKeybinding(toggleEditMode);
 
   const handleReload = async () => {
-    await reload();
+    if (isLoading || isSaving) return;
+    if (dirty && !window.confirm("重新同步將捨棄目前頁面未儲存的草稿與復原歷程。是否繼續？")) return;
+    await reload({ discardLocalChanges: dirty });
     await refresh();
     await reloadAssetHealth();
   };
@@ -756,6 +767,7 @@ export function DisplayPagesEditor({
         objects: DisplayPageFreeformObject[]
       ) => { objects: DisplayPageFreeformObject[]; selectedObjectId?: string | null } | DisplayPageFreeformObject[]
     ) => {
+      if (!canEdit) return;
       const nextValue = updater(freeformObjects);
       const nextObjects = Array.isArray(nextValue) ? nextValue : nextValue.objects;
       const nextSelectedObjectId = Array.isArray(nextValue) ? undefined : nextValue.selectedObjectId;
@@ -770,7 +782,7 @@ export function DisplayPagesEditor({
         setSelectedRegionIds(nextSelectedObjectId ? [nextSelectedObjectId] : []);
       }
     },
-    [applyConfigUpdate, freeformObjects]
+    [applyConfigUpdate, canEdit, freeformObjects]
   );
 
   const updateSelectedFreeformObject = useCallback(
@@ -962,7 +974,12 @@ export function DisplayPagesEditor({
 
   const handleApplyAssetSelectionAndReturn = useCallback((asset: ImageAsset) => {
     if (assetReturnWorkspace === "shell") {
-      setShellDraftState((current) => applyManagedAssetSelectionToShellDraft(current, assetContextId, asset));
+      setShellWorkspaceState((current) =>
+        updateShellWorkspaceDraft(
+          current,
+          applyManagedAssetSelectionToShellDraft(current.draft, assetContextId, asset)
+        )
+      );
       handleSelectWorkspace("shell");
       return;
     }
@@ -1355,10 +1372,11 @@ export function DisplayPagesEditor({
             initialDraft={shellDraftState}
             initialImages={shellImagesState}
             initialSelectedObjectId={shellSelectedObjectId}
-            onDraftChange={setShellDraftState}
             onImagesChange={setShellImagesState}
             onOpenAssetWorkspace={(context) => handleSelectWorkspace("assets", context ?? shellSelectedObjectId ?? "shell", "shell")}
             onSelectedObjectIdChange={setShellSelectedObjectId}
+            onWorkspaceStateChange={setShellWorkspaceState}
+            workspaceState={shellWorkspaceState}
             renderPreview={renderPreview}
           />
         </div>
@@ -1379,11 +1397,13 @@ export function DisplayPagesEditor({
     >
       <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[var(--shell-divider)] bg-white/50 shadow-[0_20px_45px_rgba(80,94,54,0.08)]">
       <EditorToolbar
+        canEdit={canEdit}
         canRedo={canRedo}
         canUndo={canUndo}
         dirty={dirty}
         errorMessage={errorMessage}
         isPublishing={isPublishing}
+        isLoading={isLoading}
         isSaving={isSaving}
         onPreview={() => setEditMode(false)}
         onPublishCheck={() => {
@@ -1391,6 +1411,7 @@ export function DisplayPagesEditor({
           void refresh();
         }}
         onRedo={redo}
+        onReload={() => void handleReload()}
         onSave={() => void handleSave()}
         onUndo={undo}
         pageLabel={localizeDisplayPageLabel(selectedPage.label)}
@@ -1398,8 +1419,8 @@ export function DisplayPagesEditor({
       />
       {errorMessage.includes("儲存衝突") ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-[#ead7aa] bg-[#fff8e8] px-4 py-2 text-[13px]" data-editor-remote-revision role="status">
-          <span>遠端已有較新版本。比較或重載都不會自動覆蓋目前草稿。</span>
-          <button className="mgmt-action min-h-[40px]" onClick={() => void handleReload()} type="button">重載遠端</button>
+          <span>遠端已有較新版本。重載前會確認是否捨棄目前未儲存的草稿與復原歷程。</span>
+          <button className="mgmt-action min-h-[40px]" disabled={isLoading || isSaving} onClick={() => void handleReload()} type="button">重載遠端</button>
         </div>
       ) : null}
       <div
@@ -1407,6 +1428,7 @@ export function DisplayPagesEditor({
         data-editor-workspace-layout
         style={{ gridTemplateColumns: workspaceLayout.canvasGridTemplate }}
       >
+        <fieldset className="contents" data-editor-draft-controls disabled={!canEdit}>
         <DisplayEditorLeftPanel
           freeformObjects={freeformObjects}
           dirty={dirty}
@@ -1451,15 +1473,16 @@ export function DisplayPagesEditor({
           lockedRegionIds={lockedRegionIds}
           selectedRegionId={selectedRegion?.id ?? null}
         />
+        </fieldset>
 
         <DisplayEditorCanvasPane
           applyConfigUpdate={applyConfigUpdate}
-          canRedo={canRedo}
-          canUndo={canUndo}
+          canRedo={canEdit && canRedo}
+          canUndo={canEdit && canUndo}
           config={config}
           displayEditorProfilingEnabled={displayEditorProfilingEnabled}
           distanceLockTargetRegion={distanceLockTargetRegion}
-          editMode={editMode}
+          editMode={editMode && canEdit}
           lockedSelectionIds={lockedSelectionIds}
           onApplySelectionRects={applySelectionRects}
           onSelectRegion={handleSelectRegion}
@@ -1510,7 +1533,7 @@ export function DisplayPagesEditor({
               );
             })}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <fieldset className="m-0 min-h-0 min-w-0 flex-1 overflow-y-auto border-0 p-4" data-editor-draft-controls disabled={!canEdit}>
             {rightTab === "inspector" && (
               <DisplayEditorInspectorCard
                 flat
@@ -1593,12 +1616,12 @@ export function DisplayPagesEditor({
                 isPublishBlocked={isPublishBlocked}
                 isPublishing={isPublishing}
                 onClose={() => setRightTab("inspector")}
-                onConfirmPublish={() => void publish()}
+                onConfirmPublish={() => { if (canEdit && !dirty) void publish(); }}
                 publishingError={publishingError}
                 publishingState={publishingState}
               />
             )}
-          </div>
+          </fieldset>
           </div>
         {workspaceLayout.useDrawer ? (
           <button

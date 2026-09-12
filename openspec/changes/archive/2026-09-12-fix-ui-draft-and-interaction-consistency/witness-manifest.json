@@ -1,0 +1,132 @@
+{
+  "run_id": "ui-consistency-2026-09-12T07-30-08-343Z-7yi84h",
+  "source_identity": "e13f918d28b5f5eac21d10232fe6084700873aad704053c4ceea4277cb398f15",
+  "screenshots": [
+    {
+      "path": "artifacts/browser-smoke/2026-09-12T07-30-08-343Z-7yi84h/ui-interactions-Fleet-dialog-traps-Tab-and-pending-Escape-then-restores-the-trigger.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "3c807606a4f4b44025917164e727567c7e6d4a02e0a140b5477f1eaf22128d61"
+    },
+    {
+      "path": "artifacts/browser-smoke/2026-09-12T07-30-08-343Z-7yi84h/ui-interactions-conflict-discard-cancel-failure-and-success-preserve-the-expected-history.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "23133b57d7e3d731c64eff6392b9173713518ce2da7ccec461624881e2279910"
+    },
+    {
+      "path": "artifacts/browser-smoke/2026-09-12T07-30-08-343Z-7yi84h/ui-interactions-pending-playback-save-stops-held-input-and-stays-locked-until-both-writes-settle.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "0c53e9cd89de06c74fbb3e06fdbce3dd75a37f870b8bb2c075af6b2fa4f4b8f0"
+    },
+    {
+      "path": "artifacts/browser-smoke/2026-09-12T07-30-08-343Z-7yi84h/ui-interactions-select-keyboard-commits-once-and-dismisses-without-changing-value.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "b9d9fc9f3fd30d9e7df734c4311e8fb99d7f508678562826f1e0da4f2b2b5a95"
+    },
+    {
+      "path": "artifacts/browser-smoke/2026-09-12T07-30-08-343Z-7yi84h/ui-interactions-shell-save-and-asset-return-keep-parent-and-child-dirty-indicators-aligned.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "f2096baff78424efb351d9ff4e9cc45068075c1823912327f1e9ebfc55adcc7d"
+    },
+    {
+      "path": "artifacts/browser-smoke/2026-09-12T07-30-08-343Z-7yi84h/ui-interactions-trend-axes-use-metric-units-and-forty-percent-remains-below-the-top.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "d66e1f109fdac828a6f8cb8f49e348f2f186a2af932def33793591a88c474227"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/editor/factory-circuit-editor.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "e612f6c8ecd66dc4d2a5d7c26676ab9ac8c58eb5d7ee61e52e56d612d1833422"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/editor/factory-circuit-guanyin-editor.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "9eaaa31888072de5d925fb1e74c68150cc4c21a17b9564953ce680de419ba552"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/editor/images-editor.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "3a284af99801134818318119c8a13f3f6276ac0ef298ff7d1d74cd208a30ae02"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/editor/overview-editor.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "d1ecb7078231f22c45fa6e81b0695f0eee6f2c96e4c50b767554b87590a60af5"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/editor/solar-editor.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "0bcd45df14628b909374886a81b1154191a8582e8a9dbbc41c0080a7a076540e"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/editor/sustainability-editor.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "de2fcf0421f70ad6be624290f03c8d76768589637715263d9739097ea00f72cf"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/factory-circuit-guanyin.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "3682a2866272fcde2abe53e5d3a201744b1561d1da7787f38873acbf02d0be44"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/factory-circuit.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "8d39e08f2667facc54b6de38d46ae7557d2104f0fbe58e4c57ed32b15eb2687d"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/images.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "fafb6ea35d40da3a506dd347ce93492a36285594a806423e1917136d569987f3"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/overview.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "a659df037214eb016b1e46f1319f8dab9ef762bd955feec2215d560a8e204d8b"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/site-context/kn-overview.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "d8e2a03dfd4f95ee99f287c8520d8b7c48de8efd2f9cbeec9c93d715df3ebb5d"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/site-context/kn-solar.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "fe276f37c85cf1bc7f392c964bee04b2a522ad2aa14c5c6ad293907e8bdb9713"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/site-context/kn-sustainability.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "bec46da627bf2dc757ebfee5b8bf2fd1812fcb675d82dd3315bfad62b75a2abb"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/solar.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "dc512328be070d2d8a3fca0455041481367301393c9fce6b7746158f5558514e"
+    },
+    {
+      "path": "docs/fhd-witness/runs/ui-consistency-2026-09-12T07-30-08-343Z-7yi84h/playback/sustainability.png",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "e62e69c81ce5955f518602288654ea2f5af4e53a1cd497ed73c65a116609ee6c"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useModalFocus } from "../../components/management/useModalFocus";
 import type {
   DeviceGroup,
   PlaybackProfileSummary
@@ -26,6 +27,7 @@ export function GroupEditDialog({
   onSubmit,
   profiles
 }: GroupEditDialogProps) {
+  const dialogRef = useModalFocus(onClose, mutationPending);
   const activeProfiles = profiles.filter((profile) => profile.archivedAt === null);
   const currentProfileIsActive = activeProfiles.some(
     (profile) => profile.id === group.playbackProfileId
@@ -63,6 +65,8 @@ export function GroupEditDialog({
   return (
     <div className="device-fleet-dialog-backdrop" role="presentation">
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         aria-labelledby="device-fleet-group-edit-title"
         aria-modal="true"
         className="device-fleet-dialog"

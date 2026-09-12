@@ -15,10 +15,12 @@ function useLongPressStepper(
   value: number,
   onChange: (next: number) => void,
   onDirty: () => void,
-  options: { min?: number; max?: number; step?: number } = {}
+  options: { min?: number; max?: number; step?: number } = {},
+  disabled = false
 ) {
   const { min = 1, max = Infinity, step = 1 } = options;
   const valueRef = useRef(value);
+  const disabledRef = useRef(disabled);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const delayRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -26,31 +28,39 @@ function useLongPressStepper(
     valueRef.current = value;
   }, [value]);
 
-  useEffect(() => {
-    return () => {
-      if (delayRef.current) clearTimeout(delayRef.current);
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
+  const stopChanging = () => {
+    if (delayRef.current) clearTimeout(delayRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
+    delayRef.current = null;
+    timerRef.current = null;
+  };
 
   const startChanging = (direction: -1 | 1) => {
+    if (disabledRef.current) return;
     onDirty();
     const nextVal = valueRef.current + direction * step;
     onChange(Math.min(max, Math.max(min, nextVal)));
 
     // 350ms 後判定為長按，開始以 80ms 的間隔連續變更
     delayRef.current = setTimeout(() => {
+      if (disabledRef.current) return;
       timerRef.current = setInterval(() => {
+        if (disabledRef.current) {
+          stopChanging();
+          return;
+        }
         const next = valueRef.current + direction * step;
         onChange(Math.min(max, Math.max(min, next)));
       }, 80);
     }, 350);
   };
 
-  const stopChanging = () => {
-    if (delayRef.current) clearTimeout(delayRef.current);
-    if (timerRef.current) clearInterval(timerRef.current);
-  };
+  useEffect(() => {
+    disabledRef.current = disabled;
+    if (disabled) stopChanging();
+  }, [disabled]);
+
+  useEffect(() => stopChanging, []);
 
   return {
     startChanging,
@@ -68,7 +78,7 @@ type DurationStepperProps = {
 };
 
 function DurationStepper({ value, min = 1, disabled, onDirty, onChange }: DurationStepperProps) {
-  const { startChanging, stopChanging } = useLongPressStepper(value, onChange, onDirty, { min });
+  const { startChanging, stopChanging } = useLongPressStepper(value, onChange, onDirty, { min }, disabled);
 
   // 鍵盤無障礙支援：ArrowUp / ArrowDown 微調
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -107,6 +117,7 @@ function DurationStepper({ value, min = 1, disabled, onDirty, onChange }: Durati
         value={String(value)}
         onKeyDown={handleKeyDown}
         onChange={(event) => {
+          if (disabled) return;
           const next = Number.parseInt(event.target.value, 10) || min;
           onDirty();
           onChange(next);
@@ -166,16 +177,19 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
     brightness,
     (next) => updateSettingsField("brightness", next),
     markDirty,
-    { min: 0, max: 100, step: 10 }
+    { min: 0, max: 100, step: 10 },
+    formDisabled
   );
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (formDisabled) return;
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = "move";
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
+    if (formDisabled) return;
     if (draggedIndex === null || draggedIndex === index) return;
 
     markDirty();
@@ -199,6 +213,7 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
   };
 
   const setFactorySiteEnabled = (pageKey: string, enabled: boolean) => {
+    if (formDisabled) return;
     markDirty();
     setPages((current) =>
       current.map((page) => (page.pageKey === pageKey ? { ...page, enabled } : page))
@@ -228,7 +243,7 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
               <div
                 key={page.id}
                 className={`ps-list-item${draggedIndex === index ? " ps-dragging" : ""}${!page.enabled ? " is-disabled" : ""}`}
-                draggable={isDraggable}
+                draggable={isDraggable && !formDisabled}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
@@ -236,7 +251,9 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
                 <span
                   className="ps-drag-handle"
                   title="拖曳以排序"
-                  onMouseEnter={() => setIsDraggable(true)}
+                  onMouseEnter={() => {
+                    if (!formDisabled) setIsDraggable(true);
+                  }}
                   onMouseLeave={() => {
                     if (draggedIndex === null) {
                       setIsDraggable(false);
@@ -261,9 +278,11 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
                 </span>
                 <span className="ps-badge-number">{(index + 1).toString().padStart(2, "0")}</span>
                 <CustomSelect
+                  aria-label={`${page.labelEn} 啟用狀態`}
                   className="ps-dropdown-container"
                   disabled={formDisabled}
                   onChange={(nextValue) => {
+                    if (formDisabled) return;
                     const nextEnabled = nextValue === "enabled";
                     if (page.enabled !== nextEnabled) {
                       markDirty();
@@ -311,6 +330,7 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
                   disabled={formDisabled || !page.enabled}
                   onDirty={markDirty}
                   onChange={(next) => {
+                    if (formDisabled) return;
                     setPages((current) =>
                       current.map((c) => (c.id === page.id ? { ...c, durationSeconds: next } : c))
                     );
@@ -384,6 +404,7 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
             <div className="ps-row-flex">
               <div className="ps-row-label">轉場效果 <small>Transition Effect</small></div>
               <CustomSelect
+                aria-label="轉場效果"
                 className="ps-row-select"
                 disabled={formDisabled}
                 onChange={(nextValue) => updateSettingsField("transitionType", nextValue as PlaybackSettings["transitionType"])}
@@ -472,7 +493,10 @@ export const PlaybackSettingsFormSections = memo(function PlaybackSettingsFormSe
                   max="100"
                   disabled={formDisabled}
                   value={String(brightness)}
-                  onChange={(event) => updateSettingsField("brightness", Number.parseInt(event.target.value, 10) || 0)}
+                  onChange={(event) => {
+                    if (formDisabled) return;
+                    updateSettingsField("brightness", Number.parseInt(event.target.value, 10) || 0);
+                  }}
                 />
                 <span className="ps-brightness__value">{brightness}%</span>
                 <button

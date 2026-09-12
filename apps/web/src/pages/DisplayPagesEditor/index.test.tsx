@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ImageAsset, ShellDecorationEnvelope } from "@solar-display/shared";
+import { defaultFallbackPolicy, type ImageAsset, type ShellDecorationEnvelope } from "@solar-display/shared";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
@@ -12,6 +12,7 @@ import {
   createSustainabilityDisplayPageSeedConfig,
   sustainabilityDisplayPageEditorRegions
 } from "../Sustainability/displayPageConfig";
+import { clearDisplayPageConfigCache, primeDisplayPageConfigCache } from "../../hooks/useDisplayPageConfig";
 import { CardRailInspectorActions } from "./cardRailInspectorActions";
 import {
   applyManagedAssetSelectionToRegionConfig,
@@ -24,6 +25,11 @@ import {
 } from "./index";
 import { DisplayEditorInspectorFields, resolveDisplayEditorRegions } from "./inspectorFields";
 import { DisplayEditorLeftPanel } from "./regionTree";
+
+function primeOverviewDraft(t: test.TestContext) {
+  primeDisplayPageConfigCache("overview", "draft", { pageId: "overview", stage: "draft", regions: {}, version: 4, updatedAt: null, publishedAt: null, publishedBy: null, fallbackPolicy: defaultFallbackPolicy });
+  t.after(clearDisplayPageConfigCache);
+}
 
 const initialImages: ImageAsset[] = [
   {
@@ -726,7 +732,8 @@ test("display page editor renders rail card hierarchy and template-aware control
   assert.match(html, /免責說明/);
 });
 
-test("locked regions remain selectable but do not expose resize interaction handles", () => {
+test("locked regions remain selectable but do not expose resize interaction handles", (t) => {
+  primeOverviewDraft(t);
   const html = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -818,7 +825,8 @@ test("display page editor preview keeps shell dividers visible at scaled preview
   assert.match(html, /top:110px/);
 });
 
-test("display page editor renders guide overlay across the full shell preview", () => {
+test("display page editor renders guide overlay across the full shell preview after draft hydration", (t) => {
+  primeOverviewDraft(t);
   const html = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
@@ -915,7 +923,8 @@ test("display page editor falls back to the default overlay preset when stored s
   assert.match(html, /點中區域/);
 });
 
-test("display page editor enables multi-select tools only when the initial selection contains enough regions", () => {
+test("display page editor enables multi-select tools only when the loaded draft selection contains enough regions", (t) => {
+  primeOverviewDraft(t);
   const html = renderToStaticMarkup(
     React.createElement(
       MemoryRouter,

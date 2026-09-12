@@ -946,6 +946,7 @@ export function AssetLibrary({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
               <CustomSelect
+                aria-label="上傳預設分類"
                 className="w-[95px] text-[11px]"
                 value={uploadCategory}
                 onChange={(value) => setUploadCategory(value as ManagedAssetCategory)}
@@ -964,6 +965,7 @@ export function AssetLibrary({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.657-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.657-9 3-9m-9 9a9 9 0 019-9" />
               </svg>
               <CustomSelect
+                aria-label="上傳預設範圍"
                 className="w-[115px] text-[11px]"
                 value={uploadUsageScope}
                 onChange={(value) => setUploadUsageScope(value as ManagedAssetUsageScope)}

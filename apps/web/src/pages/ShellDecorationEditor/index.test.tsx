@@ -259,7 +259,9 @@ test("shell decoration preview drag syncs frame updates during pointermove inste
 
 test("shell decoration editor only syncs parent workspace state after initial data hydration", () => {
   assert.match(editorSource, /const \[hasHydratedInitialData, setHasHydratedInitialData\] = useState/);
-  assert.match(editorSource, /if \(!hasHydratedInitialData\) \{\s+return;\s+\}\s+\n\s+onDraftChange\?\.\(draft\);/);
+  assert.match(editorSource, /if \(!hasHydratedInitialData \|\| usesSharedWorkspace\) \{\s+return;\s+\}\s+\n\s+onDraftChange\?\.\(draft\);/);
+  assert.match(editorSource, /onWorkspaceStateChange\?: Dispatch<SetStateAction<ShellWorkspaceState>>/);
+  assert.match(editorSource, /const activeDraft = usesSharedWorkspace \? workspaceState\?\.draft \?\? draft : draft/);
   assert.match(editorSource, /if \(!hasHydratedInitialData\) \{\s+return;\s+\}\s+\n\s+onImagesChange\?\.\(images\);/);
   assert.match(editorSource, /if \(!hasHydratedInitialData\) \{\s+return;\s+\}\s+\n\s+onSelectedObjectIdChange\?\.\(selectedObjectId\);/);
 });

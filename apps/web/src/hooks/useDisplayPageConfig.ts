@@ -23,6 +23,7 @@ import {
   isManagementDraftConflictError,
   updateDisplayPageConfig
 } from "../services/api";
+import { resolveDraftInteractionState } from "../pages/DisplayPagesEditor/draftInteractionState";
 import { createDraftSession, type DisplayPageDraftSession, applyDraftConfigUpdate, rebaseDraftSessionBaseline, resetDraftPaths as resetDraftSessionPaths, redoDraftSession, undoDraftSession } from "./displayPageDraftSession";
 import { deepClone, getValueAtPath, setValueAtPath } from "./displayPageConfigPaths";
 import { useDisplaySyncRefresh } from "./useDisplaySyncRefresh";
@@ -171,6 +172,7 @@ function advanceDisplayPageConfigGeneration(cacheKey: string) {
 
 type DisplayPageConfigEnvelopeLoaderOptions = {
   force?: boolean;
+  requireSuccessfulRead?: boolean;
   readConfig?: (pageId: DisplayPageId, stage: ConfigStage) => Promise<DisplayPageConfigEnvelope>;
 };
 
@@ -274,7 +276,7 @@ export async function loadDisplayPageConfigEnvelope(
         return envelope;
       },
       (error: unknown) => {
-        if (!isCurrentRead()) {
+        if (!isCurrentRead() && !options.requireSuccessfulRead) {
           return resolveSupersededRead();
         }
 
@@ -414,6 +416,7 @@ type UseDisplayPageConfigResult<T> = {
   ) => void;
   canRedo: boolean;
   canUndo: boolean;
+  canEdit: boolean;
   config: T;
   dirty: boolean;
   errorMessage: string;
@@ -423,7 +426,7 @@ type UseDisplayPageConfigResult<T> = {
   lastLoadedEnvelope: DisplayPageConfigEnvelope | null;
   message: string;
   resetPaths: (paths: Array<Array<number | string>>) => void;
-  reload: () => Promise<void>;
+  reload: (options?: { discardLocalChanges?: boolean }) => Promise<void>;
   redo: () => void;
   save: () => Promise<void>;
   setConfig: Dispatch<SetStateAction<T>>;
@@ -438,6 +441,7 @@ export function useDisplayPageConfig<T>(
 ): UseDisplayPageConfigResult<T> {
   const enabled = options.enabled ?? true;
   const stage = options.stage ?? "live";
+  const sessionKey = resolveDisplayPageConfigCacheKey(pageId, stage);
   const initialCachedSession = resolveInitialDisplayPageConfigSession({
     enabled,
     initialEnvelope: options.initialEnvelope,
@@ -447,7 +451,7 @@ export function useDisplayPageConfig<T>(
     stage
   });
   const [sessions, setSessions] = useState<Record<string, DisplayPageDraftSession<T>>>(() =>
-    initialCachedSession ? { [pageId]: initialCachedSession } : {}
+    initialCachedSession ? { [sessionKey]: initialCachedSession } : {}
   );
   const [isLoading, setIsLoading] = useState(enabled && initialCachedSession === null);
   const [isSaving, setIsSaving] = useState(false);
@@ -460,12 +464,24 @@ export function useDisplayPageConfig<T>(
   const ownerRef = useRef<{ lifecycle: number; pageId: DisplayPageId; stage: ConfigStage } | null>(null);
   const ownerLifecycleRef = useRef(0);
   const saveRequestIdRef = useRef(0);
-  const currentSession = sessions[pageId];
+  const currentSession = sessions[sessionKey];
   const hasSession = Boolean(currentSession);
   const config = currentSession?.config ?? deepClone(seedConfig);
   const lastLoadedEnvelope = currentSession?.lastLoadedEnvelope ?? null;
   const fallbackPolicy = currentSession?.fallbackPolicy ?? defaultFallbackPolicy;
   const dirty = currentSession?.dirty ?? false;
+  const interactionState = resolveDraftInteractionState({
+    enabled,
+    isLoading,
+    lastLoadedEnvelope,
+    pageId,
+    stage
+  });
+  const interactionStateRef = useRef(interactionState);
+  interactionStateRef.current = interactionState;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const { canEdit } = interactionState;
 
   useEffect(() => {
     ownerLifecycleRef.current += 1;
@@ -507,7 +523,7 @@ export function useDisplayPageConfig<T>(
 
     const cachedSession = resolveCachedDisplayPageConfigSession(pageId, stage, seedConfig);
     if (cachedSession) {
-      setSessions((current) => ({ ...current, [pageId]: cachedSession }));
+      setSessions((current) => ({ ...current, [sessionKey]: cachedSession }));
       setIsLoading(false);
       setMessage(resolveLoadMessage(stage, cachedSession.lastLoadedEnvelope));
       setErrorMessage("");
@@ -526,7 +542,7 @@ export function useDisplayPageConfig<T>(
         }
 
         const envelope = resolveNewerDisplayPageConfigEnvelope(pageId, stage, loadedEnvelope) ?? loadedEnvelope;
-        setSessions((current) => ({ ...current, [pageId]: createDisplayPageConfigSessionFromEnvelope(seedConfig, envelope) }));
+        setSessions((current) => ({ ...current, [sessionKey]: createDisplayPageConfigSessionFromEnvelope(seedConfig, envelope) }));
         setMessage(resolveLoadMessage(stage, envelope));
       } catch (error) {
         if (!isCurrentRequest()) {
@@ -537,13 +553,11 @@ export function useDisplayPageConfig<T>(
         // committed after this read began and outranks its failure.
         const committedEnvelope = resolveNewerDisplayPageConfigEnvelope(pageId, stage, undefined);
         if (committedEnvelope) {
-          setSessions((current) => ({ ...current, [pageId]: createDisplayPageConfigSessionFromEnvelope(seedConfig, committedEnvelope) }));
+          setSessions((current) => ({ ...current, [sessionKey]: createDisplayPageConfigSessionFromEnvelope(seedConfig, committedEnvelope) }));
           setMessage(resolveLoadMessage(stage, committedEnvelope));
           return;
         }
 
-        const clonedSeed = deepClone(seedConfig);
-        setSessions((current) => ({ ...current, [pageId]: createDraftSession(clonedSeed, null, defaultFallbackPolicy) }));
         setErrorMessage(error instanceof Error ? error.message : "載入展示頁設定失敗。");
         setMessage("使用 seed fallback。");
       } finally {
@@ -560,9 +574,24 @@ export function useDisplayPageConfig<T>(
     };
   }, [dirty, enabled, hasSession, pageId, seedConfig, stage]);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (options: { discardLocalChanges?: boolean } = {}) => {
     if (!enabled) {
       return;
+    }
+
+    const discardingDirtyDraft = stage === "draft" && dirtyRef.current;
+    if (discardingDirtyDraft && options.discardLocalChanges !== true) {
+      return;
+    }
+
+    if (stage === "draft") {
+      interactionStateRef.current = resolveDraftInteractionState({
+        enabled,
+        isLoading: true,
+        lastLoadedEnvelope,
+        pageId,
+        stage
+      });
     }
 
     const requestId = loadRequestIdRef.current + 1;
@@ -574,24 +603,27 @@ export function useDisplayPageConfig<T>(
     const envelopeAtStart = displayPageConfigCache.get(resolveDisplayPageConfigCacheKey(pageId, stage));
 
     try {
-      const loadedEnvelope = await loadDisplayPageConfigEnvelope(pageId, stage, { force: true });
+      const loadedEnvelope = await loadDisplayPageConfigEnvelope(pageId, stage, {
+        force: true,
+        requireSuccessfulRead: discardingDirtyDraft
+      });
       if (requestId !== loadRequestIdRef.current) {
         return;
       }
 
       const envelope = resolveNewerDisplayPageConfigEnvelope(pageId, stage, loadedEnvelope) ?? loadedEnvelope;
-      setSessions((current) => ({ ...current, [pageId]: createDisplayPageConfigSessionFromEnvelope(seedConfig, envelope) }));
+      setSessions((current) => ({ ...current, [sessionKey]: createDisplayPageConfigSessionFromEnvelope(seedConfig, envelope) }));
       setMessage(resolveLoadMessage(stage, envelope));
     } catch (error) {
       if (requestId !== loadRequestIdRef.current) {
         return;
       }
 
-      // A failed force read keeps the warm envelope; only an envelope committed
-      // after this reload began outranks the failure.
+      // A failed discard must preserve local content/history even if another
+      // owner committed a newer cache entry while this read was pending.
       const committedEnvelope = resolveNewerDisplayPageConfigEnvelope(pageId, stage, envelopeAtStart);
-      if (committedEnvelope) {
-        setSessions((current) => ({ ...current, [pageId]: createDisplayPageConfigSessionFromEnvelope(seedConfig, committedEnvelope) }));
+      if (committedEnvelope && !discardingDirtyDraft) {
+        setSessions((current) => ({ ...current, [sessionKey]: createDisplayPageConfigSessionFromEnvelope(seedConfig, committedEnvelope) }));
         setMessage(resolveLoadMessage(stage, committedEnvelope));
         return;
       }
@@ -603,7 +635,7 @@ export function useDisplayPageConfig<T>(
         setIsLoading(false);
       }
     }
-  }, [enabled, pageId, seedConfig, stage]);
+  }, [dirty, enabled, lastLoadedEnvelope, pageId, seedConfig, sessionKey, stage]);
 
   const displaySyncScopes = useMemo(
     () => resolveDisplayPageConfigSyncScopes(enabled, stage),
@@ -634,6 +666,10 @@ export function useDisplayPageConfig<T>(
       return;
     }
 
+    if (!interactionStateRef.current.canEdit) {
+      return;
+    }
+
     setIsSaving(true);
     setMessage("正在儲存展示頁設定...");
     setErrorMessage("");
@@ -648,9 +684,9 @@ export function useDisplayPageConfig<T>(
     // envelope supersedes every earlier read of the key. While the owner still
     // serves this page, its earlier load is invalidated with the publish and the
     // loading that load held is settled here, since that load's own finally no
-    // longer counts. Sessions are keyed by page, so a published envelope still
-    // reaches this page's session after the owner switched pages, but never after
-    // it switched stage, was disabled, or unmounted. An equal or older envelope
+    // longer counts. Sessions are keyed by stage and page, so a published envelope
+    // still reaches this page's session after the owner switched pages, but never
+    // after it switched stage, was disabled, or unmounted. An equal or older envelope
     // publishes nothing and fences no read; it only rebases the operation that
     // still owns it onto the confirmed envelope.
     const commitServerEnvelope = (
@@ -664,7 +700,10 @@ export function useDisplayPageConfig<T>(
       const admission = admitDisplayPageConfigEnvelope(pageId, stage, candidate);
       if (admission.outcome !== "published") {
         if (ownsOperation) {
-          setSessions((current) => ({ ...current, [pageId]: nextSession(admission.envelope, current[pageId]) }));
+          setSessions((current) => ({
+            ...current,
+            [sessionKey]: nextSession(admission.envelope, current[sessionKey])
+          }));
         }
         return;
       }
@@ -681,7 +720,10 @@ export function useDisplayPageConfig<T>(
         return;
       }
 
-      setSessions((current) => ({ ...current, [pageId]: nextSession(admission.envelope, current[pageId]) }));
+      setSessions((current) => ({
+        ...current,
+        [sessionKey]: nextSession(admission.envelope, current[sessionKey])
+      }));
       if (ownsOperation) {
         setIsLoading(false);
       }
@@ -733,12 +775,24 @@ export function useDisplayPageConfig<T>(
     nextValue: SetStateAction<T>,
     options?: { dirtyPaths?: Array<Array<number | string>>; historyBase?: T; recordHistory?: boolean }
   ) => {
+    if (!interactionStateRef.current.canEdit) {
+      return;
+    }
+    if (stage === "draft") {
+      dirtyRef.current = true;
+    }
+
     setSessions((current) => {
-      const session = current[pageId] ?? createDraftSession(deepClone(seedConfig), null, defaultFallbackPolicy);
+      const session = current[sessionKey] ?? (stage === "draft"
+        ? null
+        : createDraftSession(deepClone(seedConfig), null, defaultFallbackPolicy));
+      if (!session) {
+        return current;
+      }
 
       return {
         ...current,
-        [pageId]: applyDraftConfigUpdate(session, nextValue, options)
+        [sessionKey]: applyDraftConfigUpdate(session, nextValue, options)
       };
     });
   };
@@ -746,37 +800,63 @@ export function useDisplayPageConfig<T>(
     applyConfigUpdate(nextValue);
   };
   const resetPaths = (paths: Array<Array<number | string>>) => {
+    if (!interactionStateRef.current.canEdit) {
+      return;
+    }
+    if (stage === "draft") {
+      dirtyRef.current = true;
+    }
+
     setSessions((current) => {
-      const session = current[pageId] ?? createDraftSession(deepClone(seedConfig), null, defaultFallbackPolicy);
+      const session = current[sessionKey] ?? (stage === "draft"
+        ? null
+        : createDraftSession(deepClone(seedConfig), null, defaultFallbackPolicy));
+      if (!session) {
+        return current;
+      }
       return {
         ...current,
-        [pageId]: resetDraftSessionPaths(session, seedConfig, paths)
+        [sessionKey]: resetDraftSessionPaths(session, seedConfig, paths)
       };
     });
   };
   const undo = () => {
+    if (!interactionStateRef.current.canEdit) {
+      return;
+    }
+    if (stage === "draft") {
+      dirtyRef.current = true;
+    }
+
     setSessions((current) => {
-      const session = current[pageId];
+      const session = current[sessionKey];
       if (!session) {
         return current;
       }
 
       return {
         ...current,
-        [pageId]: undoDraftSession(session)
+        [sessionKey]: undoDraftSession(session)
       };
     });
   };
   const redo = () => {
+    if (!interactionStateRef.current.canEdit) {
+      return;
+    }
+    if (stage === "draft") {
+      dirtyRef.current = true;
+    }
+
     setSessions((current) => {
-      const session = current[pageId];
+      const session = current[sessionKey];
       if (!session) {
         return current;
       }
 
       return {
         ...current,
-        [pageId]: redoDraftSession(session)
+        [sessionKey]: redoDraftSession(session)
       };
     });
   };
@@ -785,6 +865,7 @@ export function useDisplayPageConfig<T>(
     applyConfigUpdate,
     canRedo: (currentSession?.history.future.length ?? 0) > 0,
     canUndo: (currentSession?.history.past.length ?? 0) > 0,
+    canEdit,
     config,
     dirty,
     errorMessage,

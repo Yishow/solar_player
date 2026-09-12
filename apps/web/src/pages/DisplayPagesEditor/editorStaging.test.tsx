@@ -33,6 +33,14 @@ test("display editor route preloads workspace assets and shell data for deep lin
   assert.match(runtimeSource, /initialShellDecorationImages=\{initialShellDecorationData\?\.images\}/);
 });
 
+test("display editor owns one shell draft and editable-content baseline for embedded decoration editing", () => {
+  assert.match(editorSource, /createShellWorkspaceState\(initialShellDecorationDraft\)/);
+  assert.match(editorSource, /const shellDirty = useMemo\(\(\) => isShellWorkspaceDirty\(shellWorkspaceState\), \[shellWorkspaceState\]\)/);
+  assert.match(editorSource, /workspaceState=\{shellWorkspaceState\}/);
+  assert.match(editorSource, /onWorkspaceStateChange=\{setShellWorkspaceState\}/);
+  assert.doesNotMatch(editorSource, /const \[shellBaseline\]/);
+});
+
 test("display editor diagnostics and publishing hooks are gated by active right tab", () => {
   assert.match(editorSource, /const shouldLoadAssetHealth = selectedWorkspace === "editor" && rightTab === "health"/);
   assert.match(editorSource, /const shouldLoadPublishingState = selectedWorkspace === "editor" && rightTab === "publish"/);

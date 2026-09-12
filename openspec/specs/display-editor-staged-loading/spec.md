@@ -100,94 +100,33 @@ tests:
 ---
 ### Requirement: Display editor draft config hydration avoids repeated full-object work
 
-The system SHALL hydrate draft display page config without requiring full config stringify comparison on every render. Dirty tracking, save, undo, redo, reset paths, fallback policy, conflict handling, and validation state SHALL remain correct.
+The system SHALL hydrate draft display page config without requiring full config stringify comparison on every render. Dirty tracking, save, undo, redo, reset paths, fallback policy, conflict handling, and validation state SHALL remain correct. A visible seed fallback without an authoritative server envelope SHALL be read-only until successful retry establishes the active draft baseline.
 
 #### Scenario: Draft dirty state updates through editor actions
 
-- **WHEN** an operator edits a field, resets a field, saves a draft, receives a save conflict, undoes, or redoes an editor change
-- **THEN** the editor SHALL update dirty state according to the same observable behavior as before the optimization
+- **WHEN** an operator edits a field, resets a field, saves a draft, receives a save conflict, undoes, or redoes an editor change after its baseline is ready
+- **THEN** the editor SHALL update dirty state according to the applicable draft-governance contract
 - **AND** it SHALL NOT require a full JSON serialization of the current and last-loaded config on every render to decide that state
 
 #### Scenario: Draft config failure keeps seed fallback visible
 
 - **WHEN** draft config hydration fails for the selected page
-- **THEN** the editor SHALL keep the seed fallback session usable
-- **AND** it SHALL expose the existing errorMessage and fallback policy behavior
+- **THEN** the editor SHALL keep the seed fallback visible for inspection with its fallback policy and error message
+- **AND** draft mutation and save SHALL remain disabled until retry supplies an authoritative envelope
+- **AND** the operator SHALL have a retry action without losing an already existing valid local draft
 
 
 <!-- @trace
-source: optimize-display-editor-staged-loading
-updated: 2026-06-11
+source: fix-ui-draft-and-interaction-consistency
+updated: 2026-09-12
 code:
-  - apps/web/src/pages/DisplayPagesEditor/publishing.ts
-  - apps/web/src/pages/shared/displayPageRouteHost.tsx
-  - deploy.sh
-  - apps/web/src/pages/EnergyHistory/index.tsx
-  - apps/web/src/pages/BrandAssets/loadModel.ts
-  - apps/web/src/pages/SlideshowPreview/index.tsx
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - apps/web/src/hooks/useDisplayReadiness.ts
-  - apps/web/src/pages/OfflineError/index.tsx
-  - deploy/reset-db-settings.sh
-  - apps/web/src/hooks/usePlaybackController.ts
-  - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
   - apps/web/src/hooks/useDisplayPageConfig.ts
-  - apps/web/src/pages/BrandAssets/index.tsx
-  - apps/web/src/hooks/useImagePlaylistRuntime.ts
-  - apps/web/src/pages/shared/liveDisplayPagePreviewState.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.ts
-  - apps/web/src/pages/ImageManagement/index.tsx
-  - apps/web/src/pages/PlaybackSettings/index.tsx
-  - scripts/deploy.test.mjs
-  - apps/web/src/pages/MqttSettings/index.tsx
-  - apps/web/src/hooks/useLiveMetrics.ts
-  - apps/web/src/pages/shared/useLiveDisplayPagePreviewCatalog.ts
-  - apps/web/src/pages/CircuitSettings/index.tsx
-  - apps/web/src/hooks/useImageAssetReferences.ts
-  - apps/web/src/pages/DeviceStatus/index.tsx
-  - apps/web/src/pages/DisplayPagesEditor/index.tsx
-  - apps/web/src/hooks/useDisplayPageRegistry.ts
-  - apps/web/src/pages/EnergyTrend/index.tsx
-  - apps/web/src/hooks/useDisplayStoryRuntime.ts
-  - deploy/export-runtime-state.sh
-  - apps/web/src/pages/ImageManagement/loadModel.ts
-  - apps/web/src/pages/shared/liveDisplayPagePreviewCatalogLoader.ts
-  - apps/web/src/hooks/useDisplayOpsSummary.ts
-  - apps/web/src/pages/PlaybackSettings/loadModel.ts
-  - apps/web/src/hooks/useDisplayPageAssetHealth.ts
-  - apps/web/src/hooks/displayPageDraftSession.ts
-  - apps/web/src/hooks/useMqttStatus.ts
+  - apps/web/src/pages/DisplayPagesEditor/draftInteractionState.ts
+  - apps/web/src/pages/DisplayPagesEditor/EditorToolbar.tsx
 tests:
-  - apps/web/src/pages/ImageManagement/loadModel.test.ts
-  - apps/web/src/hooks/useDisplayStoryRuntime.test.ts
-  - apps/web/src/pages/BrandAssets/loadModel.test.ts
-  - apps/web/src/pages/FactoryCircuit/index.test.tsx
-  - apps/web/src/pages/ImageManagement/index.test.tsx
-  - apps/web/src/pages/shared/useLiveDisplayPagePreviewCatalog.test.ts
-  - apps/web/src/layouts/LayoutShell.test.ts
-  - apps/web/src/hooks/useMqttStatus.test.ts
-  - apps/web/src/hooks/useImagePlaylistRuntime.test.ts
-  - apps/web/src/pages/Solar/configRender.test.ts
-  - apps/web/src/pages/OfflineError/index.test.ts
-  - apps/web/src/pages/Overview/configRender.test.tsx
-  - apps/web/src/pages/PlaybackSettings/index.test.ts
-  - apps/web/src/pages/shared/displayPageRouteHost.test.tsx
-  - apps/web/src/pages/EnergyTrend/index.test.ts
-  - apps/web/src/hooks/useDisplayPageRegistry.test.ts
-  - apps/web/src/hooks/usePlaybackController.test.ts
-  - apps/web/src/pages/SlideshowPreview/index.test.ts
-  - apps/web/src/pages/MqttSettings/index.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/editorStaging.test.tsx
-  - apps/web/src/pages/EnergyHistory/index.test.ts
-  - apps/web/src/hooks/useRuntimeRefreshLifecycle.test.ts
   - apps/web/src/hooks/useDisplayPageConfig.test.ts
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
-  - apps/web/src/pages/Images/configRender.test.ts
-  - apps/web/src/pages/PlaybackSettings/loadModel.test.ts
-  - apps/web/src/pages/DeviceStatus/index.test.tsx
-  - apps/web/src/pages/CircuitSettings/CircuitSettingsContent.test.ts
-  - apps/web/src/pages/shared/displayPageRouteHost.test.ts
-  - apps/web/src/pages/Sustainability/configRender.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/draftInteraction.test.tsx
+  - tests/browser/ui-interactions.spec.ts
 -->
 
 ---

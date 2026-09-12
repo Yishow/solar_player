@@ -103,6 +103,7 @@ export function WeatherConfigCard({
         <label className="grid gap-1 text-xs text-[#4d554f]" data-weather-control="location-mode">
           <span className="font-medium">定位方式</span>
           <CustomSelect
+            aria-label="定位方式"
             onChange={(value) => onChange("locationMode", resolveWeatherLocationMode(value))}
             options={renderSelectOptions(viewModel.locationOptions)}
             value={settings.locationMode}
@@ -111,6 +112,7 @@ export function WeatherConfigCard({
         <label className="grid gap-1 text-xs text-[#4d554f]" data-weather-control="interval">
           <span className="font-medium">更新頻率</span>
           <CustomSelect
+            aria-label="更新頻率"
             onChange={(value) => onChange("updateIntervalMinutes", Number(value))}
             options={renderSelectOptions(weatherUpdateIntervalOptions)}
             value={String(settings.updateIntervalMinutes)}
@@ -122,6 +124,7 @@ export function WeatherConfigCard({
         <label className="grid gap-1 text-xs text-[#4d554f]" data-weather-control="county">
           <span className="font-medium">縣市</span>
           <CustomSelect
+            aria-label="縣市"
             onChange={(value) => onChange("countyName", value || null)}
             options={countyOptions}
             value={settings.countyName ?? ""}
@@ -131,6 +134,7 @@ export function WeatherConfigCard({
           <label className="grid gap-1 text-xs text-[#4d554f]" data-weather-control="station">
             <span className="font-medium">測站</span>
             <CustomSelect
+              aria-label="測站"
               onChange={(value) => onChange("stationId", value || null)}
               options={stationOptions}
               value={settings.stationId ?? ""}

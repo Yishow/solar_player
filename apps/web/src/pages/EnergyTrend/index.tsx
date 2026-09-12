@@ -12,6 +12,7 @@ import {
   type MonitoringHistoryPayload
 } from "../shared/monitoringHistoryPayloadCache";
 import { energyTrendCardKeys, energyTrendLayout } from "./layout";
+import { buildTrendChartModel, type TrendChartModel } from "./chartModel";
 import "./trend.css";
 import {
   buildEnergyTrendViewModel,
@@ -30,7 +31,7 @@ const CARD_ICON_GLYPHS: Record<string, string> = {
 };
 
 function formatTickLabel(value: string) {
-  if (value.length <= 16) {
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
     return value.replace("T", " ").slice(5, 16);
   }
   return value;
@@ -56,36 +57,32 @@ function RefreshGlyph() {
 }
 
 function MiniTrendChart({
-  points
+  model
 }: {
-  points: Array<{ label: string; value: number | null }>;
+  model: TrendChartModel;
 }) {
-  const validPoints = points.filter(
-    (point): point is { label: string; value: number } => point.value !== null
-  );
+  const validPoints = model.points;
   if (validPoints.length === 0) return null;
-  const width = 272;
-  const height = 220;
-  const padding = 8;
+  const { width, height, padding } = model.plot;
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
-  const maxValue = Math.max(...validPoints.map((point) => point.value), 1);
+  const { min, max } = model.domain;
   const bottom = padding + chartHeight;
   const coords = validPoints.map((point, index) => ({
     x: padding + (index / Math.max(validPoints.length - 1, 1)) * chartWidth,
-    y: padding + chartHeight - (point.value / maxValue) * chartHeight
+    y: padding + chartHeight - ((point.value - min) / (max - min)) * chartHeight
   }));
   const linePath = coords.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x},${p.y}`).join(" ");
   const areaPath = `${linePath} L ${coords[coords.length - 1]!.x},${bottom} L ${coords[0]!.x},${bottom} Z`;
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="et-chart-svg" preserveAspectRatio="none">
-      {[0, 0.33, 0.66, 1].map((ratio) => (
+    <svg viewBox={`0 0 ${width} ${height}`} className="et-chart-svg" style={{ height }} preserveAspectRatio="none">
+      {model.ticks.map(({ ratio, y }) => (
         <line
           key={`h${ratio}`}
           x1={padding}
-          y1={padding + chartHeight * ratio}
+          y1={y}
           x2={padding + chartWidth}
-          y2={padding + chartHeight * ratio}
+          y2={y}
           strokeWidth="1"
         />
       ))}
@@ -240,9 +237,8 @@ export function EnergyTrend() {
         const cardKey = energyTrendCardKeys[index];
         const layout = cardKey ? energyTrendLayout.cards[cardKey] : null;
         if (!layout) return null;
-        const validPoints = card.chartPoints.filter(
-          (point): point is { label: string; value: number } => point.value !== null
-        );
+        const chart = buildTrendChartModel(card.chartPoints, card.unitLabel);
+        const validPoints = chart.points;
         return (
           <article
             key={card.titleZh}
@@ -265,14 +261,11 @@ export function EnergyTrend() {
               {card.valueLabel}
               <small>{card.unitLabel}</small>
             </div>
-            <div className="et-axis-labels">
-              <span>100%</span>
-              <span>66%</span>
-              <span>33%</span>
-              <span>0</span>
+            <div className="et-axis-labels" style={{ height: chart.plot.height }}>
+              {chart.ticks.map((tick) => <span key={tick.ratio} style={{ top: tick.y }}>{tick.label}</span>)}
             </div>
             {validPoints.length > 0 ? (
-              <MiniTrendChart points={card.chartPoints} />
+              <MiniTrendChart model={chart} />
             ) : (
               <div className="et-empty">{viewModel.monitoringState.emptyStateLabel}</div>
             )}

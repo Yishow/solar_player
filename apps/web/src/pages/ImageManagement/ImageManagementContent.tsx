@@ -611,6 +611,7 @@ export function ImageManagementContent({
                       <div className="im-form-row">
                         <label>Fallback 模式 <small>Fallback Mode</small></label>
                         <CustomSelect
+                          aria-label="Fallback 模式"
                           value={viewModel.selection.playlistFallbackMode ?? "display-placeholder"}
                           disabled={isLoading || isDeleting}
                           onChange={(value) => updatePlaylistEntryField(viewModel.selection!.playlistEntryId!, {
@@ -662,6 +663,7 @@ export function ImageManagementContent({
                   <div className="im-form-row">
                     <label>長寬比 <small>Aspect Ratio</small></label>
                     <CustomSelect
+                      aria-label="長寬比"
                       value={aspectRatioChoice}
                       disabled={isLoading || isDeleting}
                       onChange={(value) => updateAssetField(viewModel.selection!.id, { aspectRatio: parseAspectRatioChoice(value, selectedAsset.aspectRatio) })}

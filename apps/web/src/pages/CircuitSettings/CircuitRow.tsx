@@ -98,6 +98,7 @@ export const CircuitRow = memo(function CircuitRow({
           <div className="cs-icon-row">
             <span className="cs-icon-glyph">{iconGlyph(row.icon)}</span>
             <CustomSelect
+              aria-label={`${row.nameZh ?? "迴路"} 圖示`}
               value={row.icon ?? ""}
               onChange={(value) => handleFieldChange(row.id, "icon", value)}
               options={row.iconOptions}
@@ -105,6 +106,7 @@ export const CircuitRow = memo(function CircuitRow({
           </div>
           <div className="cs-unit-row">
             <CustomSelect
+              aria-label={`${row.nameZh ?? "迴路"} 單位`}
               value={row.unit ?? ""}
               onChange={(value) => handleFieldChange(row.id, "unit", value)}
               options={row.unitOptions}
@@ -179,6 +181,7 @@ export const CircuitRow = memo(function CircuitRow({
         <div className="cs-display-layout">
           <div className="cs-display-row cs-display-row--controls">
             <CustomSelect
+              aria-label={`${row.nameZh ?? "迴路"} 顯示位置`}
               value={row.displaySlot ?? ""}
               onChange={(value) =>
                 handleFieldChange(
