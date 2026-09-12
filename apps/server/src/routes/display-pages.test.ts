@@ -519,7 +519,7 @@ test("GET /api/display-pages/rotation-preview keeps the images registry duration
   }
 });
 
-test("overview publish checks only assigned sites and blocks when their energy profile is missing", async (t) => {
+test("overview publish succeeds without energy profile, while factory-circuit blocks when energy profile is missing", async (t) => {
   const asOf = "2026-09-08T04:00:00.000Z";
   t.mock.timers.enable({ apis: ["Date"], now: Date.parse(asOf) });
   const database = getDatabase();
@@ -545,9 +545,13 @@ test("overview publish checks only assigned sites and blocks when their energy p
     const knOnly = await publishPage(app, "overview", { publishedBy: "test-operator", unsavedBindings: false });
     assert.equal(knOnly.statusCode, 200);
     database.prepare("DELETE FROM site_energy_profiles WHERE metric_scope = 'kn'").run();
-    const publishRes = await publishPage(app, "overview", { publishedBy: "test-operator", unsavedBindings: false });
-    assert.equal(publishRes.statusCode, 422);
-    const body = publishRes.json() as { validation: { findings: Array<{ code: string }> } };
+    const overviewPublishRes = await publishPage(app, "overview", { publishedBy: "test-operator", unsavedBindings: false });
+    assert.equal(overviewPublishRes.statusCode, 200, "overview publish should succeed even when energy profile is missing");
+
+    await saveDraftConfig(app, "factory-circuit", {});
+    const circuitPublishRes = await publishPage(app, "factory-circuit", { publishedBy: "test-operator", unsavedBindings: false });
+    assert.equal(circuitPublishRes.statusCode, 422, "factory-circuit publish must block when energy profile is missing");
+    const body = circuitPublishRes.json() as { validation: { findings: Array<{ code: string }> } };
     assert.equal(body.validation.findings.some((finding) => finding.code === "ENERGY_PROFILE_INCOMPLETE"), true);
   } finally {
     await app.close();

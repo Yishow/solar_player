@@ -74,11 +74,15 @@ export function useDisplayPagePublishingState(
   const isPublishBlocked = unsavedBindings || !preflight || preflight.pageId !== pageId
     || preflight.draftUpdatedAt !== draftUpdatedAt || publishingState?.validation.canPublish !== true;
 
-  const refresh = async (refreshOptions: { force?: boolean; isActive?: () => boolean } = {}) => {
+  const refresh = async (
+    refreshOptions: { force?: boolean; isActive?: () => boolean } = {},
+    extraOptions: { unsavedBindings?: boolean } = {}
+  ) => {
     setPreflight(null);
     if (!enabled && !refreshOptions.force) {
       return;
     }
+    const unsavedBindings = extraOptions.unsavedBindings ?? (options.unsavedBindings ?? false);
 
     const [preflightResult, fallback] = await Promise.all([
       validateDisplayPageDraft(pageId, { unsavedBindings }),
@@ -146,6 +150,6 @@ export function useDisplayPagePublishingState(
     publish,
     publishingError,
     publishingState,
-    refresh: () => refresh({ force: true })
+    refresh: (extraOptions?: { unsavedBindings?: boolean }) => refresh({ force: true }, extraOptions)
   };
 }

@@ -225,7 +225,7 @@ test("Q1 consumers: history periodSummary, overview daily gaps stay null, unsave
     const withoutToken = await app.inject({
       method: "POST",
       payload: { publishedBy: "q1" },
-      url: "/api/display-pages/overview/publish"
+      url: "/api/display-pages/factory-circuit/publish"
     });
     assert.equal(withoutToken.statusCode, 422);
     assert.equal(
@@ -236,7 +236,7 @@ test("Q1 consumers: history periodSummary, overview daily gaps stay null, unsave
     const unsaved = await app.inject({
       method: "POST",
       payload: { publishedBy: "q1", unsavedBindings: true },
-      url: "/api/display-pages/overview/publish"
+      url: "/api/display-pages/factory-circuit/publish"
     });
     assert.equal(
       unsaved.json().validation.findings.some((finding: { code: string }) => finding.code === "UNSAVED_BINDINGS"),
@@ -246,7 +246,7 @@ test("Q1 consumers: history periodSummary, overview daily gaps stay null, unsave
     const preflight = await app.inject({
       method: "POST",
       payload: { unsavedBindings: false },
-      url: "/api/display-pages/overview/validate"
+      url: "/api/display-pages/factory-circuit/validate"
     });
     const preflightBody = preflight.json() as { expectedVersion: number; preflightToken: string };
     assert.equal(typeof preflightBody.expectedVersion, "number");
@@ -258,7 +258,7 @@ test("Q1 consumers: history periodSummary, overview daily gaps stay null, unsave
         preflightToken: preflightBody.preflightToken,
         publishedBy: "q1"
       },
-      url: "/api/display-pages/overview/publish"
+      url: "/api/display-pages/factory-circuit/publish"
     });
     assert.equal(published.statusCode, 200);
     assert.equal(published.json().validation.canPublish, true);

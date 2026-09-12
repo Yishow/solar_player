@@ -1063,7 +1063,7 @@ async function editTitle(hook: HookHandle, title: string) {
 // returning a pending promise would adopt it, so the caller could never reach
 // the step that answers the request the operation is waiting on.
 async function startSave(hook: HookHandle) {
-  const operation = { finished: Promise.resolve() };
+  const operation: { finished: Promise<unknown> } = { finished: Promise.resolve() };
   await settle(() => {
     operation.finished = hook.result.save();
   });

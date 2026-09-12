@@ -309,3 +309,41 @@ tests:
   - apps/server/src/routes/site-energy-profiles.test.ts
   - apps/server/src/services/siteEnergyProfileSourceReview.test.ts
 -->
+
+---
+### Requirement: Overview display page publication is decoupled from site energy preflight
+
+The publishing preflight system SHALL scope factory energy profile and meter evidence readiness checks strictly to display pages containing factory circuit diagrams and consumption accounting widgets (`factory-circuit` and `factory-circuit-guanyin`). The pure solar-and-weather `overview` page SHALL NOT be blocked by missing, incomplete, or stale factory meter readings.
+
+#### Scenario: Publishing overview without active factory energy profiles
+- **WHEN** an operator publishes draft changes for the `overview` display page
+- **THEN** preflight validation SHALL NOT require factory site energy profiles to be in `ready` status
+- **AND** it SHALL NOT return `ENERGY_PROFILE_INCOMPLETE` blocking findings regardless of factory meter availability or freshness
+
+<!-- @trace
+source: simplify-display-editor-publishing
+updated: 2026-09-12
+code:
+  - artifacts/ui-performance/fixture-identity.json
+  - scripts/run-browser-smoke.mjs
+  - tests/browser/fixtures/runtime.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/EditorToolbar.tsx
+  - apps/web/vite.config.ts
+  - apps/web/src/pages/AssetLibrary/index.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/pages/DisplayPagesEditor/publishing.ts
+  - tests/browser/fixtures/ui-performance.ts
+  - apps/web/src/pages/Overview/overview.css
+  - scripts/deploy.test.mjs
+  - apps/server/src/services/displayPagePublishingService.ts
+tests:
+  - apps/server/src/routes/display-pages.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/uiPerformanceFixtures.test.ts
+  - apps/server/src/routes/energy-authoring-consumers.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/server/src/routes/site-energy-readiness-publishing.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/EditorToolbar.test.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.test.ts
+-->

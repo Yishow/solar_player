@@ -430,6 +430,7 @@ export function DisplayPagesEditor({
   const appliedEditorDeepLinkRef = useRef<string | null>(null);
   const editMode = controlledEditMode ?? internalEditMode;
   const [rightTab, setRightTab] = useState<DisplayEditorRightTab>(initialEditorState?.rightTab ?? "inspector");
+  const [isSavingAndChecking, setIsSavingAndChecking] = useState(false);
   const displayEditorProfilingEnabled = useMemo(() => isDisplayEditorProfilingEnabled(), []);
 
   const selectedPage = useMemo(
@@ -756,9 +757,12 @@ export function DisplayPagesEditor({
   };
 
   const handleSave = async () => {
-    await save();
-    await refresh();
-    await reloadAssetHealth();
+    const saved = await save();
+    if (saved) {
+      await refresh({ unsavedBindings: false });
+      await reloadAssetHealth();
+    }
+    return saved;
   };
 
   const applyFreeformObjectUpdate = useCallback(
@@ -1405,8 +1409,20 @@ export function DisplayPagesEditor({
         isPublishing={isPublishing}
         isLoading={isLoading}
         isSaving={isSaving}
+        isSavingAndChecking={isSavingAndChecking}
         onPreview={() => setEditMode(false)}
-        onPublishCheck={() => {
+        onPublishCheck={async () => {
+          if (dirty) {
+            setIsSavingAndChecking(true);
+            try {
+              const saved = await handleSave();
+              if (!saved) {
+                return;
+              }
+            } finally {
+              setIsSavingAndChecking(false);
+            }
+          }
           setRightTab("publish");
           void refresh();
         }}
@@ -1415,7 +1431,7 @@ export function DisplayPagesEditor({
         onSave={() => void handleSave()}
         onUndo={undo}
         pageLabel={localizeDisplayPageLabel(selectedPage.label)}
-        publishBlocked={isPublishBlocked}
+        publishBlocked={rightTab === "publish" ? isPublishBlocked : false}
       />
       {errorMessage.includes("儲存衝突") ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-[#ead7aa] bg-[#fff8e8] px-4 py-2 text-[13px]" data-editor-remote-revision role="status">

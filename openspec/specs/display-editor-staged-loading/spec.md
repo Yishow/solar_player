@@ -312,3 +312,45 @@ tests:
   - apps/web/src/pages/shared/displayPageRouteHost.test.ts
   - apps/web/src/pages/Sustainability/configRender.test.ts
 -->
+
+---
+### Requirement: Editor check and publish action automatically persists pending draft changes
+
+The display editor toolbar SHALL allow the operator to invoke "檢查並發布" even when local draft changes are unsaved (`dirty === true`). Invoking the action SHALL automatically persist the current draft before opening the publishing review drawer, eliminating manual two-step save friction and preventing false unsaved-binding blockers during review.
+
+#### Scenario: Check and publish with unsaved changes
+- **WHEN** an operator modifies display page properties resulting in unsaved changes and clicks "檢查並發布"
+- **THEN** the system SHALL automatically save the draft to the server
+- **AND** upon successful save it SHALL open the publish review drawer without reporting unsaved binding blockers
+
+#### Scenario: Check and publish when clean
+- **WHEN** an operator clicks "檢查並發布" with no unsaved changes (`dirty === false`)
+- **THEN** the system SHALL directly open the publish review drawer and run preflight verification
+
+<!-- @trace
+source: simplify-display-editor-publishing
+updated: 2026-09-12
+code:
+  - artifacts/ui-performance/fixture-identity.json
+  - scripts/run-browser-smoke.mjs
+  - tests/browser/fixtures/runtime.ts
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/EditorToolbar.tsx
+  - apps/web/vite.config.ts
+  - apps/web/src/pages/AssetLibrary/index.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.ts
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - apps/web/src/pages/DisplayPagesEditor/publishing.ts
+  - tests/browser/fixtures/ui-performance.ts
+  - apps/web/src/pages/Overview/overview.css
+  - scripts/deploy.test.mjs
+  - apps/server/src/services/displayPagePublishingService.ts
+tests:
+  - apps/server/src/routes/display-pages.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/uiPerformanceFixtures.test.ts
+  - apps/server/src/routes/energy-authoring-consumers.test.ts
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/server/src/routes/site-energy-readiness-publishing.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/EditorToolbar.test.tsx
+  - apps/web/src/pages/Overview/displayPageConfig.test.ts
+-->

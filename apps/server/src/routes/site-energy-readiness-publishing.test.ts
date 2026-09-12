@@ -33,7 +33,7 @@ function seedStoredProfile(effectiveFrom = opening) {
   );
   saveMeterSource(database, source);
   createPairedDeviceTestContext("kn");
-  assert.deepEqual(readAssignedEnergyScopes(database, "overview"), ["kn"]);
+  assert.deepEqual(readAssignedEnergyScopes(database, "factory-circuit"), ["kn"]);
   return profile;
 }
 
@@ -44,7 +44,7 @@ test("R10 assigned energy preflight re-evaluates evidence instead of trusting st
   seedAcceptedReading(database, source, "1000", opening, opening);
   const app = await buildApp();
   const preflight = async () => {
-    const response = await app.inject({ method: "POST", url: "/api/display-pages/overview/validate", payload: {} });
+    const response = await app.inject({ method: "POST", url: "/api/display-pages/factory-circuit/validate", payload: {} });
     assert.equal(response.statusCode, 200, response.body);
     return response.json().validation.findings as Array<{ code: string }>;
   };
@@ -77,7 +77,7 @@ test("R10 assigned energy preflight keeps effective-profile boundaries despite c
   seedAcceptedReading(database, source, "1400", asOf, asOf);
   const app = await buildApp();
   try {
-    const response = await app.inject({ method: "POST", url: "/api/display-pages/overview/validate", payload: {} });
+    const response = await app.inject({ method: "POST", url: "/api/display-pages/factory-circuit/validate", payload: {} });
     assert.equal(response.statusCode, 200, response.body);
     assert.equal(response.json().validation.findings.some((finding: { code: string }) => finding.code === "ENERGY_PROFILE_INCOMPLETE"), true);
     const read = await app.inject({ method: "GET", url: "/api/data-hub/sites/kn/energy-profile" });
@@ -99,7 +99,7 @@ test("R10 readiness does not reuse an earlier source revision after a meter defi
   });
   const app = await buildApp();
   try {
-    const response = await app.inject({ method: "POST", url: "/api/display-pages/overview/validate", payload: {} });
+    const response = await app.inject({ method: "POST", url: "/api/display-pages/factory-circuit/validate", payload: {} });
     assert.equal(response.statusCode, 200, response.body);
     assert.equal(response.json().validation.findings.some((finding: { code: string }) => finding.code === "ENERGY_PROFILE_INCOMPLETE"), true);
     const read = await app.inject({ method: "GET", url: "/api/data-hub/sites/kn/energy-profile" });

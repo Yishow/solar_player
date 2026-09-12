@@ -7,6 +7,7 @@ export function EditorToolbar({
   isPublishing,
   isLoading,
   isSaving,
+  isSavingAndChecking = false,
   onPreview,
   onPublishCheck,
   onRedo,
@@ -24,6 +25,7 @@ export function EditorToolbar({
   isPublishing: boolean;
   isLoading: boolean;
   isSaving: boolean;
+  isSavingAndChecking?: boolean;
   onPreview: () => void;
   onPublishCheck: () => void;
   onRedo: () => void;
@@ -62,11 +64,17 @@ export function EditorToolbar({
         <button
           className="mgmt-action primary min-h-[40px]"
           data-editor-toolbar-publish
-          disabled={!canEdit || isPublishing || publishBlocked || dirty}
+          disabled={!canEdit || isPublishing || isSaving || isSavingAndChecking || (publishBlocked && !dirty)}
           onClick={onPublishCheck}
           type="button"
         >
-          檢查並發布
+          {isPublishing
+            ? "發布中..."
+            : isSavingAndChecking
+              ? "儲存並檢查中..."
+              : isSaving
+                ? "儲存中..."
+                : "檢查並發布"}
         </button>
       </div>
     </div>

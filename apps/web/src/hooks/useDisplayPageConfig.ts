@@ -428,7 +428,7 @@ type UseDisplayPageConfigResult<T> = {
   resetPaths: (paths: Array<Array<number | string>>) => void;
   reload: (options?: { discardLocalChanges?: boolean }) => Promise<void>;
   redo: () => void;
-  save: () => Promise<void>;
+  save: () => Promise<boolean>;
   setConfig: Dispatch<SetStateAction<T>>;
   seedConfig: T;
   undo: () => void;
@@ -655,19 +655,19 @@ export function useDisplayPageConfig<T>(
 
   useDisplaySyncRefresh(handleDisplaySync, displaySyncScopes);
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     if (!enabled || stage !== "draft") {
-      return;
+      return false;
     }
 
     if (!lastLoadedEnvelope) {
       setErrorMessage("缺少最新伺服器基線，請先重新同步後再儲存。");
       setMessage("儲存失敗，請先重新同步。");
-      return;
+      return false;
     }
 
     if (!interactionStateRef.current.canEdit) {
-      return;
+      return false;
     }
 
     setIsSaving(true);
@@ -742,6 +742,7 @@ export function useDisplayPageConfig<T>(
       if (ownsSaveOperation()) {
         setMessage("展示頁設定已儲存。");
       }
+      return true;
     } catch (error) {
       if (isManagementDraftConflictError(error)) {
         const latestEnvelope = error.conflict.latestEnvelope as DisplayPageConfigEnvelope;
@@ -765,6 +766,7 @@ export function useDisplayPageConfig<T>(
         setErrorMessage(error instanceof Error ? error.message : "儲存展示頁設定失敗。");
         setMessage("儲存失敗，保留未儲存變更。");
       }
+      return false;
     } finally {
       if (ownsSaveOperation()) {
         setIsSaving(false);

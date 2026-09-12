@@ -984,7 +984,7 @@ function checkImageReferences(regions: Record<string, unknown>): ValidationFindi
   return findings;
 }
 
-const ENERGY_PUBLISH_PAGES = new Set(["overview", "factory-circuit", "factory-circuit-guanyin"]);
+const ENERGY_PUBLISH_PAGES = new Set(["factory-circuit", "factory-circuit-guanyin"]);
 const preflightTokens = new Map<string, { expiresAt: number; pageId: string; version: number }>();
 
 function isEnergyPublishPage(pageId: DisplayPageId) {
