@@ -1,14 +1,8 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isDisplayEditorHistoryKey } from "../../hooks/useDisplayEditor";
 import {
   type CanvasDistanceLockSession,
-  applyCanvasDrag,
-  applyCanvasNudge,
-  applyCanvasResize,
-  applyMeasurementHandleDrag,
   panCanvasViewport,
-  resolveCanvasNudgeStep,
   resolveDistanceLockSession,
   resolveViewportAfterZoom,
   type CanvasSnapOptions,
@@ -23,19 +17,30 @@ import {
   writeStoredDisplayEditorOverlayPreset,
   type DisplayEditorOverlayPreset
 } from "./canvasOverlayState";
+import { useDisplayEditorCanvasKeyboard } from "./useDisplayEditorCanvasKeyboard";
+import { createCanvasOverlaySession, type CanvasOverlaySession } from "./canvasOverlaySession";
 import { isDisplayEditorProfilingEnabled, measureDisplayEditorScope } from "./displayEditorProfiler";
 import { applyRegionRect } from "./displayEditorGeometry";
 import { isRegionLocked } from "./displayEditorRegionState";
 import type { ResolvedDisplayEditorRegion } from "./inspectorFields";
 import { localizeDisplayEditorLabel } from "./localization";
 
-const EDITOR_PREVIEW_SCALE = 0.5;
-const EDITOR_PREVIEW_CONTENT_TOP = 110;
-const EDITOR_PREVIEW_SHELL_HEIGHT = 1080;
-const EDITOR_PREVIEW_SURFACE_HEIGHT = 898;
-const EDITOR_PREVIEW_SURFACE_WIDTH = 1920;
-const EDITOR_PREVIEW_VIEWPORT_HEIGHT = Math.round(EDITOR_PREVIEW_SHELL_HEIGHT * EDITOR_PREVIEW_SCALE);
-const EDITOR_PREVIEW_VIEWPORT_WIDTH = Math.round(EDITOR_PREVIEW_SURFACE_WIDTH * EDITOR_PREVIEW_SCALE);
+import {
+  EDITOR_PREVIEW_CONTENT_TOP,
+  EDITOR_PREVIEW_SCALE,
+  EDITOR_PREVIEW_SHELL_HEIGHT,
+  EDITOR_PREVIEW_SURFACE_HEIGHT,
+  EDITOR_PREVIEW_SURFACE_WIDTH,
+  EDITOR_PREVIEW_VIEWPORT_HEIGHT,
+  EDITOR_PREVIEW_VIEWPORT_WIDTH,
+  computeCanvasInteractionResult,
+  constraintToRect,
+  createInteractionFeedback,
+  resolveRegionConstraint,
+  resolveSnapOptions,
+  type CanvasInteractionFeedback,
+  type CanvasInteractionState
+} from "./canvasWorkflowConstraints";
 
 export {
   EDITOR_PREVIEW_CONTENT_TOP,
@@ -44,112 +49,6 @@ export {
   EDITOR_PREVIEW_SURFACE_WIDTH,
   EDITOR_PREVIEW_VIEWPORT_HEIGHT,
   EDITOR_PREVIEW_VIEWPORT_WIDTH
-};
-
-function resolveRegionConstraint(region: ResolvedDisplayEditorRegion) {
-  const schema = region.schema.geometry;
-  const boundary = region.geometryConstraint;
-
-  return {
-    canvasHeight: boundary?.height ?? EDITOR_PREVIEW_SURFACE_HEIGHT,
-    canvasWidth: boundary?.width ?? EDITOR_PREVIEW_SURFACE_WIDTH,
-    minHeight: schema?.minHeight ?? 40,
-    minWidth: schema?.minWidth ?? 40,
-    originLeft: boundary?.left ?? 0,
-    originTop: boundary?.top ?? 0
-  };
-}
-
-function constraintToRect(constraint: ReturnType<typeof resolveRegionConstraint>): CanvasRect {
-  return {
-    height: constraint.canvasHeight,
-    left: constraint.originLeft,
-    top: constraint.originTop,
-    width: constraint.canvasWidth
-  };
-}
-
-function resolveCanvasSnapTargets(
-  activeRegionId: string,
-  regions: ResolvedDisplayEditorRegion[],
-  overlayPreset: DisplayEditorOverlayPreset
-): CanvasSnapTarget[] {
-  const targets: CanvasSnapTarget[] = [];
-
-  if (overlayPreset.snapCenterLines) {
-    targets.push(
-      { axis: "x", position: EDITOR_PREVIEW_SURFACE_WIDTH / 2, type: "center-line" },
-      { axis: "y", position: EDITOR_PREVIEW_SURFACE_HEIGHT / 2, type: "center-line" }
-    );
-  }
-
-  for (const region of regions) {
-    if (!region.geometry || region.id === activeRegionId) {
-      continue;
-    }
-
-    if (overlayPreset.snapGuides && !region.parentId) {
-      targets.push(
-        { axis: "x", position: region.geometry.left, type: "guide" },
-        { axis: "x", position: region.geometry.left + region.geometry.width, type: "guide" },
-        { axis: "y", position: region.geometry.top, type: "guide" },
-        { axis: "y", position: region.geometry.top + region.geometry.height, type: "guide" }
-      );
-    }
-
-    if (overlayPreset.snapRegionEdges) {
-      targets.push(
-        { axis: "x", position: region.geometry.left, type: "region-edge" },
-        { axis: "x", position: region.geometry.left + region.geometry.width, type: "region-edge" },
-        { axis: "y", position: region.geometry.top, type: "region-edge" },
-        { axis: "y", position: region.geometry.top + region.geometry.height, type: "region-edge" }
-      );
-    }
-
-    if (overlayPreset.snapRegionCenters) {
-      targets.push(
-        { axis: "x", position: region.geometry.left + region.geometry.width / 2, type: "region-center" },
-        { axis: "y", position: region.geometry.top + region.geometry.height / 2, type: "region-center" }
-      );
-    }
-  }
-
-  return targets;
-}
-
-function resolveSnapOptions(
-  activeRegionId: string,
-  regions: ResolvedDisplayEditorRegion[],
-  overlayPreset: DisplayEditorOverlayPreset
-): CanvasSnapOptions | undefined {
-  if (!overlayPreset.snapEnabled) {
-    return undefined;
-  }
-
-  return {
-    enabled: true,
-    targets: resolveCanvasSnapTargets(activeRegionId, regions, overlayPreset),
-    threshold: 16
-  };
-}
-
-type CanvasInteractionState = {
-  distanceLock: CanvasDistanceLockSession | null;
-  handle?: CanvasResizeHandle;
-  origin: { x: number; y: number };
-  regionId: string;
-  startConfig: Record<string, unknown>;
-  startRect: CanvasRect;
-  type: "drag" | "measure-x" | "measure-y" | "resize";
-};
-
-type CanvasInteractionFeedback = {
-  boundaryClamped?: boolean;
-  constraintRect: CanvasRect;
-  guides: CanvasGuide[];
-  rect: CanvasRect;
-  regionId: string;
-  type: "drag" | "measure-x" | "measure-y" | "resize";
 };
 
 export function useDisplayEditorCanvasWorkflow({
@@ -208,6 +107,13 @@ export function useDisplayEditorCanvasWorkflow({
   lockedRegionIdsRef.current = lockedRegionIds;
   const pendingDragCommitRef = useRef<{ region: ResolvedDisplayEditorRegion; rect: CanvasRect } | null>(null);
   const sessionSnapOptionsRef = useRef<CanvasSnapOptions | undefined>(undefined);
+  const dragAnimationFrameRef = useRef<number | null>(null);
+  const latestInteractionFeedbackRef = useRef<CanvasInteractionFeedback | null>(null);
+  const dragSessionGenerationRef = useRef(0);
+  const overlaySessionRef = useRef<CanvasOverlaySession | null>(null);
+  if (!overlaySessionRef.current) {
+    overlaySessionRef.current = createCanvasOverlaySession();
+  }
   const applyConfigUpdateRef = useRef(applyConfigUpdate);
   applyConfigUpdateRef.current = applyConfigUpdate;
   const selectedRegionLocked = isRegionLocked(lockedRegionIds, selectedRegion?.id);
@@ -216,19 +122,31 @@ export function useDisplayEditorCanvasWorkflow({
     [regions, temporaryMeasureTargetRegionId]
   );
 
+  const resetPendingDragSchedule = useCallback(() => {
+    dragSessionGenerationRef.current += 1;
+    if (dragAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(dragAnimationFrameRef.current);
+      dragAnimationFrameRef.current = null;
+    }
+    latestInteractionFeedbackRef.current = null;
+    pendingDragCommitRef.current = null;
+  }, []);
+
   useEffect(() => {
     writeStoredDisplayEditorOverlayPreset(overlayPreset);
   }, [overlayPreset]);
 
   useEffect(() => {
     if (!editMode) {
+      resetPendingDragSchedule();
+      overlaySessionRef.current?.invalidate();
       setCanvasInteraction(null);
       setCanvasInteractionFeedback(null);
       setDistanceLockArmed(false);
       setTemporaryMeasureMode(false);
       setTemporaryMeasureTargetRegionId(null);
     }
-  }, [editMode]);
+  }, [editMode, resetPendingDragSchedule]);
 
   useEffect(() => {
     if (
@@ -246,83 +164,14 @@ export function useDisplayEditorCanvasWorkflow({
     }
   }, [distanceLockTargetRegion, selectedRegion, selectedRegionIds]);
 
-  useEffect(() => {
-    if (!editMode || !selectedRegion?.geometry || selectedRegionLocked) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      if (
-        !selectedRegion.geometry ||
-        !["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"].includes(event.key) ||
-        target?.matches("input, textarea, select") ||
-        event.ctrlKey ||
-        event.metaKey
-      ) {
-        return;
-      }
-
-      const directionByKey = {
-        ArrowDown: "down",
-        ArrowLeft: "left",
-        ArrowRight: "right",
-        ArrowUp: "up"
-      } as const;
-      const nudgeStep = resolveCanvasNudgeStep({
-        altKey: event.altKey,
-        shiftKey: event.shiftKey
-      });
-      const result = applyCanvasNudge(
-        selectedRegion.geometry,
-        directionByKey[event.key as keyof typeof directionByKey],
-        nudgeStep.step,
-        resolveRegionConstraint(selectedRegion)
-      );
-
-      event.preventDefault();
-      applyConfigUpdate((current) => applyRegionRect(current, selectedRegion, result.rect));
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [applyConfigUpdate, editMode, selectedRegion, selectedRegionLocked]);
-
-  useEffect(() => {
-    if (!editMode) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      const action = isDisplayEditorHistoryKey({
-        altKey: event.altKey,
-        ctrlKey: event.ctrlKey,
-        key: event.key,
-        metaKey: event.metaKey,
-        shiftKey: event.shiftKey,
-        targetTagName: target?.tagName
-      });
-
-      if (!action) {
-        return;
-      }
-
-      event.preventDefault();
-      if (action === "undo") {
-        undo();
-        return;
-      }
-      redo();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [editMode, redo, undo]);
+  useDisplayEditorCanvasKeyboard({
+    applyConfigUpdate,
+    editMode,
+    redo,
+    selectedRegion,
+    selectedRegionLocked,
+    undo
+  });
 
   useEffect(() => {
     if (!canvasInteraction) {
@@ -330,7 +179,7 @@ export function useDisplayEditorCanvasWorkflow({
     }
 
     const activeInteraction = canvasInteraction;
-    pendingDragCommitRef.current = null;
+    resetPendingDragSchedule();
     sessionSnapOptionsRef.current = resolveSnapOptions(
       activeInteraction.regionId,
       regionsRef.current,
@@ -349,42 +198,32 @@ export function useDisplayEditorCanvasWorkflow({
         y: Math.round((event.clientY - activeInteraction.origin.y) / effectiveScale)
       };
       const constraint = resolveRegionConstraint(region);
-      const snap = sessionSnapOptionsRef.current;
-      const interactionResult =
-        activeInteraction.type === "resize" && activeInteraction.handle
-          ? applyCanvasResize(
-              activeInteraction.startRect,
-              activeInteraction.handle,
-              delta,
-              constraint,
-              snap,
-              activeInteraction.distanceLock,
-              schema.resizeMode
-            )
-          : activeInteraction.type === "measure-x" || activeInteraction.type === "measure-y"
-            ? applyMeasurementHandleDrag(
-                activeInteraction.startRect,
-                activeInteraction.type === "measure-x" ? "x" : "y",
-                activeInteraction.type === "measure-x" ? delta.x : delta.y,
-                constraint
-              )
-          : applyCanvasDrag(activeInteraction.startRect, delta, constraint, snap, activeInteraction.distanceLock);
-
-      setCanvasInteractionFeedback({
-        boundaryClamped: interactionResult.boundaryClamped,
-        constraintRect: constraintToRect(constraint),
-        guides: interactionResult.guides,
-        rect: interactionResult.rect,
-        regionId: region.id,
-        type: activeInteraction.type
+      const interactionResult = computeCanvasInteractionResult({
+        activeInteraction,
+        delta,
+        constraint,
+        snap: sessionSnapOptionsRef.current,
+        schema
       });
 
+      const nextFeedback = createInteractionFeedback(interactionResult, constraint, region.id, activeInteraction.type);
+      latestInteractionFeedbackRef.current = nextFeedback;
       pendingDragCommitRef.current = { rect: interactionResult.rect, region };
+
+      const currentGeneration = dragSessionGenerationRef.current;
+      if (dragAnimationFrameRef.current === null) {
+        dragAnimationFrameRef.current = requestAnimationFrame(() => {
+          dragAnimationFrameRef.current = null;
+          if (dragSessionGenerationRef.current === currentGeneration && latestInteractionFeedbackRef.current) {
+            setCanvasInteractionFeedback(latestInteractionFeedbackRef.current);
+          }
+        });
+      }
     };
 
     const handlePointerUp = () => {
       const pendingCommit = pendingDragCommitRef.current;
-      pendingDragCommitRef.current = null;
+      resetPendingDragSchedule();
 
       if (pendingCommit) {
         applyConfigUpdateRef.current((current) => applyRegionRect(current, pendingCommit.region, pendingCommit.rect), {
@@ -399,18 +238,24 @@ export function useDisplayEditorCanvasWorkflow({
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
     return () => {
+      resetPendingDragSchedule();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       sessionSnapOptionsRef.current = undefined;
     };
-  }, [canvasInteraction]);
+  }, [canvasInteraction, resetPendingDragSchedule]);
 
   useEffect(() => {
-    if (selectedRegionLocked && canvasInteraction) {
+    if (!canvasInteraction) {
+      return;
+    }
+    const targetRegion = regions.find((r) => r.id === canvasInteraction.regionId);
+    if (!targetRegion || !targetRegion.geometry || isRegionLocked(lockedRegionIds, canvasInteraction.regionId)) {
+      resetPendingDragSchedule();
       setCanvasInteraction(null);
       setCanvasInteractionFeedback(null);
     }
-  }, [canvasInteraction, selectedRegionLocked]);
+  }, [canvasInteraction, lockedRegionIds, regions, resetPendingDragSchedule]);
 
   const viewportControls = useMemo(
     () => [
@@ -477,8 +322,10 @@ export function useDisplayEditorCanvasWorkflow({
             selectedRegion,
             selectedRegionIds,
             selectionFeedbackLabel,
+            session: overlaySessionRef.current,
             shellHeight: EDITOR_PREVIEW_SHELL_HEIGHT,
-            temporaryMeasureMode
+            temporaryMeasureMode,
+            viewport
           }),
         { enabled: displayEditorProfilingEnabled }
       ),
@@ -493,7 +340,8 @@ export function useDisplayEditorCanvasWorkflow({
       selectedRegionIds,
       selectionFeedbackLabel,
       temporaryMeasureMode,
-      temporaryMeasureTargetRegion
+      temporaryMeasureTargetRegion,
+      viewport
     ]
   );
 
@@ -567,12 +415,7 @@ export function useDisplayEditorCanvasWorkflow({
       });
     },
     onZoomDelta,
-    setDistanceLockArmed,
-    setOverlayPreset,
-    setTemporaryMeasureMode,
-    temporaryMeasureMode,
-    temporaryMeasureTargetRegionId,
-    viewport,
-    viewportControls
+    setDistanceLockArmed, setOverlayPreset, setTemporaryMeasureMode,
+    temporaryMeasureMode, temporaryMeasureTargetRegionId, viewport, viewportControls
   };
 }

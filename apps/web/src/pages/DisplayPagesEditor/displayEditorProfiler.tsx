@@ -2,15 +2,19 @@ import React from "react";
 
 export const DISPLAY_EDITOR_PROFILER_STORAGE_KEY = "solar-display:display-editor-profiler";
 
-type DisplayEditorProfileScope = "overlay-resolve" | "preview-render" | "region-resolve";
+export type DisplayEditorProfileScope =
+  | "overlay-resolve"
+  | "preview-render"
+  | "region-resolve";
 
 type PerformanceLike = {
   clearMarks?: (markName?: string) => void;
+  clearMeasures?: (measureName?: string) => void;
   mark?: (markName: string) => void;
   measure?: (measureName: string, startMark?: string, endMark?: string) => void;
 };
 
-type DisplayEditorProfilerOptions = {
+export type DisplayEditorProfilerOptions = {
   enabled?: boolean;
   performance?: PerformanceLike;
 };
@@ -65,6 +69,18 @@ export function measureDisplayEditorScope<T>(
     performanceApi.clearMarks?.(startMark);
     performanceApi.clearMarks?.(endMark);
   }
+}
+
+export function clearDisplayEditorProfileEntries(
+  options: DisplayEditorProfilerOptions = {}
+) {
+  const enabled = options.enabled ?? isDisplayEditorProfilingEnabled();
+  if (!enabled) {
+    return;
+  }
+  const performanceApi = options.performance ?? globalThis.performance;
+  performanceApi?.clearMarks?.();
+  performanceApi?.clearMeasures?.();
 }
 
 export function recordDisplayEditorRenderProfile(

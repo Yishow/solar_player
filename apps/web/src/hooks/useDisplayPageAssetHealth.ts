@@ -43,6 +43,14 @@ export function useDisplayPageAssetHealth(
   };
 
   useEffect(() => {
+    if (options.initialReport !== undefined) {
+      setReport(options.initialReport);
+      setIsLoading(false);
+      setErrorMessage("");
+    }
+  }, [options.initialReport]);
+
+  useEffect(() => {
     if (!enabled) {
       setIsLoading(false);
       return;

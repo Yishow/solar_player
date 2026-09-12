@@ -1,0 +1,24 @@
+{
+  "base_revision": "8fa2ec5976b5f6e3cbbda7f548277b8b96354f12",
+  "source_tree": "f6dff350a15b6df9967eb4b4dae868a8caa7156d",
+  "tracked_source_diff": "empty before instrumentation",
+  "lockfile_sha256": "4d7c347e8705f921518e97d8ddd8009a7f258fd86ca2e6372f571915cd23e048",
+  "fixture_source_sha256": "d5acb2c8f1d605e496b5b8dd08f13673057cb90f5f8bfe996d896456d65abaaa",
+  "playwright": "1.62.1",
+  "pnpm": "10.33.2",
+  "fixture": {
+    "version": "ui-performance-v1",
+    "assets100": "317d35078c4815a8528afec146ddff080121700ec7ad042115d25ed67a156ab6",
+    "assets1000": "e873dc0d1f50a64c032893d993eab69ce72f18bb56ae7cd282e01e8db4a3e4b5",
+    "regions100": "02d016bb47019de54b45ea92bb24e36c205f801d508996b95a61a7d734e3230e"
+  },
+  "environment": {
+    "node": "v24.15.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpus": 10,
+    "memoryBytes": 17179869184,
+    "release": "25.6.0"
+  }
+}

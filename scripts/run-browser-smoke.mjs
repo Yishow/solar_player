@@ -24,6 +24,7 @@ const ARTIFACT_ROOT = path.join(repoRoot, "artifacts", "browser-smoke");
 const PRODUCTION_DATABASE = path.join(repoRoot, "data", "solar-display.sqlite");
 const PRODUCTION_UPLOADS = path.join(repoRoot, "uploads", "images");
 const PRODUCTION_BRAND_UPLOADS = path.join(repoRoot, "uploads", "brand");
+const PRODUCTION_WEB_DIST = path.join(repoRoot, "apps/web/dist");
 
 function createRunId() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -284,6 +285,9 @@ async function main() {
   const runtimeManifestPath = path.join(runtimeDir, "runtime-manifest.json");
   const serverControlPath = path.join(runtimeDir, "server-control.json");
   const serverControlStatusPath = path.join(runtimeDir, "server-control-status.json");
+  const webDistDir = skipBuild
+    ? PRODUCTION_WEB_DIST
+    : path.join(workRoot, "web-dist");
 
   await mkdir(dataDir, { recursive: true });
   await mkdir(uploadsDir, { recursive: true });
@@ -296,6 +300,7 @@ async function main() {
   const productionDbHashBefore = hashPathIfPresent(PRODUCTION_DATABASE);
   const productionUploadsHashBefore = hashDirectorySnapshot(PRODUCTION_UPLOADS);
   const productionBrandHashBefore = hashDirectorySnapshot(PRODUCTION_BRAND_UPLOADS);
+  const productionWebDistHashBefore = hashDirectorySnapshot(PRODUCTION_WEB_DIST);
 
   console.log(`[browser-smoke] run-id=${runId}`);
   console.log(`[browser-smoke] base-url=${BASE_URL}`);
@@ -303,6 +308,7 @@ async function main() {
   console.log(`[browser-smoke] database=${databasePath}`);
   console.log(`[browser-smoke] uploads=${uploadsDir}`);
   console.log(`[browser-smoke] brand-uploads=${brandUploadsDir}`);
+  console.log(`[browser-smoke] web-dist=${webDistDir}`);
 
   let serverHandle = null;
   let exitCode = 1;
@@ -338,7 +344,7 @@ async function main() {
       }
       const webCode = await runCommand(
         "pnpm",
-        ["--filter", "@solar-display/web", "exec", "vite", "build"],
+        ["--filter", "@solar-display/web", "exec", "vite", "build", "--outDir", webDistDir],
         { env: buildEnv }
       );
       if (webCode !== 0) {
@@ -355,8 +361,8 @@ async function main() {
     if (!existsSync(path.join(repoRoot, "apps/server/dist/server.js"))) {
       throw new Error("Missing apps/server/dist/server.js after build");
     }
-    if (!existsSync(path.join(repoRoot, "apps/web/dist/index.html"))) {
-      throw new Error("Missing apps/web/dist/index.html after build");
+    if (!existsSync(path.join(webDistDir, "index.html"))) {
+      throw new Error(`Missing ${path.join(webDistDir, "index.html")} after build`);
     }
 
     const runtimeManifest = {
@@ -374,6 +380,7 @@ async function main() {
       serverControlPath,
       serverControlStatusPath,
       uploadsDir,
+      webDistDir,
       workRoot
     };
     await writeFile(runtimeManifestPath, JSON.stringify(runtimeManifest, null, 2));
@@ -389,7 +396,7 @@ async function main() {
       PORT: String(SMOKE_PORT),
       SOLAR_DISPLAY_ENV_FILE: envFilePath,
       UPLOADS_DIR: uploadsDir,
-      WEB_DIST_DIR: path.join(repoRoot, "apps/web/dist")
+      WEB_DIST_DIR: webDistDir
     };
     // Isolation: never inherit a management token from the ambient shell/.env.
     delete serverEnv.MANAGEMENT_ACCESS_TOKEN;
@@ -537,14 +544,16 @@ async function main() {
     const productionDbHashAfter = hashPathIfPresent(PRODUCTION_DATABASE);
     const productionUploadsHashAfter = hashDirectorySnapshot(PRODUCTION_UPLOADS);
     const productionBrandHashAfter = hashDirectorySnapshot(PRODUCTION_BRAND_UPLOADS);
+    const productionWebDistHashAfter = hashDirectorySnapshot(PRODUCTION_WEB_DIST);
 
     if (
       productionDbHashBefore !== productionDbHashAfter
       || productionUploadsHashBefore !== productionUploadsHashAfter
       || productionBrandHashBefore !== productionBrandHashAfter
+      || productionWebDistHashBefore !== productionWebDistHashAfter
     ) {
       const driftError = new Error(
-        "Production database/uploads hash changed during browser smoke; isolation contract broken."
+        "Production database/uploads/web-dist hash changed during browser smoke; isolation contract broken."
       );
       originalError = originalError ?? driftError;
       exitCode = 1;

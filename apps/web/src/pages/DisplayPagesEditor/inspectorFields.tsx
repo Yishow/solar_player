@@ -128,6 +128,9 @@ function DisplayEditorCanvasOverlayImpl({
         };
   const contentOffsetTop = overlayState.contentOffsetTop;
   const toShellY = (value: number) => value + contentOffsetTop;
+  const frameLookup =
+    overlayState.framesById ??
+    new Map(overlayState.frames.map((item) => [item.regionId, item]));
 
   return (
     <>
@@ -380,7 +383,7 @@ function DisplayEditorCanvasOverlayImpl({
           return null;
         }
 
-        const frame = overlayState.frames.find((item) => item.regionId === region.id);
+        const frame = frameLookup.get(region.id);
         const isSelected = selectedRegionIds.includes(region.id) || frame?.isSelected === true;
         const isLocked = lockedRegionIds.includes(region.id) || frame?.isLocked === true;
         const isVisible = frame?.visible ?? false;

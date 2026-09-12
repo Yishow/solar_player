@@ -6301,6 +6301,14 @@ test("browser smoke pins server dotenv to an isolated temp file", () => {
   assert.match(source, /SOLAR_DISPLAY_ENV_FILE:\s*envFilePath/u);
 });
 
+test("browser smoke isolates web dist to temp root and guards production web dist drift", () => {
+  const source = readFileSync(browserSmokeRunnerPath, "utf8");
+
+  assert.match(source, /PRODUCTION_WEB_DIST\s*=\s*path\.join\(repoRoot,\s*"apps\/web\/dist"\)/u);
+  assert.match(source, /WEB_DIST_DIR:\s*webDistDir/u);
+  assert.match(source, /productionWebDistHashBefore\s*!==\s*productionWebDistHashAfter/u);
+});
+
 // --- split-server-to-pc-thin-kiosk: device-agent + thin-kiosk install ---
 
 const solarDeviceAgentPath = path.join(repoRoot, "deploy/solar-device-agent.py");

@@ -20,8 +20,12 @@ const appRelease =
 
 function offlineManifestPlugin(): Plugin {
   let emittedAssets: Array<{ required: boolean; url: string }> = [];
+  let resolvedOutDir = resolve(repoRoot, "apps/web/dist");
   return {
     name: "solar-offline-manifest",
+    configResolved(config) {
+      resolvedOutDir = resolve(config.root, config.build.outDir);
+    },
     generateBundle(_options, bundle) {
       emittedAssets = Object.values(bundle)
         .filter((entry) =>
@@ -46,7 +50,7 @@ function offlineManifestPlugin(): Plugin {
       });
     },
     closeBundle() {
-      const outDir = resolve(repoRoot, "apps/web/dist");
+      const outDir = resolvedOutDir;
       const manifestAssets = emittedAssets.some((asset) => asset.url === "/index.html")
         ? emittedAssets
         : [{ required: true, url: "/index.html" }, ...emittedAssets];

@@ -22,6 +22,7 @@ import { type DisplayPagePublishingStateMap, useDisplayPagePublishingState } fro
 import { PublishReviewDrawer } from "./PublishReviewDrawer";
 import { AssetLibrary } from "../AssetLibrary";
 import { ShellDecorationEditor } from "../ShellDecorationEditor";
+import { parseWorkspaceRouteInputs } from "./workspaceLoadPlan";
 import { DisplayEditorCanvasPane } from "./canvasPane";
 import { DisplayEditorInspectorCard } from "./inspectorCard";
 import {
@@ -427,11 +428,41 @@ export function DisplayPagesEditor({
     [leftCollapsed, rightCollapsed, rightPanelWidth]
   );
   const shellDirty = useMemo(() => isShellWorkspaceDirty(shellWorkspaceState), [shellWorkspaceState]);
+
+  useEffect(() => {
+    if (initialImages !== undefined && images.length === 0) {
+      setImages(initialImages);
+    }
+  }, [initialImages, images.length]);
+
+  useEffect(() => {
+    if (initialShellDecorationDraft && !shellDirty) {
+      setShellWorkspaceState(createShellWorkspaceState(initialShellDecorationDraft));
+      setShellSelectedObjectId(
+        initialShellDecorationDraft.headerObjects[0]?.id ??
+          initialShellDecorationDraft.footerObjects[0]?.id ??
+          null
+      );
+    }
+  }, [initialShellDecorationDraft, shellDirty]);
+
+  useEffect(() => {
+    if (initialShellDecorationImages && initialShellDecorationImages.length > 0) {
+      setShellImagesState(initialShellDecorationImages);
+    }
+  }, [initialShellDecorationImages]);
+
   const appliedEditorDeepLinkRef = useRef<string | null>(null);
   const editMode = controlledEditMode ?? internalEditMode;
   const [rightTab, setRightTab] = useState<DisplayEditorRightTab>(initialEditorState?.rightTab ?? "inspector");
   const [isSavingAndChecking, setIsSavingAndChecking] = useState(false);
   const displayEditorProfilingEnabled = useMemo(() => isDisplayEditorProfilingEnabled(), []);
+
+  const workspaceRouteInputs = useMemo(
+    () => parseWorkspaceRouteInputs(searchParams),
+    [searchParams]
+  );
+  const workspacePlan = workspaceRouteInputs.plan;
 
   const selectedPage = useMemo(
     () => resolvedPageDefinitions.find((page) => page.id === selectedPageId) ?? resolvedPageDefinitions[0]!,
@@ -1492,6 +1523,7 @@ export function DisplayPagesEditor({
         </fieldset>
 
         <DisplayEditorCanvasPane
+          key={selectedPage.id}
           applyConfigUpdate={applyConfigUpdate}
           canRedo={canEdit && canRedo}
           canUndo={canEdit && canUndo}

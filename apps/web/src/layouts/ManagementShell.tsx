@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Outlet, useLoaderData } from "react-router-dom";
+import { Outlet, useLoaderData, useNavigation } from "react-router-dom";
 import { AppFooterNav } from "../components/AppFooterNav";
 import { AppHeader } from "../components/AppHeader";
 import { computeCanvasLayout } from "../components/displayCanvasLayout";
@@ -13,6 +13,16 @@ import type { ShellBootstrap } from "./shellBootstrap";
 import { ManagementUnlockScreen } from "../components/ManagementUnlockScreen";
 import { MANAGEMENT_ACCESS_DENIED_EVENT } from "../services/api";
 import { useManagementPasswordGate } from "../hooks/useManagementPasswordGate";
+import { ManagementNavigationPendingIndicator } from "../components/management/ManagementRouteState";
+
+function useSafeNavigationState(): "idle" | "loading" | "submitting" {
+  try {
+    const navigation = useNavigation();
+    return navigation?.state ?? "idle";
+  } catch {
+    return "idle";
+  }
+}
 
 const DESIGN_WIDTH = 1920;
 const DESIGN_HEIGHT = 1080;
@@ -146,6 +156,8 @@ export function ManagementShell({
     isHydrated
   });
   const shellDecorations = useShellDecorations();
+  const navigationState = useSafeNavigationState();
+  const isNavigating = navigationState === "loading";
 
   return (
     <ManagementShellFrame
@@ -158,6 +170,7 @@ export function ManagementShell({
       headerDecorationObjects={shellDecorations.headerObjects}
       initialBrandView={brandView}
     >
+      {isNavigating ? <ManagementNavigationPendingIndicator /> : null}
       <Outlet />
     </ManagementShellFrame>
   );

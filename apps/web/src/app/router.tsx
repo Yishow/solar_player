@@ -1,15 +1,12 @@
 import { Navigate, createBrowserRouter, redirect, type LoaderFunctionArgs } from "react-router-dom";
-import {
-  getConfiguredHiddenManagementRoutePaths,
-  getManagementRouteRedirectPath,
-  isManagementRouteHidden
-} from "./managementRouteVisibility";
+import { getConfiguredHiddenManagementRoutePaths, getManagementRouteRedirectPath, isManagementRouteHidden } from "./managementRouteVisibility";
 import { routeMetaList } from "./routeMeta";
 import { resolveDataHubCompatibilityRedirect } from "./dataHubCompatibility";
 import { LayoutShellRoute } from "../layouts/LayoutShell";
 import { ManagementShellRoute } from "../layouts/ManagementShell";
 import { loadShellBootstrap } from "../layouts/shellBootstrap";
 import { DisplayPageRouteHost, loadDisplayPageRoute } from "../pages/shared/displayPageRouteHost";
+import { ManagementRouteErrorBoundary, ManagementRouteState } from "../components/management/ManagementRouteState";
 
 type ManagementRouteLoader = (args: LoaderFunctionArgs) => unknown | Promise<unknown>;
 
@@ -375,7 +372,14 @@ export const router = createBrowserRouter([
         return loadDisplayPagesEditorRoute;
       }
     ),
-    hydrateFallbackElement: <></>,
+    hydrateFallbackElement: (
+      <ManagementRouteState
+        status="pending"
+        title="展示頁編輯器載入中..."
+        message="正在準備展示頁工作區與版面配置，請稍候。"
+      />
+    ),
+    errorElement: <ManagementRouteErrorBoundary />,
     lazy: async () => {
       const { DisplayPagesEditorRoute } = await import("../pages/DisplayPagesEditor/runtime");
       return { Component: DisplayPagesEditorRoute };

@@ -342,3 +342,129 @@ tests:
   - apps/web/src/pages/DeviceStatus/viewModel.test.ts
   - apps/web/src/services/deviceFleetApi.test.ts
 -->
+
+---
+### Requirement: Asset selection rerenders only cards with changed observable props
+
+AssetLibrary SHALL preserve stable card callbacks and unchanged asset object references during selection-only updates so that memoized cards with identical observable props do not rerender. Callback handling SHALL use the current asset and reference state. Existing rendered output, lazy thumbnails, filtering, batch limits, deletion guards, and asset return behavior SHALL remain unchanged.
+
+#### Scenario: Single selection updates only old and new cards
+
+- **WHEN** a mounted library of 1000 assets changes single selection from A to B with all other card props unchanged
+- **THEN** at most the A and B cards SHALL rerender
+- **AND** the final DOM, classes, styles, text, category counts, and selected asset SHALL match the baseline
+
+#### Scenario: One batch checkbox updates one card
+
+- **WHEN** an operator toggles one asset's batch selection with batch mode, assets, and other card props unchanged
+- **THEN** only that card SHALL rerender
+- **AND** the batch count and delete eligibility SHALL follow the existing rules
+
+#### Scenario: Stable callback still checks current deletion state
+
+- **WHEN** an asset reference or version changes after initial rendering and the operator opens deletion through the card
+- **THEN** the deletion flow SHALL use the latest asset/reference state and existing protection checks
+- **AND** callback memoization SHALL NOT permit stale reference or version data to bypass those checks
+
+<!-- @trace
+source: optimize-ui-loading-and-render-work
+updated: 2026-09-13
+code:
+  - artifacts/ui-performance/candidate-runs.json
+  - apps/web/src/hooks/useDisplayPageAssetHealth.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasPane.tsx
+  - solar_mqtt_go/internal/zoneidentity/prepare.go
+  - apps/web/src/pages/DisplayPagesEditor/EditorToolbar.tsx
+  - solar_mqtt_go/internal/service/service.go
+  - apps/web/src/pages/DisplayPagesEditor/runtime.tsx
+  - apps/server/src/plugins/inputValidationSupport.ts
+  - apps/web/src/pages/DisplayPagesEditor/draftInteractionState.ts
+  - apps/web/src/hooks/useDisplayPageConfig.ts
+  - scripts/deploy.test.mjs
+  - apps/server/src/plugins/runtimeInputValidation.ts
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
+  - apps/web/src/pages/DisplayPagesEditor/workspaceLoadPlan.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorProfiler.tsx
+  - apps/web/vite.config.ts
+  - apps/web/src/pages/DeviceFleet/DeviceFleetContent.tsx
+  - apps/web/src/pages/DeviceFleet/PairingDialog.tsx
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlaySession.ts
+  - apps/web/src/pages/CircuitSettings/CircuitRow.tsx
+  - tests/browser/fixtures/runtime.ts
+  - apps/web/src/pages/MqttSettings/MqttWeatherPanel.tsx
+  - scripts/run-browser-smoke.mjs
+  - apps/web/src/pages/DataHub/WeatherCards.tsx
+  - apps/web/src/pages/DisplayPagesEditor/uiPerformanceFixtures.ts
+  - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
+  - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
+  - solar_mqtt_go/zone_identity.go
+  - apps/web/src/pages/EnergyTrend/chartModel.ts
+  - apps/web/src/pages/ShellDecorationEditor/index.tsx
+  - apps/web/src/components/management/CustomSelect.tsx
+  - apps/web/src/pages/DisplayPagesEditor/shellWorkspaceState.ts
+  - solar_mqtt_go/internal/service/zone_identity.go
+  - apps/web/src/components/management/ManagementRouteState.tsx
+  - artifacts/ui-performance/baseline-runs.json
+  - apps/web/src/pages/DisplayPagesEditor/publishing.ts
+  - apps/web/src/components/management/useModalFocus.ts
+  - solar_mqtt_go/commands.go
+  - artifacts/ui-performance/fixture-identity.json
+  - apps/web/src/pages/EnergyTrend/index.tsx
+  - apps/web/src/pages/AssetLibrary/assetLibraryTypes.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts
+  - tests/browser/fixtures/ui-performance.ts
+  - apps/server/src/services/displayPagePublishingService.ts
+  - apps/web/src/pages/EnergyTrend/trend.css
+  - apps/web/src/app/router.tsx
+  - apps/web/src/pages/AssetLibrary/index.tsx
+  - apps/web/src/styles/management.css
+  - apps/server/src/plugins/managementInputValidation.ts
+  - apps/web/src/pages/PlaybackSettings/PlaybackSettingsFormSections.tsx
+  - apps/web/src/layouts/ManagementShell.tsx
+  - apps/web/src/pages/DisplayPagesEditor/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayComposition.ts
+  - apps/web/src/pages/AssetLibrary/AssetLibraryCard.tsx
+  - solar_mqtt_go/internal/zoneidentity/store.go
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlayHelpers.ts
+  - apps/web/src/pages/PlaybackSettings/index.tsx
+  - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasKeyboard.ts
+  - apps/web/src/pages/DisplayPagesEditor/canvasWorkflowConstraints.ts
+  - apps/web/src/pages/DeviceFleet/GroupEditDialog.tsx
+tests:
+  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/EditorToolbar.test.tsx
+  - apps/web/src/pages/DataHub/Weather.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/workspaceReturnContract.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/activeSurfaceRecompute.test.ts
+  - apps/web/src/pages/ShellDecorationEditor/index.test.tsx
+  - apps/web/src/hooks/useDisplayPageConfig.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/draftInteraction.test.tsx
+  - solar_mqtt_go/internal/service/zone_identity_test.go
+  - apps/server/src/routes/display-pages.test.ts
+  - solar_mqtt_go/internal/zoneidentity/prepare_test.go
+  - tests/browser/ui-interactions.spec.ts
+  - apps/server/src/routes/site-energy-readiness-publishing.test.ts
+  - apps/web/src/components/management/ManagementRouteState.interaction.test.tsx
+  - apps/server/src/routes/management-input-validation.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/editorStaging.test.tsx
+  - apps/web/src/components/management/CustomSelect.useSites.test.ts
+  - apps/web/src/pages/EnergyTrend/chartRendering.test.tsx
+  - apps/web/src/pages/EnergyTrend/chartModel.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/shellWorkspaceState.test.ts
+  - apps/web/src/components/management/ManagementRouteState.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/workspaceLoading.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/workspaceLoadPlan.test.ts
+  - apps/server/src/routes/energy-authoring-consumers.test.ts
+  - apps/web/src/pages/AssetLibrary/AssetLibraryCard.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/uiPerformanceFixtures.test.ts
+  - solar_mqtt_go/internal/zoneidentity/store_test.go
+  - apps/web/src/components/management/CustomSelect.interaction.test.tsx
+  - tests/browser/ui-performance.spec.ts
+  - apps/web/src/pages/ShellDecorationEditor/shellWorkspaceState.interaction.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/draftInteractionState.test.ts
+  - apps/web/src/pages/DisplayPagesEditor/displayEditorProfiler.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/canvasDragLifecycle.test.tsx
+  - apps/web/src/pages/PlaybackSettings/interaction.test.tsx
+  - apps/web/src/pages/DeviceFleet/dialogFocus.test.tsx
+  - apps/web/src/pages/DisplayPagesEditor/canvasOverlaySession.test.ts
+-->
