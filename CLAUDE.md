@@ -1,9 +1,31 @@
-<!-- SPECTRA:START v1.0.2 -->
+<!-- SPECTRA:START v1.3.0 -->
 
 # Spectra Instructions
 
-Specs live in `openspec/specs/`; named changes live in `openspec/changes/`.
-Use `docs/ops/workflow.md` to choose direct work or Spectra. For Spectra work, use `/spectra-*` skills; resume with `apply`, use `ingest` only when requirements change. Command routing and closeout rules live in the workflow document.
+This project uses Spectra for Spec-Driven Development(SDD). Specs live in `openspec/specs/`, change proposals in `openspec/changes/`.
+
+## Skills
+
+Each `/spectra-*` skill carries its own trigger description; these are the groups:
+
+- Shape and plan → `/spectra-discuss`, `/spectra-propose`
+- Continue tasks for an identified change → `/spectra-apply`
+- Update requirements or plans for an identified change → `/spectra-ingest`
+- Quality gate → `/spectra-verify`, `/spectra-review`, `/spectra-analyze`, `/spectra-audit`, `/spectra-drift`, `/spectra-debug`
+- Finish → `/spectra-archive`, `/spectra-commit`
+
+Explicit skill invocation takes precedence. Apply existing authorization within its unchanged scope.
+
+## Workflow
+
+discuss? → propose → apply ⇄ ingest → verify / review → archive
+
+- `discuss` is optional — skip if requirements are clear
+- Requirements change mid-work? Plan mode → `ingest` → resume `apply`
+
+## Parked Changes
+
+Changes can be parked（暫存）— temporarily moved out of `openspec/changes/`. Parked changes won't appear in `spectra list` but can be found with `spectra list --parked`. To restore: `spectra unpark <name>`. The `/spectra-apply` and `/spectra-ingest` skills disclose parking and restore when the named operation is already explicitly requested; respect a known refusal, otherwise ask for missing authorization.
 
 <!-- SPECTRA:END -->
 
