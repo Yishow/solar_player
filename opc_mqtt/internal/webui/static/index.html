@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DDE MQTT Bridge Dashboard</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <!-- Toast 訊息容器 -->
+  <div id="toast-container"></div>
+
+  <!-- 安全警告條 -->
+  <div class="warning">
+    <span>⚠️ 此介面無密碼保護，請僅在受信任的內部網路使用。</span>
+  </div>
+
+  <header>
+    <div>
+      <h1>DDE MQTT Bridge</h1>
+      <div class="subtitle">太陽能看板數據採集與發布控制台</div>
+    </div>
+    <button class="action secondary" id="theme-btn" onclick="toggleTheme()">☀️ 淺色模式</button>
+  </header>
+
+  <nav>
+    <button class="active" onclick="showTab('status', this)">狀態總覽</button>
+    <button onclick="showTab('mqtt', this)">MQTT 設定</button>
+    <button onclick="showTab('opc', this)">DDE 標籤編輯器</button>
+    <button onclick="showTab('virtual', this)">虛擬標籤公式</button>
+    <button onclick="showTab('system', this)">系統設定</button>
+  </nav>
+
+  <main>
+    <!-- 分頁：狀態總覽 -->
+    <section class="tab active" id="tab-status">
+      <div class="grid">
+        <div class="panel">
+          <h2>連線狀態</h2>
+          <div class="status-container">
+            <div class="status-pill">
+              <span class="dot" id="opc-dot"></span>
+              <span>DDE 狀態：<strong id="opc-status">--</strong></span>
+            </div>
+            <div class="status-pill">
+              <span class="dot" id="mqtt-dot"></span>
+              <span>MQTT 狀態：<strong id="mqtt-status">--</strong></span>
+            </div>
+          </div>
+          <p class="meta">最後讀取 DDE：<span id="last-read">--</span></p>
+          <p class="meta">最後發布 MQTT：<span id="last-publish">--</span></p>
+          <div class="actions">
+            <button class="action" onclick="doRead()">立即讀取 DDE</button>
+            <button class="action secondary" onclick="doPublish()">立即發布 MQTT</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>最近錯誤日誌</h2>
+          <div class="error-timeline" id="error-timeline">
+            <!-- 由 JavaScript 動態填入 -->
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>DDE Raw Tags 即時數值</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 30%;">標籤 ID</th>
+              <th style="width: 30%;">數值</th>
+              <th style="width: 15%;">狀態</th>
+              <th>錯誤訊息</th>
+            </tr>
+          </thead>
+          <tbody id="raw-table">
+            <!-- 由 JavaScript 輪詢渲染 -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>虛擬標籤即時數值</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 40%;">標籤名稱</th>
+              <th style="width: 40%;">計算值</th>
+              <th>狀態</th>
+            </tr>
+          </thead>
+          <tbody id="virtual-table">
+            <!-- 由 JavaScript 輪詢渲染 -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 分頁：MQTT 設定 -->
+    <section class="tab" id="tab-mqtt">
+      <div class="panel">
+        <h2>MQTT 連線與發布設定</h2>
+        <div class="form-grid">
+          <label for="broker">MQTT Broker 位址</label>
+          <input id="broker" type="text" placeholder="例如: 127.0.0.1">
+
+          <label for="broker-port">MQTT Port 連接埠</label>
+          <input id="broker-port" type="number" placeholder="預設: 1883">
+
+          <label for="mqtt-prefix">Topic 主題前綴</label>
+          <input id="mqtt-prefix" type="text" placeholder="例如: telemetry/solar">
+
+          <label for="mqtt-qos">QoS 品質等級</label>
+          <select id="mqtt-qos">
+            <option value="0">0 (最多一次)</option>
+            <option value="1">1 (至少一次)</option>
+            <option value="2">2 (剛好一次)</option>
+          </select>
+
+          <label for="mqtt-retain">MQTT Retain 訊息保留</label>
+          <select id="mqtt-retain">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+
+          <label for="publish-interval">自動發布週期 (秒)</label>
+          <input id="publish-interval" type="number" min="1">
+
+          <label for="publish-raw">發布 Raw Tag 數據</label>
+          <select id="publish-raw">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+
+          <label for="publish-virtual">發布虛擬標籤數據</label>
+          <select id="publish-virtual">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="action" onclick="syncFormToConfig(); configManager.save();">儲存並同步設定到 Bridge</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 分頁：DDE 標籤編輯器 -->
+    <section class="tab" id="tab-opc">
+      <div class="panel">
+        <h2>InTouch DDE 連線基本設定</h2>
+        <div class="form-grid">
+          <label for="dde-service">DDE Service</label>
+          <input id="dde-service" type="text" placeholder="預設: view">
+
+          <label for="dde-topic">DDE Topic</label>
+          <input id="dde-topic" type="text" placeholder="預設: tagname">
+
+          <label for="dde-timeout">DDE 讀取逾時 (ms)</label>
+          <input id="dde-timeout" type="number" placeholder="預設: 10000">
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>DDE Raw Tags 管理
+          <div style="display: flex; gap: 8px;">
+            <button class="action secondary" onclick="openBatchOpcModal()" style="font-size: 13px; padding: 6px 12px;">批次編輯 JSON</button>
+            <button class="action" onclick="addOpcTag()" style="font-size: 13px; padding: 6px 12px;">＋ 新增標籤</button>
+          </div>
+        </h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35%;">標籤 ID (ID)</th>
+              <th style="width: 50%;">DDE Item (dde_item)</th>
+              <th style="width: 15%;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="opc-editor-body">
+            <!-- JavaScript 渲染編輯列表 -->
+          </tbody>
+        </table>
+        <div class="actions" style="margin-top: 24px;">
+          <button class="action" onclick="syncFormToConfig(); configManager.save();">儲存並同步設定到 Bridge</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 分頁：虛擬標籤公式 -->
+    <section class="tab" id="tab-virtual">
+      <div class="panel">
+        <h2>虛擬標籤 (計算欄位)
+          <button class="action" onclick="openAddVirtualModal()" style="font-size: 13px; padding: 6px 12px;">＋ 新增虛擬標籤</button>
+        </h2>
+        <div class="virtual-card-grid" id="virtual-editor-list">
+          <!-- 由 JS 渲染虛擬標籤卡片 -->
+        </div>
+        <div class="actions" style="margin-top: 24px;">
+          <button class="action" onclick="syncFormToConfig(); configManager.save();">儲存並同步設定到 Bridge</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 分頁：系統設定 -->
+    <section class="tab" id="tab-system">
+      <div class="panel">
+        <h2>Bridge 系統監聽與管理設定</h2>
+        <div class="form-grid" style="margin-bottom: 20px;">
+          <label for="web-addr">Web UI 綁定 IP 位址</label>
+          <input id="web-addr" type="text" placeholder="預設: 127.0.0.1">
+
+          <label for="web-port">Web UI 埠號 (Port)</label>
+          <input id="web-port" type="number" placeholder="預設: 8080">
+        </div>
+        <div class="warning" style="border-radius: 12px; margin-bottom: 20px;">
+          <span>ℹ️ 提示：變更 Web 綁定位址或埠號後，Bridge 程式需要重啟才能套用新連接埠。</span>
+        </div>
+        <div class="actions">
+          <button class="action" onclick="syncFormToConfig(); configManager.save();">儲存並同步設定到 Bridge</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: 批次編輯 DDE Tags (JSON) -->
+  <div class="modal-overlay" id="modal-batch">
+    <div class="modal-content">
+      <h2>批次編輯 DDE Tags</h2>
+      <p class="helper">以 JSON 陣列格式直接編輯標籤清單。修改後請點選解析並同步。</p>
+      <textarea id="batch-json-area" style="font-family: monospace; font-size: 12px; min-height: 250px; margin-top: 10px;"></textarea>
+      <div class="actions" style="justify-content: flex-end; margin-top: 16px;">
+        <button class="action secondary" onclick="closeBatchModal()">取消</button>
+        <button class="action" onclick="saveBatchOpc()">解析並套用</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 新增/編輯虛擬標籤 -->
+  <div class="modal-overlay" id="modal-virtual">
+    <div class="modal-content" style="max-width: 600px;">
+      <h2 id="modal-vtitle">新增虛擬標籤</h2>
+      <div class="form-grid" style="margin-top: 16px;">
+        <label for="vname">標籤名稱 (ID)</label>
+        <input id="vname" type="text" placeholder="例如: Solar_Power_Total">
+
+        <label for="vunit">數值單位</label>
+        <input id="vunit" type="text" placeholder="例如: kW">
+
+        <label for="vdecimals">保留小數位數</label>
+        <input id="vdecimals" type="number" value="1" min="0" max="6">
+
+        <label for="venabled">是否啟用</label>
+        <select id="venabled">
+          <option value="true">啟用</option>
+          <option value="false">停用</option>
+        </select>
+      </div>
+
+      <h3 style="margin-top: 24px; font-size: 16px; display: flex; justify-content: space-between; align-items: center;">
+        公式運算步驟
+        <button class="action" onclick="addFormulaStepUI()" style="font-size: 12px; padding: 4px 10px;">＋ 新增計算項</button>
+      </h3>
+      <p class="helper" style="margin-bottom: 12px;">虛擬標籤將依序以設定的運算子與 Raw Tag 進行加減運算。</p>
+      
+      <div class="formula-builder" id="formula-steps">
+        <!-- JS 動態插入公式步驟 -->
+      </div>
+
+      <div class="actions" style="justify-content: flex-end; margin-top: 24px;">
+        <button class="action secondary" onclick="closeVirtualModal()">取消</button>
+        <button class="action" onclick="saveVirtualTag()">暫存並保留</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

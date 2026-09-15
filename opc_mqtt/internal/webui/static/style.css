@@ -1,0 +1,544 @@
+/* CSS 設計系統與 UI 變數定義 */
+:root {
+  /* 預設深色模式 (Dark Theme) */
+  --bg-gradient: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+  --panel-bg: rgba(30, 41, 59, 0.7);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --ink: #f8fafc;
+  --muted: #94a3b8;
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-soft: rgba(13, 148, 136, 0.15);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.15);
+  --warn: #eab308;
+  --warn-soft: rgba(234, 179, 8, 0.15);
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.15);
+  --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --blur-effect: blur(16px);
+  --input-bg: rgba(15, 23, 42, 0.6);
+  --input-border: rgba(255, 255, 255, 0.1);
+}
+
+.light-theme {
+  --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  --panel-bg: rgba(255, 255, 255, 0.75);
+  --panel-border: rgba(15, 23, 42, 0.08);
+  --ink: #0f172a;
+  --muted: #64748b;
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-soft: rgba(13, 148, 136, 0.1);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.1);
+  --warn: #d97706;
+  --warn-soft: rgba(217, 119, 6, 0.1);
+  --success: #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.1);
+  --card-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.2);
+  --input-bg: rgba(255, 255, 255, 0.9);
+  --input-border: rgba(148, 163, 184, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", "Segoe UI", "Microsoft JhengHei", sans-serif;
+  color: var(--ink);
+  background: var(--bg-gradient);
+  min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* 警示條與導覽 */
+.warning {
+  padding: 10px 20px;
+  background: var(--warn-soft);
+  border-bottom: 1px solid var(--warn);
+  font-size: 13px;
+  color: var(--warn);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+header {
+  padding: 32px 32px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  background: linear-gradient(to right, #2dd4bf, #0d9488);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* 導覽按鈕 */
+nav {
+  display: flex;
+  gap: 10px;
+  padding: 0 32px 20px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+nav button {
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  backdrop-filter: var(--blur-effect);
+  border-radius: 999px;
+  padding: 10px 20px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+nav button:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+nav button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+}
+
+/* 主面板與佈局 */
+main {
+  padding: 24px 32px 32px;
+}
+
+.tab {
+  display: none;
+}
+
+.tab.active {
+  display: block;
+}
+
+.grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  margin-bottom: 24px;
+}
+
+.panel {
+  background: var(--panel-bg);
+  backdrop-filter: var(--blur-effect);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: var(--card-shadow);
+  transition: border-color 0.3s ease;
+  margin-bottom: 24px;
+}
+
+.panel h2, .panel h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 狀態徽章 */
+.status-container {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border);
+  font-size: 14px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 10px var(--danger);
+  transition: all 0.3s ease;
+}
+
+.dot.ok {
+  background: var(--success);
+  box-shadow: 0 0 10px var(--success);
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 6px 0;
+}
+
+/* 按鈕樣式 */
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+button.action {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+button.action:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+button.action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.action.secondary {
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--ink);
+  border: 1px solid var(--panel-border);
+}
+
+button.action.secondary:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.3);
+}
+
+button.action.danger {
+  background: var(--danger);
+}
+
+button.action.danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+/* 表格樣式 */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--panel-border);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+tr {
+  transition: background-color 0.2s ease;
+}
+
+tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.light-theme tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+/* 表單與欄位 */
+.form-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px 20px;
+  align-items: center;
+}
+
+label {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 11px 16px;
+  background: var(--input-bg);
+  color: var(--ink);
+  font: inherit;
+  transition: all 0.25s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.helper {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* 標籤元件與卡片清單 */
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid rgba(13, 148, 136, 0.2);
+}
+
+.tag .btn-del {
+  cursor: pointer;
+  opacity: 0.6;
+  font-weight: bold;
+}
+
+.tag .btn-del:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+
+.virtual-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.virtual-card {
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 16px;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.virtual-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+/* 時間線錯誤日誌 */
+.error-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.error-item {
+  padding: 12px 16px;
+  background: var(--danger-soft);
+  border-left: 4px solid var(--danger);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #fca5a5;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.light-theme .error-item {
+  color: #991b1b;
+}
+
+/* Toast 提示系統 */
+#toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 14px 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 280px;
+  pointer-events: auto;
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1), fadeOut 0.3s 2.7s forwards;
+}
+
+.toast.success { background: #10b981; border: 1px solid #34d399; }
+.toast.error { background: #ef4444; border: 1px solid #f87171; }
+.toast.warn { background: #f59e0b; border: 1px solid #fbbf24; }
+
+/* 彈窗 / Modal 樣式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 5000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-content {
+  background: var(--panel-bg);
+  backdrop-filter: var(--blur-effect);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--card-shadow);
+  border-radius: 20px;
+  width: 90%;
+  max-width: 500px;
+  padding: 24px;
+  transform: translateY(20px);
+  transition: transform 0.25s ease;
+}
+
+.modal-overlay.active .modal-content {
+  transform: translateY(0);
+}
+
+/* 公式編輯器元素 */
+.formula-builder {
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--input-bg);
+  margin-top: 8px;
+}
+
+.formula-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.formula-step select {
+  flex: 1;
+}
+
+.formula-step .step-op {
+  width: 80px;
+  flex: none;
+}
+
+/* 動畫與效果 */
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+@keyframes flash-change {
+  0% { background-color: rgba(45, 212, 191, 0.4); } /* Teal glow */
+  100% { background-color: transparent; }
+}
+
+.flash-highlight {
+  animation: flash-change 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 響應式排版 */
+@media (max-width: 768px) {
+  header {
+    padding: 20px 20px 8px;
+  }
+  nav {
+    padding: 0 20px 16px;
+  }
+  main {
+    padding: 16px 20px 20px;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
