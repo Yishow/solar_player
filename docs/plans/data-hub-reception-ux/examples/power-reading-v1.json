@@ -1,0 +1,20 @@
+{
+  "exampleOnly": true,
+  "schemaVersion": 1,
+  "producer": "opc_mqtt",
+  "kind": "raw",
+  "site": "kn",
+  "publisherId": "example-kn-power-01",
+  "tagId": "SITE_LOAD_KWH",
+  "publisherConfigRevision": 1,
+  "sampleId": "example-acquisition-0001",
+  "value": "10000.125",
+  "unit": "kWh",
+  "measurementKind": "cumulative-energy",
+  "energyFlowRole": "consumption",
+  "sourceTimestamp": null,
+  "readAt": "2026-09-15T18:00:00+08:00",
+  "publishedAt": "2026-09-15T18:00:01+08:00",
+  "readStatus": "ok",
+  "sourceQuality": "unknown"
+}

@@ -1,0 +1,43 @@
+{
+  "baselineCommit": "fd405ebc2957232b6c622071622b9c7d830a3a42",
+  "previousPlanningCommit": "1ed0f563d215929f3c010da90a43da3b1399f64b",
+  "changes": [
+    "clarify-data-hub-connection-diagnostics",
+    "harden-data-hub-source-edit-transactions",
+    "plan-power-mqtt-publishing-and-kn-onboarding",
+    "redesign-data-hub-reception-workspace",
+    "refine-data-hub-source-inspector",
+    "streamline-data-hub-mapping-journey"
+  ],
+  "deltaSpecs": 9,
+  "requirements": 41,
+  "scenarios": 133,
+  "pendingTasks": {
+    "streamline-data-hub-mapping-journey": 20,
+    "refine-data-hub-source-inspector": 18,
+    "redesign-data-hub-reception-workspace": 20,
+    "harden-data-hub-source-edit-transactions": 23,
+    "plan-power-mqtt-publishing-and-kn-onboarding": 23,
+    "clarify-data-hub-connection-diagnostics": 17
+  },
+  "pendingTaskTotal": 121,
+  "localLinksChecked": 54,
+  "registry": {
+    "clRaw": 20,
+    "clVirtual": 10,
+    "knReservedTemplates": 6,
+    "allProposedEntriesDisabled": true
+  },
+  "planningTopicShapeAssertions": 9,
+  "decimalExampleAssertion": true,
+  "previousScenarioIdsPreserved": true,
+  "whitespaceCheckExitCode": 0,
+  "cliInstalled": {
+    "openspec": false,
+    "spectra": false
+  },
+  "officialValidation": "not-run",
+  "productionTests": "not-run",
+  "brokerDdeFieldAcceptance": "not-run",
+  "errors": []
+}
