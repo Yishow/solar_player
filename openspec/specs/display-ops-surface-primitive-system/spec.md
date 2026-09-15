@@ -66,7 +66,7 @@ code:
   - apps/web/src/pages/EnergyHistory/layout.ts
   - apps/web/src/pages/DeviceStatus/viewModel.ts
   - apps/web/src/pages/DeviceStatus/device.css
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/ImageManagement/imageManagement.css
   - apps/web/src/pages/CircuitSettings/circuitSettings.css
   - apps/web/src/pages/MqttSettings/index.tsx
@@ -173,7 +173,7 @@ code:
   - apps/web/src/pages/EnergyHistory/layout.ts
   - apps/web/src/pages/DeviceStatus/viewModel.ts
   - apps/web/src/pages/DeviceStatus/device.css
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/ImageManagement/imageManagement.css
   - apps/web/src/pages/CircuitSettings/circuitSettings.css
   - apps/web/src/pages/MqttSettings/index.tsx
@@ -279,7 +279,7 @@ code:
   - apps/web/src/pages/EnergyHistory/layout.ts
   - apps/web/src/pages/DeviceStatus/viewModel.ts
   - apps/web/src/pages/DeviceStatus/device.css
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/ImageManagement/imageManagement.css
   - apps/web/src/pages/CircuitSettings/circuitSettings.css
   - apps/web/src/pages/MqttSettings/index.tsx

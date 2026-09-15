@@ -6,7 +6,7 @@ import { displayPageTemplateKeys } from "@solar-display/shared";
 import { resolvePageRegionSchemas } from "./pageRegionSchemas";
 
 const repoRoot = path.resolve(import.meta.dirname, "../../../../..");
-const ledgerPath = path.join(repoRoot, "docs/fhd-editor-gap-ledger.md");
+const ledgerPath = path.join(repoRoot, "docs/reference-match/fhd-editor-gap-ledger.md");
 const ledger = () => readFileSync(ledgerPath, "utf8");
 
 const requiredReferencePaths = [

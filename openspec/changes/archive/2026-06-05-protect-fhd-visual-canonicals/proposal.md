@@ -25,8 +25,8 @@
 - Affected code:
   - Modified:
     - `openspec/specs/display-surface-visual-guardrails/spec.md`
-    - `docs/display-surface-visual-review-checklist.md`
-    - `docs/reference-match/all-pages-checklist.md`
+    - `docs/reference-match/display-surface-visual-review-checklist.md`
+    - `docs/archive/reference-match/2026-05/all-pages-checklist.md`
     - `apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts`
   - New:
     - `docs/reference-match/playback-visual-canonicals.md`

@@ -31,12 +31,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -61,12 +61,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -98,12 +98,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -128,12 +128,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -164,12 +164,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts

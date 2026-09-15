@@ -35,17 +35,17 @@ code:
   - apps/web/package.json
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/server/src/services/displaySeedAssetManifest.ts
-  - docs/reference-match/images-reference-quality-closeout.md
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - apps/server/src/services/displaySeedAssetBootstrapService.ts
   - scripts/capture-fhd-witness.mjs
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - data/server-runtime.lock.json
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - apps/web/src/pages/Solar/layout.ts
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -53,14 +53,14 @@ code:
   - apps/web/scripts/run-tests.mjs
   - apps/web/src/hooks/displayTransition.ts
   - apps/web/src/components/DisplayCanvas.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/layouts/playbackRotationFreeze.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
 tests:
   - apps/web/src/pages/Solar/layout.test.ts
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
@@ -112,17 +112,17 @@ code:
   - apps/web/package.json
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/server/src/services/displaySeedAssetManifest.ts
-  - docs/reference-match/images-reference-quality-closeout.md
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - apps/server/src/services/displaySeedAssetBootstrapService.ts
   - scripts/capture-fhd-witness.mjs
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - data/server-runtime.lock.json
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - apps/web/src/pages/Solar/layout.ts
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -130,14 +130,14 @@ code:
   - apps/web/scripts/run-tests.mjs
   - apps/web/src/hooks/displayTransition.ts
   - apps/web/src/components/DisplayCanvas.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/layouts/playbackRotationFreeze.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
 tests:
   - apps/web/src/pages/Solar/layout.test.ts
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
@@ -189,17 +189,17 @@ code:
   - apps/web/package.json
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/server/src/services/displaySeedAssetManifest.ts
-  - docs/reference-match/images-reference-quality-closeout.md
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - apps/server/src/services/displaySeedAssetBootstrapService.ts
   - scripts/capture-fhd-witness.mjs
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - data/server-runtime.lock.json
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - apps/web/src/pages/Solar/layout.ts
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -207,14 +207,14 @@ code:
   - apps/web/scripts/run-tests.mjs
   - apps/web/src/hooks/displayTransition.ts
   - apps/web/src/components/DisplayCanvas.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/layouts/playbackRotationFreeze.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
 tests:
   - apps/web/src/pages/Solar/layout.test.ts
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
@@ -265,17 +265,17 @@ code:
   - apps/web/package.json
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/server/src/services/displaySeedAssetManifest.ts
-  - docs/reference-match/images-reference-quality-closeout.md
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - apps/server/src/services/displaySeedAssetBootstrapService.ts
   - scripts/capture-fhd-witness.mjs
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - data/server-runtime.lock.json
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - apps/web/src/pages/Solar/layout.ts
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -283,14 +283,14 @@ code:
   - apps/web/scripts/run-tests.mjs
   - apps/web/src/hooks/displayTransition.ts
   - apps/web/src/components/DisplayCanvas.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/layouts/playbackRotationFreeze.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
 tests:
   - apps/web/src/pages/Solar/layout.test.ts
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts

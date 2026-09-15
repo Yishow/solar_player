@@ -29,8 +29,8 @@
   - Modified:
     - `openspec/specs/display-editor-page-authoring-coverage/spec.md`
     - `openspec/specs/display-page-draft-live-publishing/spec.md`
-    - `docs/reference-match/all-pages-audit.md`
-    - `docs/reference-match/all-pages-checklist.md`
+    - `docs/archive/reference-match/2026-05/all-pages-audit.md`
+    - `docs/archive/reference-match/2026-05/all-pages-checklist.md`
   - New:
     - `openspec/specs/display-launch-witness-gates/spec.md`
     - `docs/reference-match/display-launch-witness-matrix.md`

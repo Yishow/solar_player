@@ -49,9 +49,9 @@ code:
   - apps/web/src/components/DisplayPageLoadingState.tsx
   - docs/reference-match/display-launch-verification-pack.md
   - apps/server/src/app.ts
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .agents/skills/display-asset-generation/SKILL.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
@@ -72,12 +72,12 @@ code:
   - apps/web/src/layouts/shellBootstrap.ts
   - CLAUDE.md
   - .codex/hooks/fhd-evidence-reminder.js
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - .codex/hooks.json
   - docs/reference-match/fhd-surface-split-guide.md
   - .agents/skills/display-asset-generation/README.md
   - docs/reference-match/fhd-evidence-bundle-template.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/server/src/mqtt/MqttClientService.ts
 tests:
   - apps/web/src/components/shellFoundation.test.ts
@@ -158,9 +158,9 @@ code:
   - apps/web/src/components/DisplayPageLoadingState.tsx
   - docs/reference-match/display-launch-verification-pack.md
   - apps/server/src/app.ts
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .agents/skills/display-asset-generation/SKILL.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
@@ -181,12 +181,12 @@ code:
   - apps/web/src/layouts/shellBootstrap.ts
   - CLAUDE.md
   - .codex/hooks/fhd-evidence-reminder.js
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - .codex/hooks.json
   - docs/reference-match/fhd-surface-split-guide.md
   - .agents/skills/display-asset-generation/README.md
   - docs/reference-match/fhd-evidence-bundle-template.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/server/src/mqtt/MqttClientService.ts
 tests:
   - apps/web/src/components/shellFoundation.test.ts
@@ -266,9 +266,9 @@ code:
   - apps/web/src/components/DisplayPageLoadingState.tsx
   - docs/reference-match/display-launch-verification-pack.md
   - apps/server/src/app.ts
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .agents/skills/display-asset-generation/SKILL.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
@@ -289,12 +289,12 @@ code:
   - apps/web/src/layouts/shellBootstrap.ts
   - CLAUDE.md
   - .codex/hooks/fhd-evidence-reminder.js
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - .codex/hooks.json
   - docs/reference-match/fhd-surface-split-guide.md
   - .agents/skills/display-asset-generation/README.md
   - docs/reference-match/fhd-evidence-bundle-template.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/server/src/mqtt/MqttClientService.ts
 tests:
   - apps/web/src/components/shellFoundation.test.ts
@@ -357,12 +357,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -394,12 +394,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -421,7 +421,7 @@ The FHD evidence workflow SHALL store the five-page boundary classification as a
 
 | Downstream change | Cited artifact | Required cited tokens |
 | ----- | ----- | ----- |
-| `polish-overview-solar-reference-quality-targets` | `docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md` | `protected-product-choice`, `reference-quality-target`, `actual-gap` |
+| `polish-overview-solar-reference-quality-targets` | `docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md` | `protected-product-choice`, `reference-quality-target`, `actual-gap` |
 
 <!-- @trace
 source: capture-fhd-reference-informed-playback-witness-classifications
@@ -431,31 +431,31 @@ code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/Images/displayPageConfig.ts
   - data/server-runtime.lock.json
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/pages/Solar/displayPageConfig.ts
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
-  - docs/goal.md
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
+  - README.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/server/src/services/displaySeedAssetManifest.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/scripts/run-tests.mjs
   - docs/reference-match/fhd-evidence-bundle-template.md
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/web/src/components/DisplayCanvas.tsx
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - apps/web/src/pages/Solar/layout.ts
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - apps/web/package.json
   - apps/web/src/hooks/displayTransition.ts
   - apps/web/src/components/displayCanvasSurfaceStyle.ts
-  - docs/display-surface-visual-review-checklist.md
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - docs/fhd-witness/playback-closeout-matrix.md
   - apps/web/src/layouts/playbackRotationFreeze.ts
   - scripts/capture-fhd-witness.mjs

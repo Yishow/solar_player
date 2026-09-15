@@ -32,9 +32,9 @@ After each route check:
 
 ## Supporting Inputs
 
-- `docs/reference-match/all-pages-audit.md`
-- `docs/reference-match/all-pages-checklist.md`
+- `docs/archive/reference-match/2026-05/all-pages-audit.md`
+- `docs/archive/reference-match/2026-05/all-pages-checklist.md`
 - `docs/reference-match/playback-visual-canonicals.md`
-- `docs/display-surface-visual-review-checklist.md`
+- `docs/reference-match/display-surface-visual-review-checklist.md`
 
 Use these as supporting input or supporting reference only. The authoritative launch status still lives in the matrix.

@@ -41,14 +41,14 @@ code:
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - README.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/server/src/services/displayPagePublishingService.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/index.tsx
   - package.json
   - docs/reference-match/display-launch-witness-matrix.md
   - docs/reference-match/fhd-evidence-bundle-template.md
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - scripts/fhd-witness-config.mjs
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
@@ -57,7 +57,7 @@ code:
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/Sustainability/index.tsx
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/fhd-witness/playback-closeout-matrix.md
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/shared/displaySurfaceChrome.css
@@ -123,14 +123,14 @@ code:
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - README.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/server/src/services/displayPagePublishingService.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/index.tsx
   - package.json
   - docs/reference-match/display-launch-witness-matrix.md
   - docs/reference-match/fhd-evidence-bundle-template.md
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - scripts/fhd-witness-config.mjs
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
@@ -139,7 +139,7 @@ code:
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/Sustainability/index.tsx
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/fhd-witness/playback-closeout-matrix.md
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/shared/displaySurfaceChrome.css
@@ -203,14 +203,14 @@ code:
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - README.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/server/src/services/displayPagePublishingService.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/index.tsx
   - package.json
   - docs/reference-match/display-launch-witness-matrix.md
   - docs/reference-match/fhd-evidence-bundle-template.md
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - scripts/fhd-witness-config.mjs
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
@@ -219,7 +219,7 @@ code:
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/Sustainability/index.tsx
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/fhd-witness/playback-closeout-matrix.md
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/shared/displaySurfaceChrome.css

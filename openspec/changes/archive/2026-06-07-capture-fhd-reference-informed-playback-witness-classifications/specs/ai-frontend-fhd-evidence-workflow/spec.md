@@ -14,4 +14,4 @@ The FHD evidence workflow SHALL store the five-page boundary classification as a
 
 | Downstream change | Cited artifact | Required cited tokens |
 | ----- | ----- | ----- |
-| `polish-overview-solar-reference-quality-targets` | `docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md` | `protected-product-choice`, `reference-quality-target`, `actual-gap` |
+| `polish-overview-solar-reference-quality-targets` | `docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md` | `protected-product-choice`, `reference-quality-target`, `actual-gap` |

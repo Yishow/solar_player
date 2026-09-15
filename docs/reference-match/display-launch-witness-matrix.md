@@ -16,7 +16,7 @@
 
 Reference-informed boundary decisions explain status rationale; they do not replace this matrix. This file remains the single authoritative launch status ledger.
 
-The 2026-06-05 reference-informed witness batch is classified in `docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md`. That batch supplies DOM-measured visual/structure boundary evidence only; it does not provide fresh runtime parity, publish refresh, or fallback witness, so every route below stays `blocked`.
+The 2026-06-05 reference-informed witness batch is classified in `docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md`. That batch supplies DOM-measured visual/structure boundary evidence only; it does not provide fresh runtime parity, publish refresh, or fallback witness, so every route below stays `blocked`.
 
 - `protected-product-choice` can explain why an accepted header/footer height, position, or information-density difference is not a visual fail for the listed Protected Attributes.
 - `reference-quality-target` records page content quality direction, such as hero rhythm, flow clarity, media density, circuit language, or highlight rail density.
@@ -49,17 +49,17 @@ The 2026-06-05 reference-informed witness batch is classified in `docs/reference
 ## Recording Rule
 
 - 每次 rerun `display-launch-verification-pack.md`，都把 pass/fail/blocked 寫回這份 matrix。
-- supporting input 可來自 `docs/reference-match/all-pages-audit.md`、`docs/reference-match/all-pages-checklist.md`、editor/runtime targeted tests，但 launch status 只在這份 matrix 更新。
+- supporting input 可來自 `docs/archive/reference-match/2026-05/all-pages-audit.md`、`docs/archive/reference-match/2026-05/all-pages-checklist.md`、editor/runtime targeted tests，但 launch status 只在這份 matrix 更新。
 
 ## Closeout Progress Log
 
 視覺 closeout 進度只記錄 `reference-quality-target` 的 config-level 調整，**不改任何 launch gate 狀態**。視覺改善 ≠ launch-ready；所有 gate 在取得 fresh runtime parity / publish refresh / fallback witness 前維持 `blocked`。
 
-> Phase 2 fresh 視覺 witness（run id `polish-pass-1`，2026-06-06，主 session 親自讀圖）已完成，五頁 config-backed 目標確認朝 reference 收斂；詳見 `fhd-playback-witness-polish-pass-1-2026-06-06.md`。本輪僅 visual/structure 證據，runtime/fallback/publish 未取得，五頁維持 `blocked`。
+> Phase 2 fresh 視覺 witness（run id `polish-pass-1`，2026-06-06，主 session 親自讀圖）已完成，五頁 config-backed 目標確認朝 reference 收斂；詳見 `docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md`。本輪僅 visual/structure 證據，runtime/fallback/publish 未取得，五頁維持 `blocked`。
 
 | Date | Change | Route | Visual closeout result（config-level） | Launch status |
 | --- | --- | --- | --- | --- |
-| 2026-06-06 | `polish-overview-solar-reference-quality-targets` | `/overview` | hero fade 放寬、KPI padding/value 微增（editor-backed）。詳見 `overview-solar-reference-quality-closeout.md` | 維持 `blocked`（fresh 視覺 witness 批次延 Phase 2；runtime/fallback/publish 未驗） |
+| 2026-06-06 | `polish-overview-solar-reference-quality-targets` | `/overview` | hero fade 放寬、KPI padding/value 微增（editor-backed）。詳見 `docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md` | 維持 `blocked`（fresh 視覺 witness 批次延 Phase 2；runtime/fallback/publish 未驗） |
 | 2026-06-06 | `polish-overview-solar-reference-quality-targets` | `/solar` | connector 加粗、KPI 等寬（editor-backed）。actual-gap：node/connector 飽和、gold/leaf 基底、hero framing 留 Phase 4 | 維持 `blocked`（同上） |
 | 2026-06-06 | `polish-factory-circuit-reference-quality-targets` | `/factory-circuit` | 本輪無 editor-backed 值可調（review 大致一致）；全部質感差距為 actual-gap：電路線寬（PNG→可調 SVG）、node 飽和、CSS 字級、leaf binding，留 Phase 4 | 維持 `blocked`（fresh 視覺 witness 延 Phase 2；runtime/fallback/publish 未驗） |
 | 2026-06-06 | `polish-images-reference-quality-targets` | `/images` | media stage 放大、info panel 加寬、caption 字級加大（editor-backed）。BLOCKED：4-up thumbnail 需 Phase 3 補 seed。actual-gap：stage 圓角/全出血 toggle、thumb 圓角、copy lead 字級留 Phase 4 | 維持 `blocked`（同上；4-up 待補資料） |

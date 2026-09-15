@@ -7,7 +7,7 @@
 - 移除五個無引用的 region-builder：`buildOverviewRegions`、`buildSolarRegions`、`buildFactoryCircuitRegions`、`buildImagesRegions`、`buildSustainabilityRegions`，保留各檔 live 的 `*RuntimePageDefinition`（`renderPage` / `renderPreview` / `createSeedConfig` / `templateKey` 仍被 playback route host、preview registry 與 editor runtime 使用）。
 - 移除 `apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts`，以及僅服務 builder 的 `DisplayEditorRegion`、`DisplayEditorField` 型別與其在各 `runtime*.tsx` 的 import。
 - 移除只測試 builder helper 的測試項目（`runtimePageDefinitions.test.tsx` 對 `mediaPlacementFields` 的測試），保留針對 `*RuntimePageDefinition` 的 live 斷言。
-- 更新 `docs/fhd-editor-gap-ledger.md`：刪除引用已不存在 `build*Regions` 的描述段落，改以 `*DisplayPageEditorRegions` 為唯一權威 editor-region 來源敘述。
+- 更新 `docs/reference-match/fhd-editor-gap-ledger.md`：刪除引用已不存在 `build*Regions` 的描述段落，改以 `*DisplayPageEditorRegions` 為唯一權威 editor-region 來源敘述。
 - 更新 `fhdEditorCapabilityGapLedger.test.ts`：移除要求 ledger 內含 `build*Regions` 字串的斷言，使治理測試與移除後的事實一致。
 
 ## Non-Goals
@@ -40,6 +40,6 @@
     - apps/web/src/pages/DisplayPagesEditor/index.tsx
     - apps/web/src/pages/DisplayPagesEditor/runtimePageDefinitions.test.tsx
     - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
-    - docs/fhd-editor-gap-ledger.md
+    - docs/reference-match/fhd-editor-gap-ledger.md
   - Removed:
     - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts

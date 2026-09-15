@@ -46,3 +46,20 @@
 - `docs/goal.md` 是 0 byte 空檔；`docs/FHD.01.html`（31.8KB prototype）留在 docs/ 頂層，對弱模型是「當成 source of truth」的誘惑（禁止事項已涵蓋，但檔案還在）。
 - `.DS_Store` 有被 git 追蹤的痕跡（出現在 git status modified 清單）。
 - `scripts/deploy.test.mjs`（node:test 格式）不在 root `test` script 內，需 `node --test scripts/deploy.test.mjs` 手動跑；改 root `deploy.sh` 時容易忘。
+
+## 2026-09-15 更新章節
+
+這一節只補後續狀態，不回寫 2026-07-03 的正文判讀。
+
+### 已完成的後續修正
+
+1. 已刪除的 `docs/goal.md` 不再保留；repo 層高階產品入口改由 `README.md` 承接。
+2. `docs/FHD.01.html` 已先移到 prototype reference bucket，後續再移到 `docs/archive/prototype/FHD.01.html`，不再佔用 docs root。
+3. `openspec/specs/` 內原本對歷史 FHD.01 文件的直接引用已清理，改指向 `docs/reference/kuozui-green-fhd-html-prototype/review.html`。本輪實測清理範圍為 57 份 spec、189 處引用。
+4. `docs/archive/reference-match/2026-05/` 與 `docs/archive/reference-match/2026-06/` 已承接舊的 audit、checklist、witness evidence 與 refinement trace；`docs/reference-match/` 頂層只保留現行 workflow 與 active supporting input。
+
+### 尚未重跑或未在本輪處理的項目
+
+1. 問題 2 的 change 積壓數量沒有在本輪重新盤點；2026-07-03 的 43 個仍只能視為歷史快照，不可當作今天的現況數字。
+2. 問題 3 的 server test glob 根治法仍未在程式層實作；本輪只更新文件，不宣稱測試入口問題已解除。
+3. `.DS_Store` 追蹤狀態與 `scripts/deploy.test.mjs` 是否併入 root gate，這次都沒有再查證或更動。

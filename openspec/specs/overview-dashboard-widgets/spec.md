@@ -50,9 +50,9 @@ code:
   - apps/web/src/pages/Overview/index.tsx
   - data/server-runtime.lock.json
   - uploads/overview_bg-3.png
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - uploads/overview_bg-1.png
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/hooks/useOverviewWeather.ts
@@ -118,9 +118,9 @@ code:
   - apps/web/src/pages/Overview/index.tsx
   - data/server-runtime.lock.json
   - uploads/overview_bg-3.png
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - uploads/overview_bg-1.png
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/hooks/useOverviewWeather.ts
@@ -183,9 +183,9 @@ code:
   - apps/web/src/pages/Overview/index.tsx
   - data/server-runtime.lock.json
   - uploads/overview_bg-3.png
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - uploads/overview_bg-1.png
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/hooks/useOverviewWeather.ts

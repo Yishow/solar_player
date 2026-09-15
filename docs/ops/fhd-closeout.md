@@ -1,7 +1,7 @@
 # FHD / Display Closeout 守則
 
 > 讀者：任何要碰 playback 頁、shared display chrome、`/display-pages/editor` 或其他 FHD surface 的 agent。
-> 視覺基準：`docs/reference/FHD/` 的 14 張 PNG。prototype HTML（`docs/FHD.01.html`、`docs/reference/kuozui-green-fhd-html-prototype/`）**只是歷史參考，不是 source of truth**。
+> 視覺基準：`docs/reference/FHD/` 的 14 張 PNG。prototype HTML 以 `docs/reference/kuozui-green-fhd-html-prototype/` 為歷史參考；docs 頂層相容頁不是流程入口，也不是 source of truth。
 
 ## 現況判讀（2026-07-03）
 

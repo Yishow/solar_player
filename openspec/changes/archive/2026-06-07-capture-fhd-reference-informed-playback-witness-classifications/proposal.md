@@ -32,6 +32,6 @@
 
 - Affected specs: fhd-reference-informed-playback-witness-classification, display-launch-witness-gates, ai-frontend-fhd-evidence-workflow
 - Affected code:
-  - New: docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - New: docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
   - Modified: docs/reference-match/display-launch-witness-matrix.md, docs/fhd-witness/playback-closeout-matrix.md, docs/reference-match/fhd-evidence-bundle-template.md, apps/web/src/pages/displayLaunchWitnessGates.test.ts, apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - Removed: none

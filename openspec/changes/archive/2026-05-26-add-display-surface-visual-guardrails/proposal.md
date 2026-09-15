@@ -6,7 +6,7 @@ Display 五頁的質感問題不是單一 CSS bug，而是多個頁面長期各�
 
 ## What Changes
 
-- 新增 `docs/display-surface-visual-review-checklist.md`，作為 playback visual changes 的 review gate 與例外記錄模板。
+- 新增 `docs/reference-match/display-surface-visual-review-checklist.md`，作為 playback visual changes 的 review gate 與例外記錄模板。
 - 新增 display surface visual guardrail contract，定義五頁質感不退化的最低要求。
 - 規範新增/修改 display playback page 時必須檢查 shared semantic tokens、shared card primitives、hero/photo fade、ornaments、preview mode 與 FHD geometry。
 - 補充 targeted tests 或 lightweight assertions，確認 runtime definitions、preview definitions、shared card/chrome contracts 不被意外繞過。
@@ -40,4 +40,4 @@ Display 五頁的質感問題不是單一 CSS bug，而是多個頁面長期各�
   - `pnpm --filter @solar-display/web test`
   - `pnpm --filter @solar-display/web exec tsc --noEmit -p tsconfig.json`
   - `spectra validate --strict --changes add-display-surface-visual-guardrails`
-  - review checklist: `docs/display-surface-visual-review-checklist.md`
+  - review checklist: `docs/reference-match/display-surface-visual-review-checklist.md`

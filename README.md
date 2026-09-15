@@ -178,6 +178,7 @@ AI-led FHD witness capture 以 `docs/fhd-witness/playback-closeout-matrix.md` �
 - 穩定規格：`openspec/specs/`
 - 工作流：`discuss? → propose → apply ⇄ ingest → archive`
 - 已有明確 change 要實作時：從 repo 根目錄使用 `/spectra-apply <change-name>`
+- 補充文件總覽：`docs/README.md`
 - FHD 視覺 witness：`docs/reference/FHD/`
 - AI-led FHD witness capture：`docs/fhd-witness/playback-closeout-matrix.md`、`docs/fhd-witness/evidence-template.md`，使用 `pnpm run fhd:witness -- --base-url <url>`
 - FHD workflow 入口：`docs/reference-match/fhd-workflow-entrypoints.md`

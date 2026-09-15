@@ -274,7 +274,7 @@ code:
   - apps/server/src/metrics/solarGenerationProfile.ts
   - apps/web/src/services/api.ts
   - apps/server/src/services/generationTrendSeries.ts
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - apps/web/src/hooks/useImagesAutoplay.ts
   - .env.example
   - packages/shared/src/imagePlaylist.ts
@@ -389,7 +389,7 @@ code:
   - apps/server/src/metrics/solarGenerationProfile.ts
   - apps/web/src/services/api.ts
   - apps/server/src/services/generationTrendSeries.ts
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - apps/web/src/hooks/useImagesAutoplay.ts
   - .env.example
   - packages/shared/src/imagePlaylist.ts

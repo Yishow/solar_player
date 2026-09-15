@@ -40,7 +40,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
   - packages/shared/src/displayEditorSchema.ts
   - packages/shared/src/displayPageMediaEffects.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/hooks/useOverviewWeather.ts
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
@@ -49,14 +49,14 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/app/playbackRouteMeta.ts
   - apps/server/src/services/displayStoryService.ts
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - apps/web/src/pages/Overview/widgets/AlertNotificationsWidget.tsx
   - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/web/src/pages/displayPageMediaStyle.ts
   - apps/web/src/pages/Overview/index.tsx
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/pages/Images/images.css
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
@@ -73,7 +73,7 @@ code:
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - uploads/overview_bg-1.png
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
@@ -134,7 +134,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
   - packages/shared/src/displayEditorSchema.ts
   - packages/shared/src/displayPageMediaEffects.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/hooks/useOverviewWeather.ts
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
@@ -143,14 +143,14 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/app/playbackRouteMeta.ts
   - apps/server/src/services/displayStoryService.ts
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - apps/web/src/pages/Overview/widgets/AlertNotificationsWidget.tsx
   - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/web/src/pages/displayPageMediaStyle.ts
   - apps/web/src/pages/Overview/index.tsx
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/pages/Images/images.css
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
@@ -167,7 +167,7 @@ code:
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - uploads/overview_bg-1.png
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
@@ -228,7 +228,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
   - packages/shared/src/displayEditorSchema.ts
   - packages/shared/src/displayPageMediaEffects.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/hooks/useOverviewWeather.ts
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
@@ -237,14 +237,14 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/app/playbackRouteMeta.ts
   - apps/server/src/services/displayStoryService.ts
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - apps/web/src/pages/Overview/widgets/AlertNotificationsWidget.tsx
   - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/web/src/pages/displayPageMediaStyle.ts
   - apps/web/src/pages/Overview/index.tsx
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/pages/Images/images.css
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
@@ -261,7 +261,7 @@ code:
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - uploads/overview_bg-1.png
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
@@ -328,7 +328,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
   - packages/shared/src/displayEditorSchema.ts
   - packages/shared/src/displayPageMediaEffects.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/hooks/useOverviewWeather.ts
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/FactoryCircuit/index.tsx
@@ -337,14 +337,14 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/app/playbackRouteMeta.ts
   - apps/server/src/services/displayStoryService.ts
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - apps/web/src/pages/Overview/widgets/AlertNotificationsWidget.tsx
   - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/web/src/pages/displayPageMediaStyle.ts
   - apps/web/src/pages/Overview/index.tsx
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/pages/Images/images.css
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
@@ -361,7 +361,7 @@ code:
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - uploads/overview_bg-1.png
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
   - apps/web/src/pages/Images/index.tsx
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts

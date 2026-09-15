@@ -36,7 +36,7 @@ code:
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/displayPageConfig.ts
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - data/server-runtime.lock.json
 tests:
   - apps/web/src/pages/FactoryCircuit/configRender.test.ts
@@ -62,7 +62,7 @@ code:
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/displayPageConfig.ts
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - data/server-runtime.lock.json
 tests:
   - apps/web/src/pages/FactoryCircuit/configRender.test.ts

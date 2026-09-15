@@ -42,4 +42,4 @@
   - `pnpm --filter @solar-display/web exec tsc --noEmit -p tsconfig.json`
   - targeted live preview tests
   - `spectra validate --strict --changes split-live-display-preview-showcase-mode`
-  - review checklist: `docs/display-surface-visual-review-checklist.md`
+  - review checklist: `docs/reference-match/display-surface-visual-review-checklist.md`

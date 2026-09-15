@@ -31,7 +31,7 @@ code:
   - apps/web/src/pages/MqttSettings/mqttSettings.css
   - apps/web/src/pages/EnergyHistory/index.tsx
   - apps/web/src/components/management/RemoteSyncBanner.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/CircuitSettings/circuitSettings.css
   - apps/web/src/pages/CircuitSettings/viewModel.ts
   - apps/web/src/pages/DeviceStatus/layout.ts
@@ -137,7 +137,7 @@ code:
   - apps/web/src/pages/MqttSettings/mqttSettings.css
   - apps/web/src/pages/EnergyHistory/index.tsx
   - apps/web/src/components/management/RemoteSyncBanner.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/CircuitSettings/circuitSettings.css
   - apps/web/src/pages/CircuitSettings/viewModel.ts
   - apps/web/src/pages/DeviceStatus/layout.ts
@@ -241,7 +241,7 @@ code:
   - apps/web/src/pages/MqttSettings/mqttSettings.css
   - apps/web/src/pages/EnergyHistory/index.tsx
   - apps/web/src/components/management/RemoteSyncBanner.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/CircuitSettings/circuitSettings.css
   - apps/web/src/pages/CircuitSettings/viewModel.ts
   - apps/web/src/pages/DeviceStatus/layout.ts

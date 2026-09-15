@@ -70,7 +70,7 @@ code:
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
-  - docs/goal.md
+  - README.md
   - CLAUDE.md
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/shared/displaySurfaceChrome.css
@@ -88,10 +88,10 @@ code:
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
 tests:
   - apps/web/src/pages/fhdWitnessTooling.test.ts
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.test.ts
@@ -167,7 +167,7 @@ code:
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
-  - docs/goal.md
+  - README.md
   - CLAUDE.md
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/shared/displaySurfaceChrome.css
@@ -185,10 +185,10 @@ code:
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
 tests:
   - apps/web/src/pages/fhdWitnessTooling.test.ts
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.test.ts
@@ -242,7 +242,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - .vscode/tasks.json
 tests:
   - apps/web/src/pages/DisplayPagesEditor/fhdEditorCapabilityGapLedger.test.ts
@@ -284,7 +284,7 @@ code:
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
-  - docs/goal.md
+  - README.md
   - CLAUDE.md
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
   - apps/web/src/pages/shared/displaySurfaceChrome.css
@@ -302,10 +302,10 @@ code:
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
 tests:
   - apps/web/src/pages/fhdWitnessTooling.test.ts
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.test.ts

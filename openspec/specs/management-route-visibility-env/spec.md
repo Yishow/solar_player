@@ -85,7 +85,7 @@ code:
   - deploy/verify-kiosk-install.sh
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/server/src/db/migrations/016_co2_display_preference.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - scripts/prepare-raspi-user-data.sh
   - scripts/dev.test.mjs
   - apps/web/src/hooks/usePageRotation.ts
@@ -267,7 +267,7 @@ code:
   - deploy/verify-kiosk-install.sh
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/server/src/db/migrations/016_co2_display_preference.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - scripts/prepare-raspi-user-data.sh
   - scripts/dev.test.mjs
   - apps/web/src/hooks/usePageRotation.ts
@@ -442,7 +442,7 @@ code:
   - deploy/verify-kiosk-install.sh
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/server/src/db/migrations/016_co2_display_preference.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - scripts/prepare-raspi-user-data.sh
   - scripts/dev.test.mjs
   - apps/web/src/hooks/usePageRotation.ts

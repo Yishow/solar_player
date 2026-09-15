@@ -51,7 +51,7 @@ code:
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - CLAUDE.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/components/AppFooterNav.tsx
   - docs/README.md
   - apps/web/src/components/DisplayPageLoadingState.tsx
@@ -76,12 +76,12 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - README.md
   - apps/web/src/layouts/ManagementShell.tsx
-  - docs/reference-match/all-pages-audit.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .codex/hooks/fhd-evidence-reminder.js
   - docs/reference-match/playback-visual-canonicals.md
   - apps/web/src/layouts/shellBootstrap.ts
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
 tests:
   - apps/web/src/components/shellFoundation.test.ts
   - apps/web/src/pages/Overview/layout.test.ts
@@ -163,7 +163,7 @@ code:
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - CLAUDE.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/components/AppFooterNav.tsx
   - docs/README.md
   - apps/web/src/components/DisplayPageLoadingState.tsx
@@ -188,12 +188,12 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - README.md
   - apps/web/src/layouts/ManagementShell.tsx
-  - docs/reference-match/all-pages-audit.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .codex/hooks/fhd-evidence-reminder.js
   - docs/reference-match/playback-visual-canonicals.md
   - apps/web/src/layouts/shellBootstrap.ts
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
 tests:
   - apps/web/src/components/shellFoundation.test.ts
   - apps/web/src/pages/Overview/layout.test.ts
@@ -274,7 +274,7 @@ code:
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - CLAUDE.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/components/AppFooterNav.tsx
   - docs/README.md
   - apps/web/src/components/DisplayPageLoadingState.tsx
@@ -299,12 +299,12 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - README.md
   - apps/web/src/layouts/ManagementShell.tsx
-  - docs/reference-match/all-pages-audit.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .codex/hooks/fhd-evidence-reminder.js
   - docs/reference-match/playback-visual-canonicals.md
   - apps/web/src/layouts/shellBootstrap.ts
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
 tests:
   - apps/web/src/components/shellFoundation.test.ts
   - apps/web/src/pages/Overview/layout.test.ts

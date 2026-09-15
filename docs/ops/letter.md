@@ -37,3 +37,31 @@
 - 已完成：`docs/ops/`（diagnosis、conventions、fhd-closeout、dispatch、judgment、delegation、maintenance、letter）；CLAUDE.md 與 AGENTS.md 改寫為鏡像路由（原版備份 `~/.claude/backups/2026-07-03-solar-player-institution/`）；AGENTS.md 舊版的 web 測試入口錯誤已隨改寫消除。
 - 刻意未做（依使用者「本 session 只立制度」指示）：glob 一行修正（見上方第 2 件事）、43 change 清理（第 1 件事）、`docs/goal.md` 空檔與 `docs/FHD.01.html` 殘留的處置（見 diagnosis.md 次要觀察）。
 - 進行中的產品工作（與本制度無關，勿混淆）：working tree 上有 Sustainability 頁 household-equivalence 與累積電量單位換算的未提交變更，屬使用者既有工作。
+
+## 2026-09-15 補記
+
+這一節只補後續，不改寫 2026-07-03 的原始交接語氣與判讀。
+
+### 第 1 件事：change hygiene
+
+- 本輪沒有做 `openspec/changes/` 積壓清理，也沒有重算未歸檔 change 的數量。
+- 因此「43 個未歸檔 change」只應被視為 2026-07-03 的歷史快照，不應直接當作今天的操作依據。
+
+### 第 2 件事：server 測試 glob
+
+- 本輪沒有修改 `apps/server/package.json` 的 test script，也沒有驗證 server 頂層 5 檔測試是否已納入預設入口。
+- 這個風險仍要以本信原文與 `docs/ops/diagnosis.md` 的問題 3 理解，不能宣稱已解。
+
+### 第 3 件事：docs 頂層殘留物
+
+- 這部分已經有實際進展。
+- 已刪除的 `docs/goal.md` 不再保留；repo 目標入口改由 `README.md` 承接。
+- `docs/FHD.01.html` 已先移到 prototype reference bucket，後續再移到 `docs/archive/prototype/FHD.01.html`，不再適合作為 workflow 主入口。
+- `openspec/specs/` 內對歷史 FHD.01 文件的直接引用已改到 `docs/reference/kuozui-green-fhd-html-prototype/review.html`，避免新讀者被舊入口帶偏。
+- `docs/ops/fhd-closeout.md` 已改成只把 prototype 目錄當歷史參考，`docs/archive/reference-match/` 則承接舊的 audit / checklist / witness evidence。
+
+### 對未來 session 的新建議
+
+1. 這輪之後，舊的 FHD audit / checklist / witness evidence 已移到 `docs/archive/reference-match/`，不再佔用 `docs/reference-match/` 主線入口。
+2. `docs/archive/prototype/FHD.01.html` 也已進 archive；後續只要維持 `review.html` 作為 prototype 參考入口即可。
+3. 若還要再整理，重點會是 archive 內命名與 README 導覽，不再是主線 docs 的去雜訊。

@@ -1,6 +1,6 @@
 ## Context
 
-shared FHD shell、playback display pages 與 settings/management pages 的主要 alignment 已在前幾輪完成；目前 `docs/reference-match/all-pages-checklist.md` 只剩 `/factory-circuit`、`/sustainability`、`/offline` 三頁是 `partial`。這三頁雖然都屬播放/展示鏈的一部分，但風險類型不同：`/factory-circuit` 是 flow-heavy diagram page、`/sustainability` 是 storytelling + KPI page、`/offline` 是 runtime-sensitive error surface。新的 change 必須保持很窄，只補這三頁，不重開 shared shell 或 settings pages。
+shared FHD shell、playback display pages 與 settings/management pages 的主要 alignment 已在前幾輪完成；目前 `docs/archive/reference-match/2026-05/all-pages-checklist.md` 只剩 `/factory-circuit`、`/sustainability`、`/offline` 三頁是 `partial`。這三頁雖然都屬播放/展示鏈的一部分，但風險類型不同：`/factory-circuit` 是 flow-heavy diagram page、`/sustainability` 是 storytelling + KPI page、`/offline` 是 runtime-sensitive error surface。新的 change 必須保持很窄，只補這三頁，不重開 shared shell 或 settings pages。
 
 目前 codebase 已經有可複用的 pattern：page-local `layout.ts`、`*.css`、asset mapping、display-facing view-model fields，以及 `DisplayCanvas` / `AppHeader` / `AppFooterNav` 提供的共用 shell。這表示這一輪不需要再建立新架構，而是讓三頁回到相同的遷移模型。
 
@@ -75,7 +75,7 @@ shared FHD shell、playback display pages 與 settings/management pages 的主�
 
 - `pnpm --filter @solar-display/web exec tsx --test src/pages/FactoryCircuit/viewModel.test.ts src/pages/Sustainability/viewModel.test.ts src/pages/OfflineError/viewModel.test.ts` 成功。
 - `pnpm --filter @solar-display/web build` 成功。
-- `docs/reference-match/all-pages-checklist.md` 中三頁不再是 `partial`。
+- `docs/archive/reference-match/2026-05/all-pages-checklist.md` 中三頁不再是 `partial`。
 - code review 可確認三頁都有 page-local layout constants 與 route-local CSS，且沒有再依賴 `PageScaffold` title block 作為主體。
 
 **Scope boundaries**

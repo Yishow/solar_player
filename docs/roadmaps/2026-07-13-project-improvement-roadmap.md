@@ -417,8 +417,8 @@ upload route 有 10 MB 與副檔名限制，但目前直接把 buffer 寫入磁�
 
 - 修正 README 與 conventions 的 deploy path；不要讓文件繼續描述不存在的 `/opt` service contract。
 - OpenAPI 收斂前，把 Phase 1 skeleton 與 health-only 範圍說清楚。
-- 刪除空的 `docs/goal.md`，或填入真實且有 owner 的目標；空檔只會誤導 agent。
-- 將 `docs/FHD.01.html` 移入 archive 或加入顯眼 historical-only header；`docs/reference/FHD/` PNG 仍是 visual source of truth。
+- 刪除空的 `README.md`，或填入真實且有 owner 的目標；空檔只會誤導 agent。
+- 將 `docs/archive/prototype/FHD.01.html` 移入 archive 或加入顯眼 historical-only header；`docs/reference/FHD/` PNG 仍是 visual source of truth。
 - docs snapshot facts 要附日期；一旦 runtime/scripts 改變，同 change 同步更新與回收 workaround。
 
 ## 9. P3：可選的最小 CI
@@ -518,6 +518,16 @@ repo 目前沒有 `.github/workflows`，也沒有 lint、coverage、e2e 或 CI p
 - `docs/ops/diagnosis.md`
 - `docs/ops/fhd-closeout.md`
 - `docs/ops/judgment.md`
+
+## 2026-09-15 文件整理補記
+
+這一節只補文件後續狀態，不回寫 2026-07-13 的原始盤點。
+
+1. 已刪除的 `docs/goal.md` 不再保留；repo 層高階產品入口改由 `README.md` 承接。
+2. `docs/FHD.01.html` 已先移出 docs root，後續再進 `docs/archive/prototype/FHD.01.html`；現行 FHD source of truth 仍是 `docs/reference/FHD/` 與 `docs/reference-match/`。
+3. `openspec/specs/` 內原本對歷史 FHD.01 文件的直接引用已改到 `docs/reference/kuozui-green-fhd-html-prototype/review.html`。
+4. 舊的 reference-match audit、checklist 與 2026-06 historical evidence 已集中到 `docs/archive/reference-match/`；`docs/reference-match/` 頂層現在主要保留 current workflow docs、launch gates 與 active supporting input。
+5. 因此本 roadmap 中關於 `docs/goal.md` 空檔與 `docs/FHD.01.html` 頂層殘留的觀察，應視為 2026-07-13 的歷史快照，不是 2026-09-15 的現況。
 - `docs/ops/letter.md`
 - `docs/fhd-witness/playback-closeout-matrix.md`
 - `docs/reference-match/display-launch-witness-matrix.md`

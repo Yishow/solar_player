@@ -39,14 +39,14 @@ code:
   - docs/reference/Better/01.Overivew (大).png
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
   - apps/web/src/pages/Overview/displayPageConfig.ts
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/shared/displayCardStyleConfig.ts
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/layout.ts
   - uploads/overview_bg-4.png
   - apps/web/src/pages/Overview/viewModel.ts
   - apps/web/src/pages/Overview/overview.css
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/WeatherCardWidget.tsx
 tests:
   - apps/web/src/pages/Overview/densityViewModel.test.ts

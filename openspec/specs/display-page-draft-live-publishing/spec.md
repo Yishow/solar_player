@@ -367,8 +367,8 @@ tests:
 source: add-display-launch-witness-gates
 updated: 2026-05-27
 code:
-  - docs/display-surface-visual-review-checklist.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .codex/hooks/fhd-evidence-reminder.js
   - apps/server/src/mqtt/MqttClientService.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -377,7 +377,7 @@ code:
   - CLAUDE.md
   - apps/web/src/layouts/ManagementShell.tsx
   - AGENTS.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/web/src/app/router.tsx
   - apps/web/src/layouts/LayoutShell.tsx
   - docs/reference-match/fhd-evidence-bundle-template.md
@@ -392,7 +392,7 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - docs/reference-match/fhd-surface-split-guide.md
   - apps/web/src/hooks/useDisplayPageConfig.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/hooks/useMqttStatus.ts
   - apps/web/src/pages/shared/displayPageRouteHost.css

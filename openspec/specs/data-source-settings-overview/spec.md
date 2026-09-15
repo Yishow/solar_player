@@ -32,7 +32,7 @@ code:
   - packages/shared/src/types.ts
   - apps/server/src/routes/calculation-settings.ts
   - apps/web/scripts/run-tests.test.mjs
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/app/managementRouteVisibility.ts
   - apps/web/src/pages/ImageManagement/imageManagement.css
   - apps/web/src/pages/Overview/index.tsx
@@ -214,7 +214,7 @@ code:
   - packages/shared/src/types.ts
   - apps/server/src/routes/calculation-settings.ts
   - apps/web/scripts/run-tests.test.mjs
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/app/managementRouteVisibility.ts
   - apps/web/src/pages/ImageManagement/imageManagement.css
   - apps/web/src/pages/Overview/index.tsx
@@ -390,7 +390,7 @@ code:
   - packages/shared/src/types.ts
   - apps/server/src/routes/calculation-settings.ts
   - apps/web/scripts/run-tests.test.mjs
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/app/managementRouteVisibility.ts
   - apps/web/src/pages/ImageManagement/imageManagement.css
   - apps/web/src/pages/Overview/index.tsx
@@ -565,7 +565,7 @@ code:
   - packages/shared/src/types.ts
   - apps/server/src/routes/calculation-settings.ts
   - apps/web/scripts/run-tests.test.mjs
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/app/managementRouteVisibility.ts
   - apps/web/src/pages/ImageManagement/imageManagement.css
   - apps/web/src/pages/Overview/index.tsx

@@ -6,9 +6,9 @@
 ## 2. 寫出固定 witness 與 review 依據
 
 - [x] 2.1 完成 `Anchor review to per-page FHD witness pairs` 與 `Treat FHD witness pairs as the canonical comparison source` 的文件化，讓 `docs/reference-match/playback-visual-canonicals.md` 對五個 playback 頁明確列出 `docs/reference/FHD/` 圖像與對應 prototype artifact，並說清楚各頁的非協商質感要素；驗證方式為內容 review，確認五頁都有 witness pair 與 canonical attributes。
-- [x] 2.2 完成 `docs/display-surface-visual-review-checklist.md` 與 `docs/reference-match/all-pages-checklist.md` 更新，讓後續 review 直接檢查 hero hierarchy、card-family rhythm、photo fade、source-like icon、absolute composition 與 distance readability；驗證方式為內容 review，確認 checklist 條目可直接用於 playback visual change。
+- [x] 2.2 完成 `docs/reference-match/display-surface-visual-review-checklist.md` 與 `docs/archive/reference-match/2026-05/all-pages-checklist.md` 更新，讓後續 review 直接檢查 hero hierarchy、card-family rhythm、photo fade、source-like icon、absolute composition 與 distance readability；驗證方式為內容 review，確認 checklist 條目可直接用於 playback visual change。
 
 ## 3. 加入輕量 guardrail 與 review 記錄格式
 
 - [x] 3.1 完成 `Prevent management-surface drift inside playback focus regions` 的輕量 guardrail，讓既有 `apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts` 或同級測試能捕捉常見 dashboard/table/toolbar drift 類型；驗證方式為執行 `pnpm --filter @solar-display/web test -- src/pages/displaySurfaceVisualGuardrails.test.ts`。
-- [x] 3.2 完成 review artifact 的 preserved-or-changed canonical 記錄格式，讓 `docs/display-surface-visual-review-checklist.md` 與 `docs/reference-match/playback-visual-canonicals.md` 能記錄哪些 protected canonicals 被保留、哪些是有意偏離及其理由；驗證方式為內容 review，確認 reviewer 不需要依賴聊天記憶就能判斷變更是否退化。
+- [x] 3.2 完成 review artifact 的 preserved-or-changed canonical 記錄格式，讓 `docs/reference-match/display-surface-visual-review-checklist.md` 與 `docs/reference-match/playback-visual-canonicals.md` 能記錄哪些 protected canonicals 被保留、哪些是有意偏離及其理由；驗證方式為內容 review，確認 reviewer 不需要依賴聊天記憶就能判斷變更是否退化。

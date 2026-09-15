@@ -46,9 +46,9 @@ source: add-overview-density-widgets
 updated: 2026-06-07
 code:
   - apps/web/src/pages/Overview/viewModel.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/layout.ts
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/WeatherCardWidget.tsx
   - data/server-runtime.lock.json
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
@@ -135,9 +135,9 @@ source: add-overview-density-widgets
 updated: 2026-06-07
 code:
   - apps/web/src/pages/Overview/viewModel.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/layout.ts
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/WeatherCardWidget.tsx
   - data/server-runtime.lock.json
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx

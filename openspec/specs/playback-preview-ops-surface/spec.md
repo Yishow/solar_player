@@ -56,7 +56,7 @@ code:
   - apps/web/src/pages/PlaybackSettings/index.tsx
   - data/server-runtime.lock.json
   - apps/web/src/pages/ImageManagement/index.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/components/management/opsSurfacePrimitives.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/components/management/RemoteSyncBanner.tsx
@@ -161,7 +161,7 @@ code:
   - apps/web/src/pages/PlaybackSettings/index.tsx
   - data/server-runtime.lock.json
   - apps/web/src/pages/ImageManagement/index.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/components/management/opsSurfacePrimitives.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/components/management/RemoteSyncBanner.tsx
@@ -267,7 +267,7 @@ code:
   - apps/web/src/pages/PlaybackSettings/index.tsx
   - data/server-runtime.lock.json
   - apps/web/src/pages/ImageManagement/index.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/components/management/opsSurfacePrimitives.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/components/management/RemoteSyncBanner.tsx

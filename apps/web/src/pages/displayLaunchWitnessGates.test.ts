@@ -29,11 +29,11 @@ const verificationPackDoc = readFileSync(
   "utf8"
 );
 const allPagesAuditDoc = readFileSync(
-  path.join(repoRoot, "docs/reference-match/all-pages-audit.md"),
+  path.join(repoRoot, "docs/archive/reference-match/2026-05/all-pages-audit.md"),
   "utf8"
 );
 const allPagesChecklistDoc = readFileSync(
-  path.join(repoRoot, "docs/reference-match/all-pages-checklist.md"),
+  path.join(repoRoot, "docs/archive/reference-match/2026-05/all-pages-checklist.md"),
   "utf8"
 );
 

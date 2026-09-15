@@ -31,7 +31,7 @@ code:
   - data/server-runtime.lock.json
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - apps/web/src/pages/ImageManagement/viewModel.ts
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/Overview/assets/overview-leaf-reference-crop.png
   - apps/web/src/components/management/opsSurfacePrimitives.tsx
   - apps/web/src/pages/Overview/index.tsx
@@ -137,7 +137,7 @@ code:
   - data/server-runtime.lock.json
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - apps/web/src/pages/ImageManagement/viewModel.ts
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/Overview/assets/overview-leaf-reference-crop.png
   - apps/web/src/components/management/opsSurfacePrimitives.tsx
   - apps/web/src/pages/Overview/index.tsx
@@ -242,7 +242,7 @@ code:
   - data/server-runtime.lock.json
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - apps/web/src/pages/ImageManagement/viewModel.ts
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/Overview/assets/overview-leaf-reference-crop.png
   - apps/web/src/components/management/opsSurfacePrimitives.tsx
   - apps/web/src/pages/Overview/index.tsx

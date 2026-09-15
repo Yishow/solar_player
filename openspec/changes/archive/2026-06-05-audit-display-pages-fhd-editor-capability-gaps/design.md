@@ -15,7 +15,7 @@
 
 **Goals:**
 
-- 產出一份可交接的 `docs/fhd-editor-gap-ledger.md`。
+- 產出一份可交接的 `docs/reference-match/fhd-editor-gap-ledger.md`。
 - 逐頁列出 FHD reference、現有 runtime surface、現有 editor region、現有 field group、缺口、缺口分類、下游 change。
 - 明確標示哪些缺口已由現有 editor control 覆蓋，後續只需調值與 witness。
 - 明確標示哪些缺口需要新增 editor capability，並綁到四個已 park change 或另開 change。
@@ -65,7 +65,7 @@ The ledger SHALL map editor gaps to downstream work:
 
 ## Implementation Contract
 
-- **Behavior**: After this change, a contributor can open `docs/fhd-editor-gap-ledger.md` and determine which FHD gaps are already editor-backed, which require editor work, which are non-editor product/runtime work, and which differences are accepted.
+- **Behavior**: After this change, a contributor can open `docs/reference-match/fhd-editor-gap-ledger.md` and determine which FHD gaps are already editor-backed, which require editor work, which are non-editor product/runtime work, and which differences are accepted.
 - **Data shape**: The ledger SHALL be markdown with a stable table per page. Each row SHALL include page, route, FHD reference path, surface, current editor region id, current editor field group, current evidence path or code anchor, classification, downstream owner, next verification, and notes.
 - **Evidence source**: The audit SHALL cite current repo files and optional screenshots. It SHALL not cite `docs/reference-match/` as workflow input.
 - **Failure modes**: If a page surface cannot be classified from code, the row SHALL be `new-editor-capability` or `non-editor-runtime-gap` only after naming the missing code evidence. It SHALL not be left blank.

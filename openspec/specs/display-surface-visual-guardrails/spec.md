@@ -21,7 +21,7 @@ The implementation SHALL provide a repeatable visual review checklist for playba
 
 - **GIVEN** a change updates shared display chrome or playback-page presentation
 - **WHEN** reviewers inspect the change artifact or review note
-- **THEN** they can find `docs/display-surface-visual-review-checklist.md`
+- **THEN** they can find `docs/reference-match/display-surface-visual-review-checklist.md`
 - **AND** the note records any shared primitive or geometry exceptions
 
 
@@ -49,7 +49,7 @@ code:
   - apps/web/src/components/displayPageAssetHealthPanels.tsx
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
   - apps/web/src/components/PageContainer.tsx
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
@@ -137,7 +137,7 @@ code:
   - apps/web/src/components/displayPageAssetHealthPanels.tsx
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
   - apps/web/src/components/PageContainer.tsx
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
@@ -218,7 +218,7 @@ code:
   - apps/web/src/components/displayPageAssetHealthPanels.tsx
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
   - apps/web/src/components/PageContainer.tsx
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
@@ -304,7 +304,7 @@ code:
   - apps/web/src/components/displayPageAssetHealthPanels.tsx
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
   - apps/web/src/components/PageContainer.tsx
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
@@ -371,9 +371,9 @@ source: protect-fhd-visual-canonicals
 updated: 2026-05-27
 code:
   - openspec/specs/display-surface-visual-guardrails/spec.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/reference-match/playback-visual-canonicals.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
 tests:
   - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
 -->
@@ -383,7 +383,7 @@ tests:
 source: protect-fhd-visual-canonicals
 updated: 2026-05-27
 code:
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/shared/displayPageRouteHost.css
   - docs/README.md
@@ -397,7 +397,7 @@ code:
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/app/router.tsx
   - apps/web/src/layouts/shellBootstrap.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
   - README.md
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -407,7 +407,7 @@ code:
   - .codex/hooks.json
   - apps/server/src/mqtt/MqttClientService.ts
   - .codex/hooks/fhd-evidence-reminder.js
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - CLAUDE.md
   - docs/reference-match/fhd-exception-ledger-template.md
   - apps/web/src/hooks/useMqttStatus.ts
@@ -415,7 +415,7 @@ code:
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/server/src/app.ts
   - docs/reference-match/fhd-workflow-entrypoints.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/web/src/components/DisplayPageLoadingState.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
@@ -478,9 +478,9 @@ source: protect-fhd-visual-canonicals
 updated: 2026-05-27
 code:
   - openspec/specs/display-surface-visual-guardrails/spec.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/reference-match/playback-visual-canonicals.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
 tests:
   - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
 -->
@@ -490,7 +490,7 @@ tests:
 source: protect-fhd-visual-canonicals
 updated: 2026-05-27
 code:
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/shared/displayPageRouteHost.css
   - docs/README.md
@@ -504,7 +504,7 @@ code:
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/app/router.tsx
   - apps/web/src/layouts/shellBootstrap.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
   - README.md
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -514,7 +514,7 @@ code:
   - .codex/hooks.json
   - apps/server/src/mqtt/MqttClientService.ts
   - .codex/hooks/fhd-evidence-reminder.js
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - CLAUDE.md
   - docs/reference-match/fhd-exception-ledger-template.md
   - apps/web/src/hooks/useMqttStatus.ts
@@ -522,7 +522,7 @@ code:
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/server/src/app.ts
   - docs/reference-match/fhd-workflow-entrypoints.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/web/src/components/DisplayPageLoadingState.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
@@ -585,9 +585,9 @@ source: protect-fhd-visual-canonicals
 updated: 2026-05-27
 code:
   - openspec/specs/display-surface-visual-guardrails/spec.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/reference-match/playback-visual-canonicals.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
 tests:
   - apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts
 -->
@@ -597,7 +597,7 @@ tests:
 source: protect-fhd-visual-canonicals
 updated: 2026-05-27
 code:
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/shared/displayPageRouteHost.css
   - docs/README.md
@@ -611,7 +611,7 @@ code:
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/app/router.tsx
   - apps/web/src/layouts/shellBootstrap.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
   - README.md
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -621,7 +621,7 @@ code:
   - .codex/hooks.json
   - apps/server/src/mqtt/MqttClientService.ts
   - .codex/hooks/fhd-evidence-reminder.js
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - CLAUDE.md
   - docs/reference-match/fhd-exception-ledger-template.md
   - apps/web/src/hooks/useMqttStatus.ts
@@ -629,7 +629,7 @@ code:
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/server/src/app.ts
   - docs/reference-match/fhd-workflow-entrypoints.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/web/src/components/DisplayPageLoadingState.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
@@ -713,9 +713,9 @@ code:
   - apps/web/src/components/DisplayPageLoadingState.tsx
   - docs/reference-match/display-launch-verification-pack.md
   - apps/server/src/app.ts
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .agents/skills/display-asset-generation/SKILL.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
@@ -736,12 +736,12 @@ code:
   - apps/web/src/layouts/shellBootstrap.ts
   - CLAUDE.md
   - .codex/hooks/fhd-evidence-reminder.js
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - .codex/hooks.json
   - docs/reference-match/fhd-surface-split-guide.md
   - .agents/skills/display-asset-generation/README.md
   - docs/reference-match/fhd-evidence-bundle-template.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/server/src/mqtt/MqttClientService.ts
 tests:
   - apps/web/src/components/shellFoundation.test.ts
@@ -796,12 +796,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -826,12 +826,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -855,12 +855,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts

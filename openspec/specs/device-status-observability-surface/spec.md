@@ -119,7 +119,7 @@ code:
   - apps/web/src/pages/EnergyTrend/index.tsx
   - apps/web/src/pages/Overview/index.tsx
   - apps/web/src/pages/SlideshowPreview/preview.css
-  - docs/goal.md
+  - README.md
   - data/server-runtime.lock.json
   - apps/web/src/pages/DisplayPagesEditor/rotationPreview.ts
   - apps/web/src/hooks/useDisplayPageConfig.ts
@@ -223,7 +223,7 @@ code:
   - apps/web/src/pages/EnergyTrend/index.tsx
   - apps/web/src/pages/Overview/index.tsx
   - apps/web/src/pages/SlideshowPreview/preview.css
-  - docs/goal.md
+  - README.md
   - data/server-runtime.lock.json
   - apps/web/src/pages/DisplayPagesEditor/rotationPreview.ts
   - apps/web/src/hooks/useDisplayPageConfig.ts

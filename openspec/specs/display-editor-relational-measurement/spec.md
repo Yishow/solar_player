@@ -43,7 +43,7 @@ code:
   - apps/web/src/pages/shared/displaySurfaceNodes.css
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/solar.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/SlideshowPreview/preview.css
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/styles/tokens.css
@@ -113,7 +113,7 @@ code:
   - apps/web/src/pages/shared/displaySurfaceNodes.css
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/solar.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/SlideshowPreview/preview.css
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/styles/tokens.css
@@ -183,7 +183,7 @@ code:
   - apps/web/src/pages/shared/displaySurfaceNodes.css
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/solar.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/SlideshowPreview/preview.css
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/styles/tokens.css
@@ -252,7 +252,7 @@ code:
   - apps/web/src/pages/shared/displaySurfaceNodes.css
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/solar.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/SlideshowPreview/preview.css
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/styles/tokens.css

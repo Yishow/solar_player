@@ -15,5 +15,5 @@
 
 ## 4. 對齊現有 audit 並鎖定單一狀態來源
 
-- [x] 4.1 完成 `Keep launch gates evidence-driven inside the current repo workflow` 的 audit 對齊，讓 `docs/reference-match/all-pages-audit.md` 與 `docs/reference-match/all-pages-checklist.md` 映射到新的 witness matrix，並明確作為輸入與盤點輔助，而不是平行的 launch status ledger；驗證方式為內容 review，確認 launch-critical gates 能從 audit 文件追溯到 matrix。
+- [x] 4.1 完成 `Keep launch gates evidence-driven inside the current repo workflow` 的 audit 對齊，讓 `docs/archive/reference-match/2026-05/all-pages-audit.md` 與 `docs/archive/reference-match/2026-05/all-pages-checklist.md` 映射到新的 witness matrix，並明確作為輸入與盤點輔助，而不是平行的 launch status ledger；驗證方式為內容 review，確認 launch-critical gates 能從 audit 文件追溯到 matrix。
 - [x] 4.2 完成 `Keep launch status in one authoritative matrix` 與 `Use a page-by-page witness matrix instead of a vague launch checklist` 的權威來源收尾，讓 `docs/reference-match/display-launch-witness-matrix.md` 成為唯一 pass/fail/blocked 狀態記錄，`docs/reference-match/display-launch-verification-pack.md` 只負責 procedure 與 rerun 指引；驗證方式為內容 review，確認 reviewer 不需要同時維護多份 launch 狀態文件。

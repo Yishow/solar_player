@@ -32,7 +32,7 @@ code:
   - packages/shared/src/displayStory.ts
   - apps/web/src/app/playbackRouteMeta.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/Overview/overview.css
   - apps/server/src/services/displayStoryService.ts
   - apps/web/src/app/routeMeta.ts
@@ -45,7 +45,7 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
   - apps/web/src/hooks/useOverviewWeather.ts
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -59,7 +59,7 @@ code:
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/viewModel.ts
   - apps/web/src/pages/shared/displayCardStyleConfig.ts
   - uploads/overview_bg-1.png
@@ -70,7 +70,7 @@ code:
   - packages/shared/src/displayEditorSchema.ts
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - apps/web/src/pages/Overview/index.tsx
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
   - apps/web/src/pages/Images/images.css
@@ -139,7 +139,7 @@ code:
   - packages/shared/src/displayStory.ts
   - apps/web/src/app/playbackRouteMeta.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/Overview/overview.css
   - apps/server/src/services/displayStoryService.ts
   - apps/web/src/app/routeMeta.ts
@@ -152,7 +152,7 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
   - apps/web/src/hooks/useOverviewWeather.ts
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -166,7 +166,7 @@ code:
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/viewModel.ts
   - apps/web/src/pages/shared/displayCardStyleConfig.ts
   - uploads/overview_bg-1.png
@@ -177,7 +177,7 @@ code:
   - packages/shared/src/displayEditorSchema.ts
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - apps/web/src/pages/Overview/index.tsx
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
   - apps/web/src/pages/Images/images.css
@@ -240,7 +240,7 @@ code:
   - packages/shared/src/displayStory.ts
   - apps/web/src/app/playbackRouteMeta.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/Overview/overview.css
   - apps/server/src/services/displayStoryService.ts
   - apps/web/src/app/routeMeta.ts
@@ -253,7 +253,7 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
   - apps/web/src/hooks/useOverviewWeather.ts
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -267,7 +267,7 @@ code:
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/viewModel.ts
   - apps/web/src/pages/shared/displayCardStyleConfig.ts
   - uploads/overview_bg-1.png
@@ -278,7 +278,7 @@ code:
   - packages/shared/src/displayEditorSchema.ts
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - apps/web/src/pages/Overview/index.tsx
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
   - apps/web/src/pages/Images/images.css
@@ -333,7 +333,7 @@ code:
   - packages/shared/src/displayStory.ts
   - apps/web/src/app/playbackRouteMeta.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/Overview/overview.css
   - apps/server/src/services/displayStoryService.ts
   - apps/web/src/app/routeMeta.ts
@@ -346,7 +346,7 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/displayPageMediaEffectAuthoring.ts
   - apps/web/src/hooks/useOverviewWeather.ts
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -360,7 +360,7 @@ code:
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/pages/DisplayPagesEditor/mediaEffectInspector.tsx
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/viewModel.ts
   - apps/web/src/pages/shared/displayCardStyleConfig.ts
   - uploads/overview_bg-1.png
@@ -371,7 +371,7 @@ code:
   - packages/shared/src/displayEditorSchema.ts
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - apps/web/src/pages/Overview/index.tsx
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
   - apps/web/src/pages/Images/images.css

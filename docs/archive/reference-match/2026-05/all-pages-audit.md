@@ -29,7 +29,7 @@
 - `close`: 主要 shell、layout model、page composition 已接近 reference，只剩細部 refinement。
 - `unknown`: 缺少足夠對照資訊。
 
-本文件最初建立於 2026-05-13，作為全站 reference migration 的 baseline audit。經過 shared shell、display pages、settings pages 與最後三頁 migration 後，目前 14 條 route 都已有對應 reference page，且現況可判定為 14 條 route 全部 `close`、0 條 `matched`；authoritative closeout 狀態以 `docs/reference-match/all-pages-checklist.md` 為準。
+本文件最初建立於 2026-05-13，作為全站 reference migration 的 baseline audit。經過 shared shell、display pages、settings pages 與最後三頁 migration 後，目前 14 條 route 都已有對應 reference page，且現況可判定為 14 條 route 全部 `close`、0 條 `matched`；authoritative closeout 狀態以 `docs/archive/reference-match/2026-05/all-pages-checklist.md` 為準。
 
 ## Launch Status Role
 

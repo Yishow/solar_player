@@ -32,7 +32,7 @@ updated: 2026-06-05
 code:
   - package.json
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - scripts/fhd-witness-config.mjs
   - apps/web/src/pages/Images/images.css
   - docs/reference-match/fhd-evidence-bundle-template.md
@@ -44,12 +44,12 @@ code:
   - apps/server/src/services/displayPagePublishingService.ts
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
-  - docs/goal.md
+  - README.md
   - scripts/capture-fhd-witness.mjs
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - README.md
@@ -113,7 +113,7 @@ updated: 2026-06-05
 code:
   - package.json
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - scripts/fhd-witness-config.mjs
   - apps/web/src/pages/Images/images.css
   - docs/reference-match/fhd-evidence-bundle-template.md
@@ -125,12 +125,12 @@ code:
   - apps/server/src/services/displayPagePublishingService.ts
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
-  - docs/goal.md
+  - README.md
   - scripts/capture-fhd-witness.mjs
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - README.md
@@ -193,7 +193,7 @@ updated: 2026-06-05
 code:
   - package.json
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - scripts/fhd-witness-config.mjs
   - apps/web/src/pages/Images/images.css
   - docs/reference-match/fhd-evidence-bundle-template.md
@@ -205,12 +205,12 @@ code:
   - apps/server/src/services/displayPagePublishingService.ts
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
-  - docs/goal.md
+  - README.md
   - scripts/capture-fhd-witness.mjs
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - README.md

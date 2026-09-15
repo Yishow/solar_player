@@ -34,12 +34,12 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - README.md
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - AGENTS.md
   - apps/server/src/services/displayPagePublishingService.ts
   - scripts/fhd-witness-config.mjs
@@ -53,7 +53,7 @@ code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/shared/displaySurfaceChrome.css
   - apps/web/src/pages/Solar/solar.css
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
   - scripts/capture-fhd-witness.mjs
   - CLAUDE.md
@@ -115,12 +115,12 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - README.md
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - AGENTS.md
   - apps/server/src/services/displayPagePublishingService.ts
   - scripts/fhd-witness-config.mjs
@@ -134,7 +134,7 @@ code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/shared/displaySurfaceChrome.css
   - apps/web/src/pages/Solar/solar.css
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
   - scripts/capture-fhd-witness.mjs
   - CLAUDE.md
@@ -195,12 +195,12 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - README.md
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Solar/index.tsx
   - apps/web/src/pages/Images/displayPageConfig.ts
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - AGENTS.md
   - apps/server/src/services/displayPagePublishingService.ts
   - scripts/fhd-witness-config.mjs
@@ -214,7 +214,7 @@ code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/shared/displaySurfaceChrome.css
   - apps/web/src/pages/Solar/solar.css
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/shared/displayPageFhdRhythmConfig.ts
   - scripts/capture-fhd-witness.mjs
   - CLAUDE.md

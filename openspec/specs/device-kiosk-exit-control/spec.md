@@ -208,7 +208,7 @@ code:
   - deploy/disable-display-sleep.sh
   - scripts/dev-lib.d.mts
   - packages/shared/src/types.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/server/src/services/generationTrendSeries.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeSolar.tsx
   - apps/web/src/components/PageNumberPill.tsx

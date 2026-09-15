@@ -4,7 +4,7 @@
 
 ## What Changes
 
-- 只處理 `docs/reference-match/all-pages-audit.md` 中較適合 playback canvas 的 7 條 route：`/overview`、`/solar`、`/images`、`/trends`、`/history`、`/slideshow-preview`、`/device-status`。
+- 只處理 `docs/archive/reference-match/2026-05/all-pages-audit.md` 中較適合 playback canvas 的 7 條 route：`/overview`、`/solar`、`/images`、`/trends`、`/history`、`/slideshow-preview`、`/device-status`。
 - 讓上述頁面改用 shared `KuozuiFhdCanvas` / `ReferenceFhdShell` / `DisplayCanvas` 家族與 page-local layout constants，而不再依賴 dashboard-style `PageScaffold` title block 作為主要版面。
 - 每頁建立或更新 page layout constants、asset mapping 與 page JSX，使畫面主要區塊接近對應 reference HTML/CSS，但保留原本的資料 hook、viewModel 與 fallback contract。
 - 將 page-specific asset 使用限制在既有 generated assets、page-artifacts 與 mock/fallback 範圍內，不新增 backend API 或 service contract。

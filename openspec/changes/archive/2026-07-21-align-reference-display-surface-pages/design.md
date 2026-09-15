@@ -1,6 +1,6 @@
 ## Context
 
-shared FHD shell 與 playback shell boundary 已另外用 foundation change 處理，所以下一個合理步驟不是再碰 root shell，而是把最適合 playback canvas 的 display surface pages 真正遷移到 reference page body composition。根據 `docs/reference-match/all-pages-audit.md`，這一批最明顯的共通點是：它們大多不是高風險 CRUD / save/test pages，主要 drift 集中在 hero、flow、chart、media、summary panel 與 dense information staging。這使得它們適合作為「view-layer 優先」的遷移批次。
+shared FHD shell 與 playback shell boundary 已另外用 foundation change 處理，所以下一個合理步驟不是再碰 root shell，而是把最適合 playback canvas 的 display surface pages 真正遷移到 reference page body composition。根據 `docs/archive/reference-match/2026-05/all-pages-audit.md`，這一批最明顯的共通點是：它們大多不是高風險 CRUD / save/test pages，主要 drift 集中在 hero、flow、chart、media、summary panel 與 dense information staging。這使得它們適合作為「view-layer 優先」的遷移批次。
 
 本 change 的困難不在資料來源，而在每頁都已經有自己的 hook、viewModel、mock/fallback 與 route contract。若在遷移時順手改 service 或 hook，scope 就會失控，也會讓 regression 難以定位。因此這一批必須採 page-local layout constants + asset mapping + JSX composition 的策略，只動 view layer 與必要的 view-model display fields。
 

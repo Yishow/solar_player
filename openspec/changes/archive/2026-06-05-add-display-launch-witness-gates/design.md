@@ -52,7 +52,7 @@
   - 新 spec `display-launch-witness-gates` 定義 launch gates。
   - `docs/reference-match/display-launch-witness-matrix.md` 是唯一的 page-by-page launch status ledger，記錄 pass、fail、blocked 與 blocker notes。
   - `docs/reference-match/display-launch-verification-pack.md` 提供 command pack、manual review pack 與如何回填到 witness matrix 的 procedure。
-  - `docs/reference-match/all-pages-audit.md` 與 `docs/reference-match/all-pages-checklist.md` 僅做對照輸入與盤點輔助，不平行維護另一份 launch status。
+  - `docs/archive/reference-match/2026-05/all-pages-audit.md` 與 `docs/archive/reference-match/2026-05/all-pages-checklist.md` 僅做對照輸入與盤點輔助，不平行維護另一份 launch status。
   - 既有 `display-editor-page-authoring-coverage` 與 `display-page-draft-live-publishing` spec 需補上 launch 語境下的 requirement。
 - Failure modes:
   - 若某頁只有 editor coverage、沒有 runtime parity witness，該頁不可標示為 launch-ready。

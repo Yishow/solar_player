@@ -28,7 +28,7 @@ code:
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/pages/Overview/widgets/WeatherCardWidget.tsx
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
   - apps/web/src/pages/Overview/index.tsx
   - apps/web/src/pages/Overview/viewModel.ts
@@ -36,7 +36,7 @@ code:
   - apps/web/src/hooks/useOverviewWeather.ts
   - docs/reference/Better/01.Overivew (大).png
   - data/server-runtime.lock.json
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
 tests:
@@ -201,7 +201,7 @@ code:
   - apps/web/src/pages/Overview/layout.ts
   - apps/web/src/pages/Overview/overview.css
   - apps/web/src/pages/Overview/widgets/WeatherCardWidget.tsx
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
   - apps/web/src/pages/Overview/index.tsx
   - apps/web/src/pages/Overview/viewModel.ts
@@ -209,7 +209,7 @@ code:
   - apps/web/src/hooks/useOverviewWeather.ts
   - docs/reference/Better/01.Overivew (大).png
   - data/server-runtime.lock.json
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
 tests:
@@ -381,7 +381,7 @@ code:
   - apps/server/src/metrics/solarGenerationProfile.ts
   - apps/web/src/services/api.ts
   - apps/server/src/services/generationTrendSeries.ts
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - apps/web/src/hooks/useImagesAutoplay.ts
   - .env.example
   - packages/shared/src/imagePlaylist.ts

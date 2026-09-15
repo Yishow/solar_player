@@ -20,5 +20,5 @@
 
 ## 5. Batch verification and scope guard
 
-- [x] 5.1 完成 display surface batch 驗證，確認七條 in-scope routes 已接上 shared playback shell，且 settings pages 不在本 change scope；驗證方式為執行 `pnpm --filter @solar-display/web build`，並內容 review `docs/reference-match/all-pages-audit.md` 與 change artifacts 的 route 清單。
+- [x] 5.1 完成 display surface batch 驗證，確認七條 in-scope routes 已接上 shared playback shell，且 settings pages 不在本 change scope；驗證方式為執行 `pnpm --filter @solar-display/web build`，並內容 review `docs/archive/reference-match/2026-05/all-pages-audit.md` 與 change artifacts 的 route 清單。
 - [x] 5.2 完成 narrow-scope 收尾，確認本 change 沒有聲稱完成 settings-form alignment、backend contract changes 或 shared shell host foundation 重構；驗證方式為 `spectra analyze align-reference-display-surface-pages --json` 與 artifact review。

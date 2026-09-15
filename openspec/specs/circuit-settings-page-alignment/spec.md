@@ -85,7 +85,7 @@ code:
   - solar-display/apps/web/src/pages/EnergyTrend/index.tsx
   - apps/server/src/services/displaySeedAssetManifest.ts
   - apps/web/src/pages/FactoryCircuit/layout.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - kuozui-green-fhd-html-prototype/review.html
   - docs/reference/solar_complete_spec_md/UI/logo.png
   - docs/reference/kuozui-green-fhd-html-prototype/html-pages/04-images.html
@@ -175,7 +175,7 @@ code:
   - uploads/images/.gitkeep
   - apps/web/src/components/TitleBlock.tsx
   - deploy/deploy.sh
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
   - apps/web/src/hooks/useDisplayPageAssetHealth.ts
   - apps/web/src/pages/Sustainability/iconRegistry.tsx
   - solar-display/apps/server/src/routes/circuits.ts
@@ -197,14 +197,14 @@ code:
   - docs/reference-match/fhd-exception-ledger-template.md
   - apps/web/src/pages/ShellDecorationEditor/assetPicker.tsx
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-leaf-reference.png
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - mqtt/solar/discovery.py
   - apps/server/src/services/shellDecorationService.ts
   - apps/web/src/pages/runtimeConfigHydration.tsx
   - deploy/enable-readonly-root.sh
   - apps/web/src/assets/playback/slide-solar.jpg
   - solar-display/apps/server/src/routes/playback.ts
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
   - apps/web/src/pages/Sustainability/assets/sustainability-hero-reference.png
   - solar-display/apps/web/src/components/PanelCard.tsx
@@ -277,7 +277,7 @@ code:
   - solar-display/packages/shared/src/index.ts
   - solar_complete_spec_md/UI/07_slideshow_preview.md
   - solar-display/apps/web/src/components/LeafOrnament.tsx
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - docs/reference/kuozui-green-fhd-html-prototype/prompts/pages/14-device-status-details-spec.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/generated/slideshow-preview/05-sustainability.png
   - docs/reference/FHD/02-2.Solar (大).png
@@ -315,7 +315,7 @@ code:
   - apps/web/src/recovery/crashRecovery.ts
   - apps/web/src/pages/shared/monitoringHistoryPayloadCache.ts
   - apps/server/src/routes/imagesSupport.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - solar-display/apps/server/src/routes/metrics-history.ts
   - kuozui-green-fhd-html-prototype/assets/clean/factory-wide.jpg
   - kuozui-green-fhd-html-prototype/assets/provisional/green-site-main.jpg
@@ -438,7 +438,7 @@ code:
   - apps/web/src/hooks/usePlaybackWatchdog.ts
   - docs/reference/kuozui-green-fhd-html-prototype/prompts/pages/07-playback-settings-spec.md
   - docs/reference/solar_complete_spec_md/UI/08.Image Management.png
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-wind.jpg
   - kuozui-green-fhd-html-prototype/assets/provisional/slide-solar.jpg
   - apps/web/src/pages/MqttSettings/weatherFieldPresets.ts
@@ -447,7 +447,7 @@ code:
   - solar_complete_spec_md/UI/logo.png
   - apps/server/src/services/displayPagePublishingService.ts
   - apps/web/src/pages/Images/layout.ts
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - kuozui-green-fhd-html-prototype/assets/provisional/sustain-hero-ref.jpg
   - apps/web/src/pages/shared/displayPageTemplateLoaders.ts
   - apps/web/src/styles/management.css
@@ -538,7 +538,7 @@ code:
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/device-board.png
   - kuozui-green-fhd-html-prototype/prompts/pages/01-overview-html-prompt.md
   - apps/server/src/services/displayStoryService.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - deploy/configure-lightweight-desktop.sh
   - docs/reference/kuozui-green-fhd-html-prototype/觀音廠/solar-3.jpg
   - docs/reference/solar_complete_spec_md/13_Environment_and_Deployment.md
@@ -575,7 +575,7 @@ code:
   - kuozui-green-fhd-html-prototype/prompts/pages/14-device-status-details-html-prompt.md
   - apps/web/src/pages/Sustainability/assets.ts
   - docs/reference/kuozui-green-fhd-html-prototype/scripts/fit.js
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/layouts/playbackRotationFreeze.ts
   - solar-display/apps/web/src/pages/OfflineError/index.tsx
   - apps/web/src/components/management/CustomSelect.tsx
@@ -628,7 +628,7 @@ code:
   - apps/web/src/pages/BrandAssets/brandAssets.css
   - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
   - apps/web/src/hooks/usePlaybackController.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - docs/reference-match/screenshots/diff/README.md
   - deploy/repair-kiosk-system.sh
   - solar-display/apps/server/src/db/migrate.ts
@@ -674,7 +674,7 @@ code:
   - apps/web/src/pages/EnergyHistory/layout.ts
   - apps/web/src/components/ActionCluster.tsx
   - kuozui-green-fhd-html-prototype/assets/provisional/image-admin-preview.jpg
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DeviceStatus/layout.ts
   - kuozui-green-fhd-html-prototype/page-artifacts/02-solar/crop-plan.json
   - playwright.config.ts
@@ -767,7 +767,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - docs/reference-match/screenshots/reference/README.md
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - solar_mqtt/solar/heartbeat.py
   - apps/web/src/components/headerConnectionMeta.ts
   - apps/web/src/pages/CircuitSettings/circuitSettings.css
@@ -834,7 +834,7 @@ code:
   - apps/web/src/pages/Overview/backgroundPool.ts
   - apps/server/src/db/index.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - kuozui-green-fhd-html-prototype/page-artifacts/02-solar/page-object-inventory.json
   - packages/shared/src/playback.ts
   - apps/server/src/services/weatherService.ts
@@ -993,7 +993,7 @@ code:
   - apps/web/src/mocks/circuits.ts
   - apps/server/src/db/migrations/002_mqtt.sql
   - deploy/readonly-system-enable.sh
-  - docs/goal.md
+  - README.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/slideshow-card.png
   - solar-display/apps/web/src/components/BilingualLabel.tsx
   - apps/web/src/pages/DataSourceSettings/viewModel.ts
@@ -1171,7 +1171,7 @@ code:
   - apps/server/src/services/deviceKioskExitService.ts
   - kuozui-green-fhd-html-prototype/assets/provisional/thumb-wind.jpg
   - apps/web/src/components/SectionWrapper.tsx
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - docs/reference/kuozui-green-fhd-html-prototype/page-artifacts/02-solar/binding-report.md
   - solar_complete_spec_md/README.md
   - docs/ops/conventions.md
@@ -1193,7 +1193,7 @@ code:
   - solar_complete_spec_md/UI/11_energy_data_history.md
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-sun-reference.png
   - kuozui-green-fhd-html-prototype/styles/pages/13-slideshow-preview.css
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - apps/web/src/components/ShellDecorationLayer.tsx
   - apps/server/src/env.ts
   - docs/runbooks/device-diagnostics-safe-ops.md
@@ -1216,7 +1216,7 @@ code:
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-switchboard-reference.png
   - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
   - apps/web/src/pages/Images/assets/images-thumb-4-reference.png
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/clean/bg.png
   - apps/web/src/pages/DisplayPagesEditor/localization.ts
   - docs/reference/kuozui-green-fhd-html-prototype/html-pages/01-overview.html
@@ -1597,7 +1597,7 @@ code:
   - solar-display/apps/web/src/pages/EnergyTrend/index.tsx
   - apps/server/src/services/displaySeedAssetManifest.ts
   - apps/web/src/pages/FactoryCircuit/layout.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - kuozui-green-fhd-html-prototype/review.html
   - docs/reference/solar_complete_spec_md/UI/logo.png
   - docs/reference/kuozui-green-fhd-html-prototype/html-pages/04-images.html
@@ -1687,7 +1687,7 @@ code:
   - uploads/images/.gitkeep
   - apps/web/src/components/TitleBlock.tsx
   - deploy/deploy.sh
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
   - apps/web/src/hooks/useDisplayPageAssetHealth.ts
   - apps/web/src/pages/Sustainability/iconRegistry.tsx
   - solar-display/apps/server/src/routes/circuits.ts
@@ -1709,14 +1709,14 @@ code:
   - docs/reference-match/fhd-exception-ledger-template.md
   - apps/web/src/pages/ShellDecorationEditor/assetPicker.tsx
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-leaf-reference.png
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - mqtt/solar/discovery.py
   - apps/server/src/services/shellDecorationService.ts
   - apps/web/src/pages/runtimeConfigHydration.tsx
   - deploy/enable-readonly-root.sh
   - apps/web/src/assets/playback/slide-solar.jpg
   - solar-display/apps/server/src/routes/playback.ts
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
   - apps/web/src/pages/Sustainability/assets/sustainability-hero-reference.png
   - solar-display/apps/web/src/components/PanelCard.tsx
@@ -1789,7 +1789,7 @@ code:
   - solar-display/packages/shared/src/index.ts
   - solar_complete_spec_md/UI/07_slideshow_preview.md
   - solar-display/apps/web/src/components/LeafOrnament.tsx
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - docs/reference/kuozui-green-fhd-html-prototype/prompts/pages/14-device-status-details-spec.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/generated/slideshow-preview/05-sustainability.png
   - docs/reference/FHD/02-2.Solar (大).png
@@ -1827,7 +1827,7 @@ code:
   - apps/web/src/recovery/crashRecovery.ts
   - apps/web/src/pages/shared/monitoringHistoryPayloadCache.ts
   - apps/server/src/routes/imagesSupport.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - solar-display/apps/server/src/routes/metrics-history.ts
   - kuozui-green-fhd-html-prototype/assets/clean/factory-wide.jpg
   - kuozui-green-fhd-html-prototype/assets/provisional/green-site-main.jpg
@@ -1950,7 +1950,7 @@ code:
   - apps/web/src/hooks/usePlaybackWatchdog.ts
   - docs/reference/kuozui-green-fhd-html-prototype/prompts/pages/07-playback-settings-spec.md
   - docs/reference/solar_complete_spec_md/UI/08.Image Management.png
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/thumb-wind.jpg
   - kuozui-green-fhd-html-prototype/assets/provisional/slide-solar.jpg
   - apps/web/src/pages/MqttSettings/weatherFieldPresets.ts
@@ -1959,7 +1959,7 @@ code:
   - solar_complete_spec_md/UI/logo.png
   - apps/server/src/services/displayPagePublishingService.ts
   - apps/web/src/pages/Images/layout.ts
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - kuozui-green-fhd-html-prototype/assets/provisional/sustain-hero-ref.jpg
   - apps/web/src/pages/shared/displayPageTemplateLoaders.ts
   - apps/web/src/styles/management.css
@@ -2050,7 +2050,7 @@ code:
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/device-board.png
   - kuozui-green-fhd-html-prototype/prompts/pages/01-overview-html-prompt.md
   - apps/server/src/services/displayStoryService.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - deploy/configure-lightweight-desktop.sh
   - docs/reference/kuozui-green-fhd-html-prototype/觀音廠/solar-3.jpg
   - docs/reference/solar_complete_spec_md/13_Environment_and_Deployment.md
@@ -2087,7 +2087,7 @@ code:
   - kuozui-green-fhd-html-prototype/prompts/pages/14-device-status-details-html-prompt.md
   - apps/web/src/pages/Sustainability/assets.ts
   - docs/reference/kuozui-green-fhd-html-prototype/scripts/fit.js
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/layouts/playbackRotationFreeze.ts
   - solar-display/apps/web/src/pages/OfflineError/index.tsx
   - apps/web/src/components/management/CustomSelect.tsx
@@ -2140,7 +2140,7 @@ code:
   - apps/web/src/pages/BrandAssets/brandAssets.css
   - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
   - apps/web/src/hooks/usePlaybackController.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - docs/reference-match/screenshots/diff/README.md
   - deploy/repair-kiosk-system.sh
   - solar-display/apps/server/src/db/migrate.ts
@@ -2186,7 +2186,7 @@ code:
   - apps/web/src/pages/EnergyHistory/layout.ts
   - apps/web/src/components/ActionCluster.tsx
   - kuozui-green-fhd-html-prototype/assets/provisional/image-admin-preview.jpg
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DeviceStatus/layout.ts
   - kuozui-green-fhd-html-prototype/page-artifacts/02-solar/crop-plan.json
   - playwright.config.ts
@@ -2279,7 +2279,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/canvasInteractions.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - docs/reference-match/screenshots/reference/README.md
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - solar_mqtt/solar/heartbeat.py
   - apps/web/src/components/headerConnectionMeta.ts
   - apps/web/src/pages/CircuitSettings/circuitSettings.css
@@ -2346,7 +2346,7 @@ code:
   - apps/web/src/pages/Overview/backgroundPool.ts
   - apps/server/src/db/index.ts
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - kuozui-green-fhd-html-prototype/page-artifacts/02-solar/page-object-inventory.json
   - packages/shared/src/playback.ts
   - apps/server/src/services/weatherService.ts
@@ -2505,7 +2505,7 @@ code:
   - apps/web/src/mocks/circuits.ts
   - apps/server/src/db/migrations/002_mqtt.sql
   - deploy/readonly-system-enable.sh
-  - docs/goal.md
+  - README.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/slideshow-card.png
   - solar-display/apps/web/src/components/BilingualLabel.tsx
   - apps/web/src/pages/DataSourceSettings/viewModel.ts
@@ -2683,7 +2683,7 @@ code:
   - apps/server/src/services/deviceKioskExitService.ts
   - kuozui-green-fhd-html-prototype/assets/provisional/thumb-wind.jpg
   - apps/web/src/components/SectionWrapper.tsx
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - docs/reference/kuozui-green-fhd-html-prototype/page-artifacts/02-solar/binding-report.md
   - solar_complete_spec_md/README.md
   - docs/ops/conventions.md
@@ -2705,7 +2705,7 @@ code:
   - solar_complete_spec_md/UI/11_energy_data_history.md
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-sun-reference.png
   - kuozui-green-fhd-html-prototype/styles/pages/13-slideshow-preview.css
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - apps/web/src/components/ShellDecorationLayer.tsx
   - apps/server/src/env.ts
   - docs/runbooks/device-diagnostics-safe-ops.md
@@ -2728,7 +2728,7 @@ code:
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-switchboard-reference.png
   - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
   - apps/web/src/pages/Images/assets/images-thumb-4-reference.png
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/clean/bg.png
   - apps/web/src/pages/DisplayPagesEditor/localization.ts
   - docs/reference/kuozui-green-fhd-html-prototype/html-pages/01-overview.html

@@ -65,14 +65,14 @@ code:
   - solar_mqtt/solar/heartbeat.py
   - apps/web/src/pages/Sustainability/householdEquivalentRuntime.ts
   - docs/ops/delegation.md
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - apps/web/src/components/Sparkline.tsx
   - apps/server/src/server-startup.ts
   - apps/web/src/components/displayCanvasSurfaceStyle.ts
   - apps/web/src/devtools/reactGrabNoop.ts
   - apps/web/src/components/displayPageCards.tsx
   - deploy/start-solar-kiosk.sh
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/ops/fhd-closeout.md
   - apps/web/src/pages/FactoryCircuit/assets/factory-routing-inverter-drop-reference.png
   - deploy/restore-runtime-state.sh
@@ -114,7 +114,7 @@ code:
   - packages/shared/src/cloneValue.ts
   - scripts/verify-weather-connectivity.test.mjs
   - apps/web/src/components/headerWeatherMeta.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - apps/web/index.html
   - apps/web/src/pages/DisplayPagesEditor/displayEditorValidation.ts
   - packages/shared/src/types.ts
@@ -212,7 +212,7 @@ code:
   - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
   - apps/web/src/pages/Overview/overview.css
   - packages/shared/src/displayPageMediaEffects.ts
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
   - apps/server/src/routes/display-pages-asset-governance.references.test-suite.ts
   - CLAUDE.md
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-leaf-reference.png
@@ -238,7 +238,7 @@ code:
   - apps/web/src/hooks/usePlaybackController.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - docs/fhd-witness/evidence-template.md
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/server/src/routes/display-story.ts
   - apps/web/src/pages/DisplayPagesEditor/freeformObjectList.tsx
   - .hermes/codex_goal3.md
@@ -285,7 +285,7 @@ code:
   - apps/web/src/hooks/useDisplaySyncRefresh.ts
   - apps/web/src/pages/MqttSettings/mqttSettings.css
   - solar_mqtt/solar/schedule.py
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - apps/server/src/config.ts
   - apps/web/src/pages/shared/displayPageCardRailRenderer.tsx
   - apps/web/src/pages/shared/editableSettingsLoader.ts
@@ -293,7 +293,7 @@ code:
   - solar_mqtt/solar/anomaly.py
   - apps/server/src/services/displayRotationService.ts
   - apps/web/src/components/displayPageIconResolver.tsx
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - scripts/dev.mjs
   - packages/shared/src/imagePlaylist.ts
   - solar_mqtt/solar/service.py
@@ -301,7 +301,7 @@ code:
   - docs/openapi.yaml
   - apps/web/src/pages/SlideshowPreview/viewModel.ts
   - packages/shared/src/managementDraftSave.ts
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - apps/server/src/services/displayOpsService.ts
   - apps/web/src/pages/FactoryCircuit/assets/factory-routing-inverter-board-reference.png
   - apps/web/src/pages/Overview/runtimeContent.tsx
@@ -318,8 +318,8 @@ code:
   - scripts/verify-weather-connectivity.mjs
   - solar_mqtt/solar_config.json
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
-  - docs/FHD.01.html
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/DeviceStatus/index.tsx
   - apps/web/src/pages/MqttSettings/weatherFieldPresets.ts
   - apps/web/src/pages/ImageManagement/viewModel.ts
@@ -328,7 +328,7 @@ code:
   - apps/web/src/services/runtimeOrigin.ts
   - apps/web/src/pages/FactoryCircuit/assets/factory-leaf-vine-reference.png
   - apps/server/src/realtime/SocketService.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/PlaybackSettings/LiveRotationPreviewList.tsx
   - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
   - apps/web/src/pages/Images/displayPageConfig.ts
@@ -382,7 +382,7 @@ code:
   - apps/server/src/services/sustainabilityStoryService.ts
   - apps/server/src/services/displayStoryService.ts
   - findings.md
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - deploy/configure-pi5-fan-control.sh
   - scripts/run-browser-smoke.mjs
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
@@ -409,7 +409,7 @@ code:
   - deploy/disable-display-sleep.sh
   - apps/web/src/pages/CircuitSettings/CircuitRow.tsx
   - apps/web/src/pages/Overview/widgets/GenerationTrendChartView.tsx
-  - docs/goal.md
+  - README.md
   - apps/server/src/db/seed.ts
   - deploy/verify-kiosk-install.sh
   - apps/web/src/pages/SlideshowPreview/preview.css
@@ -456,7 +456,7 @@ code:
   - apps/web/src/pages/Solar/layout.ts
   - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
   - apps/web/src/pages/Solar/index.tsx
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - apps/web/src/hooks/useImagesAutoplay.ts
   - apps/server/src/db/migrations/018_display_value_overrides.sql
   - apps/web/src/pages/EnergyTrend/layout.ts
@@ -478,7 +478,7 @@ code:
   - apps/web/src/pages/shared/displayCardStyleConfig.ts
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/server/src/db/migrations/009_display_page_registry.sql
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - apps/web/src/pages/Sustainability/layout.ts
   - apps/web/src/pages/DisplayPagesEditor/cardRailInspectorActions.tsx
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
@@ -527,7 +527,7 @@ code:
   - apps/web/src/components/management/rotationOpsSummary.tsx
   - deploy/install-kiosk.sh
   - deploy/firefox-kiosk.desktop
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/web/src/hooks/weatherPolling.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/server/src/db/normalizeMetricSnapshotCapturedAt.ts
@@ -546,7 +546,7 @@ code:
   - apps/server/scripts/run-tests.test.mjs
   - scripts/capture-fhd-witness.mjs
   - docs/reference-match/fhd-surface-split-guide.md
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - apps/web/src/pages/ShellDecorationEditor/runtime.tsx
   - deploy/disable-readonly-system.desktop
   - apps/web/src/components/StatusBadge.tsx
@@ -555,7 +555,7 @@ code:
   - apps/web/src/pages/BrandAssets/index.tsx
   - apps/server/src/db/migrations/022_factory_peak_multiplier.sql
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/EnergyHistory/index.tsx
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-ev-reference.png
   - apps/web/src/hooks/useShellDecorations.ts
@@ -912,14 +912,14 @@ code:
   - solar_mqtt/solar/heartbeat.py
   - apps/web/src/pages/Sustainability/householdEquivalentRuntime.ts
   - docs/ops/delegation.md
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - apps/web/src/components/Sparkline.tsx
   - apps/server/src/server-startup.ts
   - apps/web/src/components/displayCanvasSurfaceStyle.ts
   - apps/web/src/devtools/reactGrabNoop.ts
   - apps/web/src/components/displayPageCards.tsx
   - deploy/start-solar-kiosk.sh
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/ops/fhd-closeout.md
   - apps/web/src/pages/FactoryCircuit/assets/factory-routing-inverter-drop-reference.png
   - deploy/restore-runtime-state.sh
@@ -961,7 +961,7 @@ code:
   - packages/shared/src/cloneValue.ts
   - scripts/verify-weather-connectivity.test.mjs
   - apps/web/src/components/headerWeatherMeta.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - apps/web/index.html
   - apps/web/src/pages/DisplayPagesEditor/displayEditorValidation.ts
   - packages/shared/src/types.ts
@@ -1059,7 +1059,7 @@ code:
   - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
   - apps/web/src/pages/Overview/overview.css
   - packages/shared/src/displayPageMediaEffects.ts
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
   - apps/server/src/routes/display-pages-asset-governance.references.test-suite.ts
   - CLAUDE.md
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-leaf-reference.png
@@ -1085,7 +1085,7 @@ code:
   - apps/web/src/hooks/usePlaybackController.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - docs/fhd-witness/evidence-template.md
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/server/src/routes/display-story.ts
   - apps/web/src/pages/DisplayPagesEditor/freeformObjectList.tsx
   - .hermes/codex_goal3.md
@@ -1132,7 +1132,7 @@ code:
   - apps/web/src/hooks/useDisplaySyncRefresh.ts
   - apps/web/src/pages/MqttSettings/mqttSettings.css
   - solar_mqtt/solar/schedule.py
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - apps/server/src/config.ts
   - apps/web/src/pages/shared/displayPageCardRailRenderer.tsx
   - apps/web/src/pages/shared/editableSettingsLoader.ts
@@ -1140,7 +1140,7 @@ code:
   - solar_mqtt/solar/anomaly.py
   - apps/server/src/services/displayRotationService.ts
   - apps/web/src/components/displayPageIconResolver.tsx
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - scripts/dev.mjs
   - packages/shared/src/imagePlaylist.ts
   - solar_mqtt/solar/service.py
@@ -1148,7 +1148,7 @@ code:
   - docs/openapi.yaml
   - apps/web/src/pages/SlideshowPreview/viewModel.ts
   - packages/shared/src/managementDraftSave.ts
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - apps/server/src/services/displayOpsService.ts
   - apps/web/src/pages/FactoryCircuit/assets/factory-routing-inverter-board-reference.png
   - apps/web/src/pages/Overview/runtimeContent.tsx
@@ -1165,8 +1165,8 @@ code:
   - scripts/verify-weather-connectivity.mjs
   - solar_mqtt/solar_config.json
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
-  - docs/FHD.01.html
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/DeviceStatus/index.tsx
   - apps/web/src/pages/MqttSettings/weatherFieldPresets.ts
   - apps/web/src/pages/ImageManagement/viewModel.ts
@@ -1175,7 +1175,7 @@ code:
   - apps/web/src/services/runtimeOrigin.ts
   - apps/web/src/pages/FactoryCircuit/assets/factory-leaf-vine-reference.png
   - apps/server/src/realtime/SocketService.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/PlaybackSettings/LiveRotationPreviewList.tsx
   - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
   - apps/web/src/pages/Images/displayPageConfig.ts
@@ -1229,7 +1229,7 @@ code:
   - apps/server/src/services/sustainabilityStoryService.ts
   - apps/server/src/services/displayStoryService.ts
   - findings.md
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - deploy/configure-pi5-fan-control.sh
   - scripts/run-browser-smoke.mjs
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
@@ -1256,7 +1256,7 @@ code:
   - deploy/disable-display-sleep.sh
   - apps/web/src/pages/CircuitSettings/CircuitRow.tsx
   - apps/web/src/pages/Overview/widgets/GenerationTrendChartView.tsx
-  - docs/goal.md
+  - README.md
   - apps/server/src/db/seed.ts
   - deploy/verify-kiosk-install.sh
   - apps/web/src/pages/SlideshowPreview/preview.css
@@ -1303,7 +1303,7 @@ code:
   - apps/web/src/pages/Solar/layout.ts
   - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
   - apps/web/src/pages/Solar/index.tsx
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - apps/web/src/hooks/useImagesAutoplay.ts
   - apps/server/src/db/migrations/018_display_value_overrides.sql
   - apps/web/src/pages/EnergyTrend/layout.ts
@@ -1325,7 +1325,7 @@ code:
   - apps/web/src/pages/shared/displayCardStyleConfig.ts
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/server/src/db/migrations/009_display_page_registry.sql
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - apps/web/src/pages/Sustainability/layout.ts
   - apps/web/src/pages/DisplayPagesEditor/cardRailInspectorActions.tsx
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
@@ -1374,7 +1374,7 @@ code:
   - apps/web/src/components/management/rotationOpsSummary.tsx
   - deploy/install-kiosk.sh
   - deploy/firefox-kiosk.desktop
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/web/src/hooks/weatherPolling.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/server/src/db/normalizeMetricSnapshotCapturedAt.ts
@@ -1393,7 +1393,7 @@ code:
   - apps/server/scripts/run-tests.test.mjs
   - scripts/capture-fhd-witness.mjs
   - docs/reference-match/fhd-surface-split-guide.md
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - apps/web/src/pages/ShellDecorationEditor/runtime.tsx
   - deploy/disable-readonly-system.desktop
   - apps/web/src/components/StatusBadge.tsx
@@ -1402,7 +1402,7 @@ code:
   - apps/web/src/pages/BrandAssets/index.tsx
   - apps/server/src/db/migrations/022_factory_peak_multiplier.sql
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/EnergyHistory/index.tsx
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-ev-reference.png
   - apps/web/src/hooks/useShellDecorations.ts
@@ -1759,14 +1759,14 @@ code:
   - solar_mqtt/solar/heartbeat.py
   - apps/web/src/pages/Sustainability/householdEquivalentRuntime.ts
   - docs/ops/delegation.md
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - apps/web/src/components/Sparkline.tsx
   - apps/server/src/server-startup.ts
   - apps/web/src/components/displayCanvasSurfaceStyle.ts
   - apps/web/src/devtools/reactGrabNoop.ts
   - apps/web/src/components/displayPageCards.tsx
   - deploy/start-solar-kiosk.sh
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/ops/fhd-closeout.md
   - apps/web/src/pages/FactoryCircuit/assets/factory-routing-inverter-drop-reference.png
   - deploy/restore-runtime-state.sh
@@ -1808,7 +1808,7 @@ code:
   - packages/shared/src/cloneValue.ts
   - scripts/verify-weather-connectivity.test.mjs
   - apps/web/src/components/headerWeatherMeta.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - apps/web/index.html
   - apps/web/src/pages/DisplayPagesEditor/displayEditorValidation.ts
   - packages/shared/src/types.ts
@@ -1906,7 +1906,7 @@ code:
   - apps/web/src/hooks/useRuntimeRefreshLifecycle.ts
   - apps/web/src/pages/Overview/overview.css
   - packages/shared/src/displayPageMediaEffects.ts
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
   - apps/server/src/routes/display-pages-asset-governance.references.test-suite.ts
   - CLAUDE.md
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-leaf-reference.png
@@ -1932,7 +1932,7 @@ code:
   - apps/web/src/hooks/usePlaybackController.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - docs/fhd-witness/evidence-template.md
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/server/src/routes/display-story.ts
   - apps/web/src/pages/DisplayPagesEditor/freeformObjectList.tsx
   - .hermes/codex_goal3.md
@@ -1979,7 +1979,7 @@ code:
   - apps/web/src/hooks/useDisplaySyncRefresh.ts
   - apps/web/src/pages/MqttSettings/mqttSettings.css
   - solar_mqtt/solar/schedule.py
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - apps/server/src/config.ts
   - apps/web/src/pages/shared/displayPageCardRailRenderer.tsx
   - apps/web/src/pages/shared/editableSettingsLoader.ts
@@ -1987,7 +1987,7 @@ code:
   - solar_mqtt/solar/anomaly.py
   - apps/server/src/services/displayRotationService.ts
   - apps/web/src/components/displayPageIconResolver.tsx
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - scripts/dev.mjs
   - packages/shared/src/imagePlaylist.ts
   - solar_mqtt/solar/service.py
@@ -1995,7 +1995,7 @@ code:
   - docs/openapi.yaml
   - apps/web/src/pages/SlideshowPreview/viewModel.ts
   - packages/shared/src/managementDraftSave.ts
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - apps/server/src/services/displayOpsService.ts
   - apps/web/src/pages/FactoryCircuit/assets/factory-routing-inverter-board-reference.png
   - apps/web/src/pages/Overview/runtimeContent.tsx
@@ -2012,8 +2012,8 @@ code:
   - scripts/verify-weather-connectivity.mjs
   - solar_mqtt/solar_config.json
   - apps/web/src/pages/Overview/widgets/GenerationTrendWidget.tsx
-  - docs/FHD.01.html
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/DeviceStatus/index.tsx
   - apps/web/src/pages/MqttSettings/weatherFieldPresets.ts
   - apps/web/src/pages/ImageManagement/viewModel.ts
@@ -2022,7 +2022,7 @@ code:
   - apps/web/src/services/runtimeOrigin.ts
   - apps/web/src/pages/FactoryCircuit/assets/factory-leaf-vine-reference.png
   - apps/server/src/realtime/SocketService.ts
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - apps/web/src/pages/PlaybackSettings/LiveRotationPreviewList.tsx
   - .antigravitycli/ec616887-aba6-4235-9194-e467c9582ec4.json
   - apps/web/src/pages/Images/displayPageConfig.ts
@@ -2076,7 +2076,7 @@ code:
   - apps/server/src/services/sustainabilityStoryService.ts
   - apps/server/src/services/displayStoryService.ts
   - findings.md
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - deploy/configure-pi5-fan-control.sh
   - scripts/run-browser-smoke.mjs
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
@@ -2103,7 +2103,7 @@ code:
   - deploy/disable-display-sleep.sh
   - apps/web/src/pages/CircuitSettings/CircuitRow.tsx
   - apps/web/src/pages/Overview/widgets/GenerationTrendChartView.tsx
-  - docs/goal.md
+  - README.md
   - apps/server/src/db/seed.ts
   - deploy/verify-kiosk-install.sh
   - apps/web/src/pages/SlideshowPreview/preview.css
@@ -2150,7 +2150,7 @@ code:
   - apps/web/src/pages/Solar/layout.ts
   - apps/web/src/pages/ImageManagement/ImageManagementContent.tsx
   - apps/web/src/pages/Solar/index.tsx
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - apps/web/src/hooks/useImagesAutoplay.ts
   - apps/server/src/db/migrations/018_display_value_overrides.sql
   - apps/web/src/pages/EnergyTrend/layout.ts
@@ -2172,7 +2172,7 @@ code:
   - apps/web/src/pages/shared/displayCardStyleConfig.ts
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/server/src/db/migrations/009_display_page_registry.sql
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - apps/web/src/pages/Sustainability/layout.ts
   - apps/web/src/pages/DisplayPagesEditor/cardRailInspectorActions.tsx
   - apps/web/src/pages/DisplayPagesEditor/useDisplayEditorCanvasWorkflow.ts
@@ -2221,7 +2221,7 @@ code:
   - apps/web/src/components/management/rotationOpsSummary.tsx
   - deploy/install-kiosk.sh
   - deploy/firefox-kiosk.desktop
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/web/src/hooks/weatherPolling.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeFieldBuilders.ts
   - apps/server/src/db/normalizeMetricSnapshotCapturedAt.ts
@@ -2240,7 +2240,7 @@ code:
   - apps/server/scripts/run-tests.test.mjs
   - scripts/capture-fhd-witness.mjs
   - docs/reference-match/fhd-surface-split-guide.md
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - apps/web/src/pages/ShellDecorationEditor/runtime.tsx
   - deploy/disable-readonly-system.desktop
   - apps/web/src/components/StatusBadge.tsx
@@ -2249,7 +2249,7 @@ code:
   - apps/web/src/pages/BrandAssets/index.tsx
   - apps/server/src/db/migrations/022_factory_peak_multiplier.sql
   - apps/web/src/hooks/useHeaderWeatherMeta.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/EnergyHistory/index.tsx
   - apps/web/src/pages/FactoryCircuit/assets/factory-icon-ev-reference.png
   - apps/web/src/hooks/useShellDecorations.ts

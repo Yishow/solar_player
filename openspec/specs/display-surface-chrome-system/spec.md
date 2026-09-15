@@ -60,7 +60,7 @@ code:
   - .codex/hooks.json
   - AGENTS.md
   - apps/web/src/pages/Images/images.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/SlideshowPreview/preview.css
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
   - apps/web/src/pages/shared/displaySurfaceNodes.css
@@ -141,7 +141,7 @@ code:
   - .codex/hooks.json
   - AGENTS.md
   - apps/web/src/pages/Images/images.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/SlideshowPreview/preview.css
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
   - apps/web/src/pages/shared/displaySurfaceNodes.css
@@ -228,7 +228,7 @@ code:
   - .codex/hooks.json
   - AGENTS.md
   - apps/web/src/pages/Images/images.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/SlideshowPreview/preview.css
   - apps/web/src/pages/DisplayPagesEditor/regionTree.tsx
   - apps/web/src/pages/shared/displaySurfaceNodes.css

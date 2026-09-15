@@ -2,7 +2,7 @@
 
 這個 repo 的 playback 頁面已經累積了多個 alignment change、editor capability change 與 shared token work，但「質感」仍會在後續 AI 修改中慢慢流失。根因不是單一 CSS 錯字，而是 playback surface 缺少一套被明確保護的 visual canon。
 
-目前已有 `display-surface-visual-guardrails` 與 `docs/display-surface-visual-review-checklist.md`，但它們更偏 review checklist，還不足以阻止下列 drift：
+目前已有 `display-surface-visual-guardrails` 與 `docs/reference-match/display-surface-visual-review-checklist.md`，但它們更偏 review checklist，還不足以阻止下列 drift：
 
 - 把 playback 的 hero / KPI / focus composition 逐步改成 management-style board stack
 - 用 generic toolbar icon、表單按鈕或 dashboard card 語言取代 source-like symbol 與 display ornament
@@ -64,7 +64,7 @@
   - 後續規格與 checklist 會把 management-surface drift 視為顯性違規，而不是事後主觀爭論。
 - Interface / data shape:
   - `openspec/specs/display-surface-visual-guardrails/spec.md` 需新增 requirement，定義 protected visual canonicals、canonical witness source、以及 management-surface drift 禁制。
-  - `docs/display-surface-visual-review-checklist.md` 與新增的 `docs/reference-match/playback-visual-canonicals.md` 需列出每頁 witness pair、非協商屬性與允許例外格式。
+  - `docs/reference-match/display-surface-visual-review-checklist.md` 與新增的 `docs/reference-match/playback-visual-canonicals.md` 需列出每頁 witness pair、非協商屬性與允許例外格式。
 - Failure modes:
   - 若 change 無法指出對應 witness，視為 review 資訊不足。
   - 若 change 以 style cleanup 名義引入 dashboard card、toolbar icon 或把 focus region 改成 control board，而沒有明示例外，視為違反 visual canonical。

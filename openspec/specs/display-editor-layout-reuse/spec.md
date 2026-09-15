@@ -74,7 +74,7 @@ code:
   - apps/web/src/components/PageContainer.tsx
   - apps/web/src/pages/Sustainability/sustainability.css
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/shared/displaySurfaceChrome.css
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/DisplayPagesEditor/canvasOverlayState.ts

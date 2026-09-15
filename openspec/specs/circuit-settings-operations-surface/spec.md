@@ -62,7 +62,7 @@ code:
   - apps/web/src/pages/CircuitSettings/viewModel.ts
   - apps/web/src/styles/tokens.css
   - apps/web/src/pages/ImageManagement/index.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/pages/Overview/index.tsx
@@ -168,7 +168,7 @@ code:
   - apps/web/src/pages/CircuitSettings/viewModel.ts
   - apps/web/src/styles/tokens.css
   - apps/web/src/pages/ImageManagement/index.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/pages/Overview/index.tsx
@@ -267,7 +267,7 @@ code:
   - apps/web/src/pages/CircuitSettings/viewModel.ts
   - apps/web/src/styles/tokens.css
   - apps/web/src/pages/ImageManagement/index.tsx
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
   - apps/web/src/hooks/useDisplayPageConfig.ts
   - apps/web/src/pages/Overview/index.tsx

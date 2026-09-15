@@ -255,7 +255,7 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - packages/shared/src/displayPageConfig.ts
   - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/MqttSettings/loadModel.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -437,7 +437,7 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - packages/shared/src/displayPageConfig.ts
   - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/MqttSettings/loadModel.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -631,7 +631,7 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - packages/shared/src/displayPageConfig.ts
   - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/MqttSettings/loadModel.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -813,7 +813,7 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - packages/shared/src/displayPageConfig.ts
   - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/MqttSettings/loadModel.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -1003,7 +1003,7 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - packages/shared/src/displayPageConfig.ts
   - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/MqttSettings/loadModel.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -1185,7 +1185,7 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - packages/shared/src/displayPageConfig.ts
   - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/MqttSettings/loadModel.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -1373,7 +1373,7 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - packages/shared/src/displayPageConfig.ts
   - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/MqttSettings/loadModel.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -1563,7 +1563,7 @@ code:
   - apps/web/src/pages/Images/index.tsx
   - packages/shared/src/displayPageConfig.ts
   - apps/server/src/db/migrations/014_topic_display_names.sql
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
   - apps/web/src/pages/MqttSettings/loadModel.ts
   - apps/web/src/pages/Solar/displayPageConfig.ts

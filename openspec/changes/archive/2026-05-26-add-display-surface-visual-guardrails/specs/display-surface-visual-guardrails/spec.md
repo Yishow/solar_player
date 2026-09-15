@@ -15,7 +15,7 @@ The implementation SHALL provide a repeatable visual review checklist for playba
 
 - **GIVEN** a change updates shared display chrome or playback-page presentation
 - **WHEN** reviewers inspect the change artifact or review note
-- **THEN** they can find `docs/display-surface-visual-review-checklist.md`
+- **THEN** they can find `docs/reference-match/display-surface-visual-review-checklist.md`
 - **AND** the note records any shared primitive or geometry exceptions
 
 ### Requirement: Guard shared primitive adoption with lightweight tests or assertions

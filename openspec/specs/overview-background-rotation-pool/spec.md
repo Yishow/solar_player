@@ -25,7 +25,7 @@ The Overview display page SHALL support a pool of full-canvas background candida
 source: add-overview-background-rotation-pool
 updated: 2026-06-07
 code:
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - data/server-runtime.lock.json
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/assets.ts
@@ -72,7 +72,7 @@ The Overview display page SHALL select one background from the pool each time th
 source: add-overview-background-rotation-pool
 updated: 2026-06-07
 code:
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - data/server-runtime.lock.json
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/assets.ts
@@ -106,7 +106,7 @@ The Overview display page SHALL fall back to the existing hero media when the ba
 source: add-overview-background-rotation-pool
 updated: 2026-06-07
 code:
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - data/server-runtime.lock.json
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/assets.ts
@@ -139,7 +139,7 @@ The change SHALL keep navigation, routing, server APIs, the SQLite schema, the M
 source: add-overview-background-rotation-pool
 updated: 2026-06-07
 code:
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - data/server-runtime.lock.json
   - uploads/overview_bg-2.png
   - apps/web/src/pages/Overview/assets.ts

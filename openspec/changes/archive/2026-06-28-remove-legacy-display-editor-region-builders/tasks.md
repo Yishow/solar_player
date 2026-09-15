@@ -15,7 +15,7 @@
 
 - [x] 3.1 從 `runtimePageDefinitions.test.tsx` 移除針對 `mediaPlacementFields` 的測試與其 import，保留 `*RuntimePageDefinition` 的 live 斷言；驗證：`pnpm --filter @solar-display/web test` 中該測試檔通過且不再 import `runtimeFieldBuilders`。
 - [x] 3.2 從 `fhdEditorCapabilityGapLedger.test.ts` 移除要求 ledger 內含五個 `build*Regions` 字串的 `assert.match`，保留 `*DisplayPageEditorRegions` 與 live editor source 斷言；驗證：該測試檔通過。
-- [x] 3.3 更新 `docs/fhd-editor-gap-ledger.md`，刪除引用已不存在 `build*Regions` 的描述，改述 `*DisplayPageEditorRegions` 為唯一 active editor-region 來源，以滿足 Requirement: Ledger SHALL use current repo sources and avoid deprecated workflow inputs；驗證：`grep -n "build.*Regions" docs/fhd-editor-gap-ledger.md` 無輸出，且 ledger 仍保有五頁 `*DisplayPageEditorRegions` 引用。
+- [x] 3.3 更新 `docs/reference-match/fhd-editor-gap-ledger.md`，刪除引用已不存在 `build*Regions` 的描述，改述 `*DisplayPageEditorRegions` 為唯一 active editor-region 來源，以滿足 Requirement: Ledger SHALL use current repo sources and avoid deprecated workflow inputs；驗證：`grep -n "build.*Regions" docs/reference-match/fhd-editor-gap-ledger.md` 無輸出，且 ledger 仍保有五頁 `*DisplayPageEditorRegions` 引用。
 
 ## 4. 全面驗證
 

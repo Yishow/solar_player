@@ -1,36 +1,54 @@
 # Domain Docs
 
-How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+How engineering skills should consume this repo's domain documentation when exploring the codebase.
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root, or
-- **`CONTEXT-MAP.md`** at the repo root if it exists — it points at one `CONTEXT.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`** — read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
-
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+- **`README.md`** at the repo root for product overview, runtime paths, and current commands.
+- **`AGENTS.md`** or **`CLAUDE.md`** for repo workflow routing and hard rules.
+- **`docs/ops/workflow.md`** and **`docs/ops/conventions.md`** before planning edits or validation.
+- **`openspec/specs/`** and **`openspec/changes/`** when the task depends on product behavior, requirements, or active change intent.
+- **`docs/reference-match/fhd-workflow-entrypoints.md`** when the task touches playback, display surfaces, or FHD closeout.
+- Topic-specific docs such as **`docs/runbooks/`**, **`docs/architecture/`**, or **`docs/reviews/`** only when they match the area you are exploring.
 
 ## File structure
 
-> **本 repo 為 single-context。** 一份 root `CONTEXT.md` + `docs/adr/`。雖是 monorepo（`apps/server`、`apps/web`、`packages/shared`），但三套件同屬同一 playback 產品、高度耦合，單一 context 即足夠。
+> **本 repo 是單一產品 monorepo。** domain vocabulary 與 workflow 入口分散在 root README、docs/ops 與 openspec，而不是 `CONTEXT.md` / `docs/adr/` 佈局。
 
 ```
 /
-├── CONTEXT.md
-├── docs/adr/
-│   ├── 0001-event-sourced-orders.md
-│   └── 0002-postgres-for-write-model.md
-└── src/
+├── README.md
+├── AGENTS.md
+├── CLAUDE.md
+├── openspec/
+│   ├── specs/
+│   └── changes/
+├── docs/
+│   ├── ops/
+│   ├── runbooks/
+│   ├── reference-match/
+│   ├── fhd-witness/
+│   ├── architecture/
+│   ├── reviews/
+│   └── roadmaps/
+├── apps/
+└── packages/
 ```
 
-## Use the glossary's vocabulary
+## Use the repo's vocabulary
 
-When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
+When naming a domain concept in a review, hypothesis, refactor note, or test name, prefer the current terms already used by the repo:
 
-If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
+- `playback page`, `display page editor`, `management page`
+- `witness batch`, `evidence bundle`, `launch witness gates`
+- `runtime profile`, `trusted-management`, `playback-safe`
 
-## Flag ADR conflicts
+If the term you want is not present in the current docs, specs, or code, prefer the closest existing product term instead of inventing a new synonym.
 
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
+## Flag contract conflicts
 
-> _Contradicts ADR-0007 (event-sourced orders) — but worth reopening because…_
+If your output contradicts current source-of-truth docs, surface it explicitly instead of silently overriding it:
+
+- `openspec/` conflict: the behavior or requirement disagrees with the active spec/change.
+- `docs/ops/` conflict: the suggested workflow or validation path disagrees with repo rules.
+- `reference-match/` conflict: the suggested playback/FHD change would weaken a visual canonical or witness gate.

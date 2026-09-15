@@ -38,13 +38,13 @@ The playback footer navigation SHALL render a route-specific icon beside the tex
 source: add-display-nav-icons
 updated: 2026-06-07
 code:
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
   - apps/web/src/pages/Overview/overview.css
   - uploads/overview_bg-1.png
   - docs/reference/Better/01.Overivew (大).png
   - apps/web/src/pages/Overview/viewModel.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/index.tsx
   - uploads/overview_bg-3.png
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -91,13 +91,13 @@ The management mode footer navigation SHALL remain unchanged by this capability 
 source: add-display-nav-icons
 updated: 2026-06-07
 code:
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - apps/web/src/pages/Overview/widgets/PhasePowerTableWidget.tsx
   - apps/web/src/pages/Overview/overview.css
   - uploads/overview_bg-1.png
   - docs/reference/Better/01.Overivew (大).png
   - apps/web/src/pages/Overview/viewModel.ts
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - apps/web/src/pages/Overview/index.tsx
   - uploads/overview_bg-3.png
   - apps/web/src/pages/Overview/displayPageConfig.ts

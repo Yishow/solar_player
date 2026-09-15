@@ -27,5 +27,5 @@
 - Affected specs: fhd-reference-informed-closeout-boundaries, ai-frontend-fhd-evidence-workflow, display-surface-visual-guardrails, display-launch-witness-gates
 - Affected code:
   - New: docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - Modified: docs/reference-match/fhd-evidence-bundle-template.md, docs/display-surface-visual-review-checklist.md, docs/reference-match/display-launch-witness-matrix.md, docs/fhd-witness/playback-closeout-matrix.md, docs/fhd-editor-gap-ledger.md, apps/web/src/pages/fhdEvidenceWorkflow.test.ts, apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts, apps/web/src/pages/displayLaunchWitnessGates.test.ts
+  - Modified: docs/reference-match/fhd-evidence-bundle-template.md, docs/reference-match/display-surface-visual-review-checklist.md, docs/reference-match/display-launch-witness-matrix.md, docs/fhd-witness/playback-closeout-matrix.md, docs/reference-match/fhd-editor-gap-ledger.md, apps/web/src/pages/fhdEvidenceWorkflow.test.ts, apps/web/src/pages/displaySurfaceVisualGuardrails.test.ts, apps/web/src/pages/displayLaunchWitnessGates.test.ts
   - Removed: none

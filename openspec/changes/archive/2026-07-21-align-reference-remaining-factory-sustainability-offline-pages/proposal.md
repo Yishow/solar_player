@@ -1,6 +1,6 @@
 ## Why
 
-在前幾輪 reference alignment 後，`docs/reference-match/all-pages-checklist.md` 仍只剩 `/factory-circuit`、`/sustainability`、`/offline` 三頁維持 `partial`。如果不把這三頁補齊，全站 reference-match closeout 仍會停在不完整狀態，而且播放頁與離線備援頁之間會持續存在兩套視覺模型。
+在前幾輪 reference alignment 後，`docs/archive/reference-match/2026-05/all-pages-checklist.md` 仍只剩 `/factory-circuit`、`/sustainability`、`/offline` 三頁維持 `partial`。如果不把這三頁補齊，全站 reference-match closeout 仍會停在不完整狀態，而且播放頁與離線備援頁之間會持續存在兩套視覺模型。
 
 ## What Changes
 
@@ -33,8 +33,8 @@
     - `apps/web/src/pages/OfflineError/index.tsx`
     - `apps/web/src/pages/OfflineError/viewModel.ts`
     - `apps/web/src/pages/OfflineError/viewModel.test.ts`
-    - `docs/reference-match/all-pages-audit.md`
-    - `docs/reference-match/all-pages-checklist.md`
+    - `docs/archive/reference-match/2026-05/all-pages-audit.md`
+    - `docs/archive/reference-match/2026-05/all-pages-checklist.md`
   - New:
     - `apps/web/src/pages/FactoryCircuit/layout.ts`
     - `apps/web/src/pages/FactoryCircuit/layout.test.ts`

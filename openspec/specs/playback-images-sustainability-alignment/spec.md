@@ -164,7 +164,7 @@ code:
   - apps/web/src/components/FlowConnector.tsx
   - kuozui-green-fhd-html-prototype/styles/pages/10-circuit-settings.css
   - kuozui-green-fhd-html-prototype/prompts/pages/01-overview-html-prompt.md
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
   - apps/web/src/mocks/metrics.ts
   - kuozui-green-fhd-html-prototype/styles/components.css
   - apps/web/src/pages/shared/liveDisplayPagePreviewCatalogLoader.ts
@@ -183,7 +183,7 @@ code:
   - solar-display/apps/server/src/routes/circuits.ts
   - apps/web/src/layouts/offlineRouting.ts
   - kuozui-green-fhd-html-prototype/assets/page2/ChatGPT Image 2026年5月11日 下午11_53_09 (5).png
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - docs/reference/solar_complete_spec_md/UI/13.Playback Settings.png
   - apps/server/src/server-startup.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
@@ -191,7 +191,7 @@ code:
   - apps/web/src/hooks/useSustainabilityStoryRuntime.ts
   - kuozui-green-fhd-html-prototype/觀音廠/solar-2.jpg
   - apps/web/src/components/management/RemoteSyncBanner.tsx
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - solar-display/apps/server/src/db/migrations/001_init.sql
   - kuozui-green-fhd-html-prototype/html-pages/02-solar.html
   - apps/server/src/db/migrations/003_history.sql
@@ -215,7 +215,7 @@ code:
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/green-site-main.jpg
   - docs/reference/solar_complete_spec_md/UI/07_slideshow_preview.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/clean/factory-sky.jpg
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - solar-display/apps/server/src/mqtt/settings-source.ts
   - apps/server/src/db/migrations/015_calculation_settings.sql
   - apps/web/src/hooks/useBrandAssets.ts
@@ -293,7 +293,7 @@ code:
   - docs/reference/kuozui-green-fhd-html-prototype/html-pages/02-solar.html
   - docs/reference/kuozui-green-fhd-html-prototype/styles/pages/12-offline-error-display.css
   - apps/server/src/services/MetricsAccumulatorService.ts
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/server/src/db/migrations/023_normalize_factory_circuit_jungli_rows.sql
   - apps/web/src/pages/EnergyHistory/history.css
   - apps/web/src/pages/shared/editableSettingsLoader.ts
@@ -394,7 +394,7 @@ code:
   - kuozui-green-fhd-html-prototype/prompts/pages/10-circuit-settings-html-prompt.md
   - apps/server/src/services/displaySeedAssetManifest.ts
   - apps/server/src/services/sustainabilityStoryService.ts
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - kuozui-green-fhd-html-prototype/assets/provisional/thumb-ev.jpg
   - kuozui-green-fhd-html-prototype/page-artifacts/02-solar/crop-plan.json
   - kuozui-green-fhd-html-prototype/styles/pages/03-factory-circuit.css
@@ -444,7 +444,7 @@ code:
   - docs/reference/kuozui-green-fhd-html-prototype/assets/generated/slideshow-preview/02-solar.png
   - docs/reference-match/playback-visual-canonicals.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - mqtt/solar/__init__.py
   - apps/server/src/services/metricRetentionPlan.ts
   - solar-display/apps/server/src/metrics/liveMetrics.ts
@@ -512,7 +512,7 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/gallery-thumbs.png
   - solar_mqtt/solar/schedule.py
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - apps/server/src/routes/image-playlist.ts
   - kuozui-green-fhd-html-prototype/assets/provisional/green-site-main.jpg
   - kuozui-green-fhd-html-prototype/styles/pages/09-mqtt-settings.css
@@ -632,7 +632,7 @@ code:
   - kuozui-green-fhd-html-prototype/assets/generated/slideshow-preview/05-sustainability.png
   - solar_complete_spec_md/02_Backend_Spec_Fastify.md
   - apps/web/src/hooks/useDisplayPageConfig.ts
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - apps/web/src/pages/Sustainability/assets/sustainability-hero-reference.png
   - kuozui-green-fhd-html-prototype/page-artifacts/02-solar/object-binding-map.json
   - docs/reference/kuozui-green-fhd-html-prototype/觀音廠/solar-2.jpg
@@ -778,7 +778,7 @@ code:
   - apps/web/src/components/LeafOrnament.tsx
   - apps/server/src/mqtt/settings-source.ts
   - deploy/disable-display-sleep.sh
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/hooks/displaySyncPlaybackReload.ts
   - kuozui-green-fhd-html-prototype/assets/provisional/solar-carport-wide.jpg
   - docs/reference/kuozui-green-fhd-html-prototype/reference-sources/09-9.MQTT Settings.png
@@ -792,7 +792,7 @@ code:
   - solar_complete_spec_md/UI/07_slideshow_preview.md
   - apps/web/src/pages/DisplayPagesEditor/localization.ts
   - docs/display-assets/prompt-recipes/shared-style.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/server/src/metrics/liveMetrics.ts
   - deploy/readonly-system-enable.sh
   - packages/shared/src/displayReadiness.ts
@@ -1065,9 +1065,9 @@ code:
   - apps/web/src/pages/Sustainability/iconRegistry.tsx
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
   - deploy/repair-kiosk-system.sh
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/Overview/backgroundPool.ts
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-co2-total-source.png
   - apps/web/src/pages/OfflineError/index.tsx
   - deploy/firefox-kiosk.desktop
@@ -1122,12 +1122,12 @@ code:
   - docs/archive/prompt-pack/03_TASK_CHECKLIST.md
   - docs/reference/kuozui-green-fhd-html-prototype/prompts/pages/14-device-status-details-spec.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/page2/ChatGPT Image 2026年5月11日 下午11_53_08 (1).png
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - docs/reference/solar_complete_spec_md/UI/01.Overview.png
   - docs/reference/mqtt/solar/heartbeat.py
   - scripts/fhd-witness-config.mjs
   - solar-display/apps/web/src/hooks/usePlaybackController.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/OfflineError/layout.ts
   - apps/server/package.json
   - docs/reference/mqtt/solar/storage.py
@@ -1153,7 +1153,7 @@ code:
   - kuozui-green-fhd-html-prototype/assets/provisional/solar-strip-source.png
   - docs/runbooks/device-diagnostics-safe-ops.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/generated/slideshow-preview/04-images.png
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - solar-display/apps/web/src/hooks/playbackRouteSync.ts
   - example/.DS_Store
   - docs/fhd-witness/evidence-template.md
@@ -1174,7 +1174,7 @@ code:
   - scripts/capture-fhd-witness.mjs
   - kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png
   - kuozui-green-fhd-html-prototype/scripts/ui.js
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - packages/shared/src/index.ts
   - apps/web/src/app/router.tsx
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
@@ -1207,7 +1207,7 @@ code:
   - apps/web/src/pages/OfflineError/assets.ts
   - solar-display/apps/web/src/components/SectionTitle.tsx
   - docs/reference-match/fhd-surface-split-guide.md
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - kuozui-green-fhd-html-prototype/assets/page2/ChatGPT Image 2026年5月11日 下午11_53_08 (2).png
   - mqtt/solar/heartbeat.py
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/offline-bg-ref.jpg
@@ -1676,7 +1676,7 @@ code:
   - apps/web/src/components/FlowConnector.tsx
   - kuozui-green-fhd-html-prototype/styles/pages/10-circuit-settings.css
   - kuozui-green-fhd-html-prototype/prompts/pages/01-overview-html-prompt.md
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
   - apps/web/src/mocks/metrics.ts
   - kuozui-green-fhd-html-prototype/styles/components.css
   - apps/web/src/pages/shared/liveDisplayPagePreviewCatalogLoader.ts
@@ -1695,7 +1695,7 @@ code:
   - solar-display/apps/server/src/routes/circuits.ts
   - apps/web/src/layouts/offlineRouting.ts
   - kuozui-green-fhd-html-prototype/assets/page2/ChatGPT Image 2026年5月11日 下午11_53_09 (5).png
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - docs/reference/solar_complete_spec_md/UI/13.Playback Settings.png
   - apps/server/src/server-startup.ts
   - apps/web/src/pages/DisplayPagesEditor/runtimeSustainability.tsx
@@ -1703,7 +1703,7 @@ code:
   - apps/web/src/hooks/useSustainabilityStoryRuntime.ts
   - kuozui-green-fhd-html-prototype/觀音廠/solar-2.jpg
   - apps/web/src/components/management/RemoteSyncBanner.tsx
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - solar-display/apps/server/src/db/migrations/001_init.sql
   - kuozui-green-fhd-html-prototype/html-pages/02-solar.html
   - apps/server/src/db/migrations/003_history.sql
@@ -1727,7 +1727,7 @@ code:
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/green-site-main.jpg
   - docs/reference/solar_complete_spec_md/UI/07_slideshow_preview.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/clean/factory-sky.jpg
-  - docs/reference-match/settings-images-layout-refactor-plan.md
+  - docs/archive/reference-match/2026-06/settings-images-layout-refactor-plan.md
   - solar-display/apps/server/src/mqtt/settings-source.ts
   - apps/server/src/db/migrations/015_calculation_settings.sql
   - apps/web/src/hooks/useBrandAssets.ts
@@ -1805,7 +1805,7 @@ code:
   - docs/reference/kuozui-green-fhd-html-prototype/html-pages/02-solar.html
   - docs/reference/kuozui-green-fhd-html-prototype/styles/pages/12-offline-error-display.css
   - apps/server/src/services/MetricsAccumulatorService.ts
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/server/src/db/migrations/023_normalize_factory_circuit_jungli_rows.sql
   - apps/web/src/pages/EnergyHistory/history.css
   - apps/web/src/pages/shared/editableSettingsLoader.ts
@@ -1906,7 +1906,7 @@ code:
   - kuozui-green-fhd-html-prototype/prompts/pages/10-circuit-settings-html-prompt.md
   - apps/server/src/services/displaySeedAssetManifest.ts
   - apps/server/src/services/sustainabilityStoryService.ts
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - kuozui-green-fhd-html-prototype/assets/provisional/thumb-ev.jpg
   - kuozui-green-fhd-html-prototype/page-artifacts/02-solar/crop-plan.json
   - kuozui-green-fhd-html-prototype/styles/pages/03-factory-circuit.css
@@ -1956,7 +1956,7 @@ code:
   - docs/reference/kuozui-green-fhd-html-prototype/assets/generated/slideshow-preview/02-solar.png
   - docs/reference-match/playback-visual-canonicals.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - mqtt/solar/__init__.py
   - apps/server/src/services/metricRetentionPlan.ts
   - solar-display/apps/server/src/metrics/liveMetrics.ts
@@ -2024,7 +2024,7 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/gallery-thumbs.png
   - solar_mqtt/solar/schedule.py
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - apps/server/src/routes/image-playlist.ts
   - kuozui-green-fhd-html-prototype/assets/provisional/green-site-main.jpg
   - kuozui-green-fhd-html-prototype/styles/pages/09-mqtt-settings.css
@@ -2144,7 +2144,7 @@ code:
   - kuozui-green-fhd-html-prototype/assets/generated/slideshow-preview/05-sustainability.png
   - solar_complete_spec_md/02_Backend_Spec_Fastify.md
   - apps/web/src/hooks/useDisplayPageConfig.ts
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - apps/web/src/pages/Sustainability/assets/sustainability-hero-reference.png
   - kuozui-green-fhd-html-prototype/page-artifacts/02-solar/object-binding-map.json
   - docs/reference/kuozui-green-fhd-html-prototype/觀音廠/solar-2.jpg
@@ -2290,7 +2290,7 @@ code:
   - apps/web/src/components/LeafOrnament.tsx
   - apps/server/src/mqtt/settings-source.ts
   - deploy/disable-display-sleep.sh
-  - docs/reference-match/fhd-closeout-handoff-2026-06-07.md
+  - docs/archive/reference-match/2026-06/fhd-closeout-handoff-2026-06-07.md
   - apps/web/src/hooks/displaySyncPlaybackReload.ts
   - kuozui-green-fhd-html-prototype/assets/provisional/solar-carport-wide.jpg
   - docs/reference/kuozui-green-fhd-html-prototype/reference-sources/09-9.MQTT Settings.png
@@ -2304,7 +2304,7 @@ code:
   - solar_complete_spec_md/UI/07_slideshow_preview.md
   - apps/web/src/pages/DisplayPagesEditor/localization.ts
   - docs/display-assets/prompt-recipes/shared-style.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/server/src/metrics/liveMetrics.ts
   - deploy/readonly-system-enable.sh
   - packages/shared/src/displayReadiness.ts
@@ -2577,9 +2577,9 @@ code:
   - apps/web/src/pages/Sustainability/iconRegistry.tsx
   - apps/web/src/pages/DisplayPagesEditor/inspectorFields.tsx
   - deploy/repair-kiosk-system.sh
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/Overview/backgroundPool.ts
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - kuozui-green-fhd-html-prototype/assets/generated/02-solar/metric-co2-total-source.png
   - apps/web/src/pages/OfflineError/index.tsx
   - deploy/firefox-kiosk.desktop
@@ -2634,12 +2634,12 @@ code:
   - docs/archive/prompt-pack/03_TASK_CHECKLIST.md
   - docs/reference/kuozui-green-fhd-html-prototype/prompts/pages/14-device-status-details-spec.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/page2/ChatGPT Image 2026年5月11日 下午11_53_08 (1).png
-  - docs/reference-match/phase4-visual-witness-2026-06-07.md
+  - docs/archive/reference-match/2026-06/phase4-visual-witness-2026-06-07.md
   - docs/reference/solar_complete_spec_md/UI/01.Overview.png
   - docs/reference/mqtt/solar/heartbeat.py
   - scripts/fhd-witness-config.mjs
   - solar-display/apps/web/src/hooks/usePlaybackController.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/OfflineError/layout.ts
   - apps/server/package.json
   - docs/reference/mqtt/solar/storage.py
@@ -2665,7 +2665,7 @@ code:
   - kuozui-green-fhd-html-prototype/assets/provisional/solar-strip-source.png
   - docs/runbooks/device-diagnostics-safe-ops.md
   - docs/reference/kuozui-green-fhd-html-prototype/assets/generated/slideshow-preview/04-images.png
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - solar-display/apps/web/src/hooks/playbackRouteSync.ts
   - example/.DS_Store
   - docs/fhd-witness/evidence-template.md
@@ -2686,7 +2686,7 @@ code:
   - scripts/capture-fhd-witness.mjs
   - kuozui-green-fhd-html-prototype/assets/generated/02-solar/carbon-reduction-display-source.png
   - kuozui-green-fhd-html-prototype/scripts/ui.js
-  - docs/reference-match/flow-connector-refinement-closeout-2026-06-07.md
+  - docs/archive/reference-match/2026-06/flow-connector-refinement-closeout-2026-06-07.md
   - packages/shared/src/index.ts
   - apps/web/src/app/router.tsx
   - apps/web/src/pages/DisplayPagesEditor/runtimeImages.tsx
@@ -2719,7 +2719,7 @@ code:
   - apps/web/src/pages/OfflineError/assets.ts
   - solar-display/apps/web/src/components/SectionTitle.tsx
   - docs/reference-match/fhd-surface-split-guide.md
-  - docs/reference-match/overview-density-baseline-2026-06-07.md
+  - docs/archive/reference-match/2026-06/overview-density-baseline-2026-06-07.md
   - kuozui-green-fhd-html-prototype/assets/page2/ChatGPT Image 2026年5月11日 下午11_53_08 (2).png
   - mqtt/solar/heartbeat.py
   - docs/reference/kuozui-green-fhd-html-prototype/assets/provisional/offline-bg-ref.jpg

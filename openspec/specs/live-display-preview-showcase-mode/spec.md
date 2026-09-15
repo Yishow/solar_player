@@ -43,7 +43,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/inspectorCard.tsx
   - apps/web/src/pages/Overview/index.tsx
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Images/images.css
@@ -124,7 +124,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/inspectorCard.tsx
   - apps/web/src/pages/Overview/index.tsx
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Images/images.css
@@ -204,7 +204,7 @@ code:
   - apps/web/src/pages/DisplayPagesEditor/inspectorCard.tsx
   - apps/web/src/pages/Overview/index.tsx
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - .agents/skills/display-asset-generation/README.md
   - apps/web/src/pages/FactoryCircuit/index.tsx
   - apps/web/src/pages/Images/images.css

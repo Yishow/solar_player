@@ -31,6 +31,6 @@ Overview 與 Solar 是最適合先驗證 reference-informed closeout 邊界的�
 
 - Affected specs: overview-solar-reference-quality-closeout
 - Affected code:
-  - New: docs/reference-match/overview-solar-reference-quality-closeout.md
+  - New: docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
   - Modified: apps/web/src/pages/Overview/displayPageConfig.ts, apps/web/src/pages/Solar/displayPageConfig.ts, apps/web/src/pages/Overview/configRender.test.tsx, apps/web/src/pages/Solar/configRender.test.ts, apps/web/src/pages/Solar/layout.test.ts, apps/web/src/pages/displayPageSeeds.test.ts, docs/reference-match/display-launch-witness-matrix.md, docs/fhd-witness/playback-closeout-matrix.md
   - Removed: none

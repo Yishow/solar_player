@@ -32,6 +32,6 @@ Images 的主要 closeout 落差集中在 media stage 的裁切比例、thumbnai
 
 - Affected specs: images-reference-quality-closeout
 - Affected code:
-  - New: docs/reference-match/images-reference-quality-closeout.md
+  - New: docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - Modified: apps/web/src/pages/Images/displayPageConfig.ts, apps/web/src/pages/Images/images.css, apps/web/src/pages/Images/index.tsx, apps/web/src/pages/Images/configRender.test.ts, apps/web/src/pages/Images/layout.test.ts, apps/web/src/pages/Images/viewModel.test.ts, apps/web/src/pages/displayPageSeeds.test.ts, docs/reference-match/display-launch-witness-matrix.md, docs/fhd-witness/playback-closeout-matrix.md
   - Removed: none

@@ -33,7 +33,7 @@ code:
   - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
   - apps/web/src/pages/shared/displaySurfaceChrome.css
   - .codex/hooks.json
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/components/PageContainer.tsx
   - apps/web/src/pages/Solar/index.tsx
@@ -103,7 +103,7 @@ code:
   - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
   - apps/web/src/pages/shared/displaySurfaceChrome.css
   - .codex/hooks.json
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/components/PageContainer.tsx
   - apps/web/src/pages/Solar/index.tsx
@@ -185,7 +185,7 @@ code:
   - apps/web/src/pages/SlideshowPreview/LiveSlideshowPreviewCards.tsx
   - apps/web/src/pages/shared/displaySurfaceChrome.css
   - .codex/hooks.json
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/Solar/solar.css
   - apps/web/src/components/PageContainer.tsx
   - apps/web/src/pages/Solar/index.tsx

@@ -21,7 +21,7 @@
 
 ## 3. Classify gaps and map downstream ownership
 
-- [x] 3.1 Create `docs/fhd-editor-gap-ledger.md` with a stable table per page containing page, route, FHD reference path, surface, current editor region id, current editor field group, code anchor or evidence path, classification, downstream owner, next verification, and notes.
+- [x] 3.1 Create `docs/reference-match/fhd-editor-gap-ledger.md` with a stable table per page containing page, route, FHD reference path, surface, current editor region id, current editor field group, code anchor or evidence path, classification, downstream owner, next verification, and notes.
 - [x] 3.2 Classify every row as exactly one of `existing-editor-control`, `new-editor-capability`, `non-editor-runtime-gap`, or `accepted-difference`; reject rows with blank status, `todo`, `unknown`, or `needs polish`.
 - [x] 3.3 Map every `new-editor-capability` row to `add-display-editor-fhd-typography-rhythm-controls`, `add-display-editor-fhd-ornament-media-controls`, `add-display-editor-fhd-flow-connector-controls`, `add-ai-led-fhd-witness-tooling`, or `new-change-required:<proposed-name>`.
 - [x] 3.4 Mark existing controls that only require value tuning as `existing-editor-control` so downstream work does not duplicate already implemented schema helpers or region fields.

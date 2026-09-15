@@ -32,8 +32,8 @@ code:
   - openspec/specs/display-page-draft-live-publishing/spec.md
   - docs/reference-match/display-launch-witness-matrix.md
   - docs/reference-match/display-launch-verification-pack.md
-  - docs/reference-match/all-pages-audit.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
 tests:
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
 -->
@@ -43,8 +43,8 @@ tests:
 source: add-display-launch-witness-gates
 updated: 2026-05-27
 code:
-  - docs/display-surface-visual-review-checklist.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .codex/hooks/fhd-evidence-reminder.js
   - apps/server/src/mqtt/MqttClientService.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -53,7 +53,7 @@ code:
   - CLAUDE.md
   - apps/web/src/layouts/ManagementShell.tsx
   - AGENTS.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/web/src/app/router.tsx
   - apps/web/src/layouts/LayoutShell.tsx
   - docs/reference-match/fhd-evidence-bundle-template.md
@@ -68,7 +68,7 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - docs/reference-match/fhd-surface-split-guide.md
   - apps/web/src/hooks/useDisplayPageConfig.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/hooks/useMqttStatus.ts
   - apps/web/src/pages/shared/displayPageRouteHost.css
@@ -142,8 +142,8 @@ code:
   - openspec/specs/display-page-draft-live-publishing/spec.md
   - docs/reference-match/display-launch-witness-matrix.md
   - docs/reference-match/display-launch-verification-pack.md
-  - docs/reference-match/all-pages-audit.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
 tests:
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
 -->
@@ -153,8 +153,8 @@ tests:
 source: add-display-launch-witness-gates
 updated: 2026-05-27
 code:
-  - docs/display-surface-visual-review-checklist.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .codex/hooks/fhd-evidence-reminder.js
   - apps/server/src/mqtt/MqttClientService.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -163,7 +163,7 @@ code:
   - CLAUDE.md
   - apps/web/src/layouts/ManagementShell.tsx
   - AGENTS.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/web/src/app/router.tsx
   - apps/web/src/layouts/LayoutShell.tsx
   - docs/reference-match/fhd-evidence-bundle-template.md
@@ -178,7 +178,7 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - docs/reference-match/fhd-surface-split-guide.md
   - apps/web/src/hooks/useDisplayPageConfig.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/hooks/useMqttStatus.ts
   - apps/web/src/pages/shared/displayPageRouteHost.css
@@ -252,8 +252,8 @@ code:
   - openspec/specs/display-page-draft-live-publishing/spec.md
   - docs/reference-match/display-launch-witness-matrix.md
   - docs/reference-match/display-launch-verification-pack.md
-  - docs/reference-match/all-pages-audit.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
 tests:
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
 -->
@@ -263,8 +263,8 @@ tests:
 source: add-display-launch-witness-gates
 updated: 2026-05-27
 code:
-  - docs/display-surface-visual-review-checklist.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .codex/hooks/fhd-evidence-reminder.js
   - apps/server/src/mqtt/MqttClientService.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -273,7 +273,7 @@ code:
   - CLAUDE.md
   - apps/web/src/layouts/ManagementShell.tsx
   - AGENTS.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/web/src/app/router.tsx
   - apps/web/src/layouts/LayoutShell.tsx
   - docs/reference-match/fhd-evidence-bundle-template.md
@@ -288,7 +288,7 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - docs/reference-match/fhd-surface-split-guide.md
   - apps/web/src/hooks/useDisplayPageConfig.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/hooks/useMqttStatus.ts
   - apps/web/src/pages/shared/displayPageRouteHost.css
@@ -362,8 +362,8 @@ code:
   - openspec/specs/display-page-draft-live-publishing/spec.md
   - docs/reference-match/display-launch-witness-matrix.md
   - docs/reference-match/display-launch-verification-pack.md
-  - docs/reference-match/all-pages-audit.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
 tests:
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
 -->
@@ -372,8 +372,8 @@ tests:
 source: add-display-launch-witness-gates
 updated: 2026-05-27
 code:
-  - docs/display-surface-visual-review-checklist.md
-  - docs/reference-match/all-pages-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
+  - docs/archive/reference-match/2026-05/all-pages-checklist.md
   - .codex/hooks/fhd-evidence-reminder.js
   - apps/server/src/mqtt/MqttClientService.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
@@ -382,7 +382,7 @@ code:
   - CLAUDE.md
   - apps/web/src/layouts/ManagementShell.tsx
   - AGENTS.md
-  - docs/FHD.01.html
+  - docs/reference/kuozui-green-fhd-html-prototype/review.html
   - apps/web/src/app/router.tsx
   - apps/web/src/layouts/LayoutShell.tsx
   - docs/reference-match/fhd-evidence-bundle-template.md
@@ -397,7 +397,7 @@ code:
   - apps/web/src/pages/shared/displayPageRouteHost.tsx
   - docs/reference-match/fhd-surface-split-guide.md
   - apps/web/src/hooks/useDisplayPageConfig.ts
-  - docs/reference-match/all-pages-audit.md
+  - docs/archive/reference-match/2026-05/all-pages-audit.md
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/hooks/useMqttStatus.ts
   - apps/web/src/pages/shared/displayPageRouteHost.css
@@ -462,12 +462,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -499,12 +499,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -540,12 +540,12 @@ source: define-fhd-reference-informed-closeout-boundaries
 updated: 2026-06-05
 code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - docs/reference-match/display-launch-witness-matrix.md
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - docs/fhd-witness/playback-closeout-matrix.md
-  - docs/goal.md
+  - README.md
 tests:
   - apps/web/src/pages/fhdEvidenceWorkflow.test.ts
   - apps/web/src/pages/displayLaunchWitnessGates.test.ts
@@ -572,31 +572,31 @@ code:
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/Images/displayPageConfig.ts
   - data/server-runtime.lock.json
-  - docs/reference-match/fhd-playback-boundary-classification-2026-06-05.md
-  - docs/reference-match/images-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/fhd-playback-boundary-classification-2026-06-05.md
+  - docs/archive/reference-match/2026-06/images-reference-quality-closeout.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - apps/web/src/pages/Overview/displayPageConfig.ts
   - docs/reference-match/display-launch-witness-matrix.md
   - apps/web/src/pages/Solar/displayPageConfig.ts
-  - docs/reference-match/overview-solar-reference-quality-closeout.md
-  - docs/goal.md
-  - docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/overview-solar-reference-quality-closeout.md
+  - README.md
+  - docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - apps/server/src/services/displaySeedAssetManifest.ts
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/scripts/run-tests.mjs
   - docs/reference-match/fhd-evidence-bundle-template.md
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.ts
   - apps/web/src/layouts/LayoutShell.tsx
   - apps/web/src/components/DisplayCanvas.tsx
-  - docs/reference-match/sustainability-reference-quality-closeout.md
+  - docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - apps/web/src/pages/Solar/layout.ts
-  - docs/reference-match/fhd-playback-witness-polish-pass-1-2026-06-06.md
+  - docs/archive/reference-match/2026-06/fhd-playback-witness-polish-pass-1-2026-06-06.md
   - apps/web/package.json
   - apps/web/src/hooks/displayTransition.ts
   - apps/web/src/components/displayCanvasSurfaceStyle.ts
-  - docs/display-surface-visual-review-checklist.md
-  - docs/reference-match/visual-fidelity-review-2026-06-06.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
+  - docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md
   - docs/fhd-witness/playback-closeout-matrix.md
   - apps/web/src/layouts/playbackRotationFreeze.ts
   - scripts/capture-fhd-witness.mjs

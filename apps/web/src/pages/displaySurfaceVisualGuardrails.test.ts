@@ -11,7 +11,7 @@ import { createSustainabilityDisplayPageSeedConfig } from "./Sustainability/disp
 
 const repoRoot = path.resolve(import.meta.dirname, "../../../../");
 const checklistDoc = readFileSync(
-  path.join(repoRoot, "docs/display-surface-visual-review-checklist.md"),
+  path.join(repoRoot, "docs/reference-match/display-surface-visual-review-checklist.md"),
   "utf8"
 );
 const referenceBoundaryDoc = readFileSync(
@@ -112,7 +112,7 @@ test("display surface checklist covers the required review dimensions and docume
 
   for (const proposalPath of proposalPaths) {
     const proposalSource = readFileSync(proposalPath, "utf8");
-    assert.match(proposalSource, /docs\/display-surface-visual-review-checklist\.md/);
+    assert.match(proposalSource, /docs\/reference-match\/display-surface-visual-review-checklist\.md/);
   }
 });
 

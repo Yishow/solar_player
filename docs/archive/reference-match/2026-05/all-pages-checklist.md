@@ -6,7 +6,7 @@
 
 此文件是全站 reference-match QA closeout ledger，承接：
 
-- `docs/reference-match/all-pages-audit.md`
+- `docs/archive/reference-match/2026-05/all-pages-audit.md`
 - shared Kuozui FHD shell / reference components migration
 - display/playback routes migration
 - settings/management routes migration
@@ -26,7 +26,7 @@
 
 對 `/overview`、`/solar`、`/factory-circuit`、`/images`、`/sustainability` 做 visual review 時，除了本文件的 closeout evidence，還要額外檢查：
 
-- `docs/display-surface-visual-review-checklist.md`
+- `docs/reference-match/display-surface-visual-review-checklist.md`
 - `docs/reference-match/playback-visual-canonicals.md`
 
 review 不能只寫 `close` 或 `needs manual QA`；還要明確看過：

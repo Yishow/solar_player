@@ -16,7 +16,7 @@
 
 ```
 你在 solar_player repo。任務：對 5 個 playback 頁做 FHD 視覺保真比對，把結果寫回
-docs/reference-match/visual-fidelity-review-2026-06-06.md 的「待回填」區塊。
+docs/archive/reference-match/2026-06/visual-fidelity-review-2026-06-06.md 的「待回填」區塊。
 
 前置：
 1. 起 dev server（含後端）：在 repo 根目錄執行 `pnpm dev`，等 web=5173 與 server=3000 都 200。

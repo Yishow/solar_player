@@ -32,6 +32,6 @@ Factory Circuit 的主要落差不是 shared header/footer，而是 page content
 
 - Affected specs: factory-circuit-reference-quality-closeout
 - Affected code:
-  - New: docs/reference-match/factory-circuit-reference-quality-closeout.md
+  - New: docs/archive/reference-match/2026-06/factory-circuit-reference-quality-closeout.md
   - Modified: apps/web/src/pages/FactoryCircuit/displayPageConfig.ts, apps/web/src/pages/FactoryCircuit/factoryCircuit.css, apps/web/src/pages/FactoryCircuit/index.tsx, apps/web/src/pages/FactoryCircuit/configRender.test.ts, apps/web/src/pages/FactoryCircuit/layout.test.ts, apps/web/src/pages/FactoryCircuit/nodeVocabulary.test.ts, apps/web/src/pages/FactoryCircuit/cardFamily.test.ts, apps/web/src/pages/displayPageSeeds.test.ts, docs/reference-match/display-launch-witness-matrix.md, docs/fhd-witness/playback-closeout-matrix.md
   - Removed: none

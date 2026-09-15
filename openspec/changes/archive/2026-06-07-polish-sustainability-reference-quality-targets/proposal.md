@@ -32,6 +32,6 @@ Sustainability 的 reference-informed closeout 重點在 hero media 與 ring orn
 
 - Affected specs: sustainability-reference-quality-closeout
 - Affected code:
-  - New: docs/reference-match/sustainability-reference-quality-closeout.md
+  - New: docs/archive/reference-match/2026-06/sustainability-reference-quality-closeout.md
   - Modified: apps/web/src/pages/Sustainability/displayPageConfig.ts, apps/web/src/pages/Sustainability/sustainability.css, apps/web/src/pages/Sustainability/index.tsx, apps/web/src/pages/Sustainability/configRender.test.ts, apps/web/src/pages/Sustainability/layout.test.ts, apps/web/src/pages/Sustainability/viewModel.test.ts, apps/web/src/pages/displayPageSeeds.test.ts, docs/reference-match/display-launch-witness-matrix.md, docs/fhd-witness/playback-closeout-matrix.md
   - Removed: none

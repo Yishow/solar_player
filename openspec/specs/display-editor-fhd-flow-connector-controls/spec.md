@@ -45,13 +45,13 @@ code:
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - README.md
   - package.json
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - apps/server/src/services/displayPagePublishingService.ts
   - scripts/capture-fhd-witness.mjs
   - scripts/fhd-witness-config.mjs
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/Images/index.tsx
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -63,7 +63,7 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
 tests:
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.test.ts
@@ -127,13 +127,13 @@ code:
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - README.md
   - package.json
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - apps/server/src/services/displayPagePublishingService.ts
   - scripts/capture-fhd-witness.mjs
   - scripts/fhd-witness-config.mjs
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/Images/index.tsx
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -145,7 +145,7 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
 tests:
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.test.ts
@@ -207,13 +207,13 @@ code:
   - apps/web/src/pages/shared/displayPageChromeConfig.ts
   - README.md
   - package.json
-  - docs/fhd-editor-gap-ledger.md
+  - docs/reference-match/fhd-editor-gap-ledger.md
   - docs/reference-match/fhd-evidence-bundle-template.md
   - apps/web/src/pages/shared/displayPageMediaEffectConfig.ts
   - apps/server/src/services/displayPagePublishingService.ts
   - scripts/capture-fhd-witness.mjs
   - scripts/fhd-witness-config.mjs
-  - docs/goal.md
+  - README.md
   - apps/web/src/pages/Images/index.tsx
   - docs/reference-match/fhd-reference-informed-closeout-boundaries.md
   - apps/web/src/pages/Solar/displayPageConfig.ts
@@ -225,7 +225,7 @@ code:
   - apps/web/src/pages/Sustainability/displayPageConfig.ts
   - apps/web/src/pages/Sustainability/index.tsx
   - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - docs/display-surface-visual-review-checklist.md
+  - docs/reference-match/display-surface-visual-review-checklist.md
   - apps/web/src/pages/FactoryCircuit/factoryCircuit.css
 tests:
   - apps/web/src/pages/shared/displayPageFlowTreatmentConfig.test.ts
