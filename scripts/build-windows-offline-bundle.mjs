@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const projectRoot = resolve(import.meta.dirname, "..");
@@ -42,17 +42,60 @@ function copyRequired(source, destination) {
 }
 
 function findBetterSqlitePackage(root) {
-  const result = run("find", [root, "-path", "*/better-sqlite3@*/node_modules/better-sqlite3/package.json", "-print"]);
-  const packageJson = result.stdout.trim().split("\n").find(Boolean);
-  if (!packageJson) throw new Error("better-sqlite3 package was not produced by pnpm deploy");
-  return dirname(packageJson);
+  // Avoid `find -path`: platform find implementations disagree on separators.
+  const pnpmDir = join(root, "node_modules", ".pnpm");
+  const candidates = readdirSync(pnpmDir).filter((name) => name.startsWith("better-sqlite3@"));
+  for (const candidate of candidates) {
+    const packageJson = join(pnpmDir, candidate, "node_modules", "better-sqlite3", "package.json");
+    if (existsSync(packageJson)) return dirname(packageJson);
+  }
+  throw new Error("better-sqlite3 package was not produced by pnpm deploy");
+}
+
+function collectPaths(root) {
+  const out = [];
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      out.push(full);
+      if (!entry.isSymbolicLink() && entry.isDirectory()) stack.push(full);
+    }
+  }
+  return out;
+}
+
+function copyTreeWindows(source, destination) {
+  // robocopy follows pnpm junctions and tolerates long paths where cp -RL fails on Windows.
+  const result = spawnSync("robocopy", [source, destination, "/E", "/NFL", "/NDL", "/NJH", "/NJS", "/NP"], { encoding: "utf8", stdio: "pipe" });
+  if (result.status !== null && result.status <= 8) return;
+  // robocopy counts the self-referential workspace junction
+  // (@solar-display/server -> payload/apps/server) recursion as a failure and
+  // may drop unrelated files in the same pass; reconcile every source file.
+  try {
+    const srcFiles = collectPaths(source).map((p) => [p, p.slice(source.length).toLowerCase()]);
+    const dstFiles = new Set(collectPaths(destination).map((p) => p.slice(destination.length).toLowerCase()));
+    let repaired = 0;
+    for (const [full, rel] of srcFiles) {
+      if (dstFiles.has(rel)) continue;
+      const target = join(destination, rel);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(full, target);
+      repaired += 1;
+    }
+    if (repaired > 0) console.log(`robocopy status ${result.status}: reconciled ${repaired} missing path(s)`);
+    return;
+  } catch (repairError) {
+    throw new Error(`robocopy ${source} ${destination} failed (reconcile also failed: ${repairError.message}):\n${result.stderr || result.stdout}`);
+  }
 }
 
 function materializeRuntimeDependencies(serverDir) {
   const nodeModules = join(serverDir, "node_modules");
   const portableNodeModules = join(serverDir, "node_modules.portable");
   rmSync(portableNodeModules, { recursive: true, force: true });
-  run("cp", ["-RL", join(serverDir, "node_modules"), portableNodeModules]);
+  copyTreeWindows(join(serverDir, "node_modules"), portableNodeModules);
   rmSync(nodeModules, { recursive: true, force: true });
   renameSync(portableNodeModules, nodeModules);
   const hoistedDependencies = join(nodeModules, ".pnpm", "node_modules");
@@ -63,10 +106,10 @@ function materializeRuntimeDependencies(serverDir) {
       mkdirSync(destination, { recursive: true });
       for (const scopedDependency of readdirSync(source)) {
         const scopedDestination = join(destination, scopedDependency);
-        if (!existsSync(scopedDestination)) run("cp", ["-RL", join(source, scopedDependency), scopedDestination]);
+        if (!existsSync(scopedDestination)) copyTreeWindows(join(source, scopedDependency), scopedDestination);
       }
     } else if (!existsSync(destination)) {
-      run("cp", ["-RL", source, destination]);
+      copyTreeWindows(source, destination);
     }
   }
   const symlinks = run("find", [nodeModules, "-type", "l", "-print"]).stdout.trim();
@@ -118,7 +161,16 @@ function build() {
   const sqliteVersion = JSON.parse(readFileSync(join(sqlitePackagePath, "package.json"), "utf8")).version;
   const sqliteBinary = join(sqlitePackagePath, "prebuilds/win32-x64.node");
   if (!existsSync(sqliteBinary)) throw new Error(`Windows x64 better-sqlite3 prebuild is missing: ${sqliteBinary}`);
-  run("find", [serverDir, "-name", "*.node", "!", "-path", "*/better-sqlite3/prebuilds/win32-x64.node", "-delete"]);
+  const keptSuffix = `${sep}better-sqlite3${sep}prebuilds${sep}win32-x64.node`.toLowerCase();
+  const deleteOtherNodeBinaries = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) deleteOtherNodeBinaries(full);
+      else if (entry.name.endsWith(".node") && !full.toLowerCase().endsWith(keptSuffix)) rmSync(full, { force: true });
+    }
+  };
+  deleteOtherNodeBinaries(serverDir);
 
   const nodeExtract = join(cacheDir, "node-win-x64");
   rmSync(nodeExtract, { recursive: true, force: true });
@@ -156,8 +208,17 @@ function build() {
   copyRequired(payload, portableStageDir);
   copyRequired(join(stageDir, "runtime"), join(portableStageDir, "runtime"));
   writeFileSync(join(portableStageDir, "bundle-manifest.json"), `${JSON.stringify({ ...manifest, mode: "portable" }, null, 2)}\n`);
-  run("zip", ["-qry", archivePath, basename(stageDir)], { cwd: outputDir });
-  run("zip", ["-qry", portableArchivePath, basename(portableStageDir)], { cwd: outputDir });
+  // Info-ZIP prefers -qry; the Windows zip port lacks -y and spawnSync cannot
+  // launch .cmd wrappers, so fall back to 7-Zip when Info-ZIP is unusable.
+  const zipDir = (archivePath, dirName) => {
+    try {
+      run("zip", ["-qry", archivePath, dirName], { cwd: outputDir });
+    } catch {
+      run("7z", ["a", "-tzip", "-y", archivePath, dirName], { cwd: outputDir });
+    }
+  };
+  zipDir(archivePath, basename(stageDir));
+  zipDir(portableArchivePath, basename(portableStageDir));
   console.log(`Built ${archivePath}`);
   console.log(`sha256=${sha256(archivePath)}`);
   console.log(`Built ${portableArchivePath}`);

@@ -6241,7 +6241,7 @@ test("Windows offline bundle builder and installer target x64 port 4000 without 
   assert.match(builder, /apps\/web\/dist/u);
   assert.match(builder, /rmSync\(join\(serverDir, "data"\)/u);
   assert.match(builder, /--frozen-lockfile/u);
-  assert.match(builder, /cp", \["-RL", join\(serverDir, "node_modules"\)/u);
+  assert.match(builder, /copyTreeWindows\(join\(serverDir, "node_modules"\)/u);
   assert.match(builder, /hoistedDependencies = join\(nodeModules, "\.pnpm", "node_modules"\)/u);
   assert.match(builder, /readdirSync\(hoistedDependencies\)/u);
   assert.match(builder, /Portable bundle contains symlinked dependencies/u);
