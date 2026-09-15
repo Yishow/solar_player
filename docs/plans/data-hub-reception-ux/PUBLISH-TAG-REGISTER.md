@@ -1,6 +1,6 @@
 # Publish tag 登錄與封包計畫
 
-基準 main `fd405ebc`；完整機器可讀清單見 [tag-register.json](tag-register.json)。本檔是**提案，不是現場已啟用設定**。中壢候選沿用 opc_mqtt/internal/config/defaults.go 的 20 raw／10 virtual，現行程式沒有 site 欄位；本輪將其列入 CL 盤點計畫，不宣稱已確認設備歸屬或計量邊界。KN 目前沒有實際 Item 清單。[S18–S21]
+基準 main `fd405ebc`；完整機器可讀清單見 [tag-register.json](tag-register.json)。本檔是**提案，不是現場已啟用設定**。中壢候選沿用 opc_mqtt/internal/config/defaults.go 的 20 raw／10 virtual，現行程式沒有 site 欄位；本輪將其列入 CL 盤點計畫，不宣稱已確認設備歸屬或計量邊界。KN 已確認工程別接收；實際工程 payload/mode 尚未提供，不以 Item 清單作接入前置。[S18–S21]
 
 ## 1. 保持既有 Solar 契約
 
@@ -14,7 +14,7 @@
 
 Solar summary/zone 目前可 retained，原始時間支配 freshness；新 OPC live retain=false 的提案不能反過來更動 Solar。Solar timestamp 既有 offset-free 限制另列環境／來源時區證據，不在此變更默改 parser。[S22–S24]
 
-## 2. 新電力 topic 命名（提案）
+## 2. 新實體電力 topic 命名（提案；不強制KN工程採用）
 
 | Topic | 用途 | QoS／retain |
 |---|---|---|
@@ -72,20 +72,24 @@ site 精確 cl/kn；raw tagId 使用批准的 `[A-Z0-9_]+`，virtual/publisher I
 | `assembly` | `opc/裝配` | VCB_7_2_KWH |
 | `krdc` | `opc/KRDC` | VCB_8_2_KWH |
 
-這是 defaults.go 的公式盤點，不是已確認部門用電規則。virtual 全部為 calculation-only：任何成員失效就整組 invalid；公式版本／成員資料時間要顯示。不得計算「GCB + 全部部門 + virtual」或把一製／二製與其子盤一起加總。某 raw 換錶或 reset 也不得讓 virtual lifetime sum 的落差被當用電。正式部門、總錶與 shareBasis 保留 E6，區間數據由 raw 的 E1/E2 計算。[S19/S21/S26]
+這是 defaults.go 的公式盤點，不是已確認部門用電規則。本節未審查comparison virtual為 calculation-only；已批准KN工程成果另走G正式工程provider，不能一律排除。comparison virtual：任何成員失效就整組 invalid；公式版本／成員資料時間要顯示。不得計算「GCB + 全部部門 + virtual」或把一製／二製與其子盤一起加總。某 raw 換錶或 reset 也不得讓 virtual lifetime sum 的落差被當用電。本節 physical profile 的正式部門、總錶與 shareBasis 保留 E6，區間數據由 raw 的 E1/E2 計算；工程成果按 G 的 typed profile/provider 接入。[S19/S21/S26]
 
-## 5. KN 邏輯 tag 預留（全部停用）
+## 5. KN 改為八工程別交接（來源未配置）
 
-| 預留 tagId | 目的／語意 | 單位 | 計畫 |
+舊SITE_LOAD/GRID_IMPORT/FEEDER模板不是此次工程接收前提，已從KN範本移除。八工程已知，但實際mode/payload仍待核對；sourceKind=engineering，不需要meterId/Item。
+
+| 工程 | ID | 既有功率topic（kW） | 既有KN metric |
 |---|---|---|---|
-| `SITE_LOAD_KWH` | 全廠負載累積用電（有實體邊界證據才成立）；cumulative-energy／consumption | kWh | 優先核對；沒有完整邊界就保持不可用 |
-| `GRID_IMPORT_KWH` | 電網購入累積電量；cumulative-energy／grid-import | kWh | 可獨立先上，但不叫全廠總用電 |
-| `SITE_LOAD_KW` | 全廠即時有功功率；power-gauge／consumption | kW | 選配；必須真有功率量測 |
-| `GRID_EXPORT_KWH` | 電網回送累積電量；cumulative-energy／grid-export | kWh | 選配；有反送／自用率需求再盤點 |
-| `FEEDER_<ID>_KWH` | 已確認饋線累積用電；cumulative-energy／consumption | kWh | 第二階段；每顆錶替換 <ID> 並核對重疊 |
-| `FEEDER_<ID>_KW` | 已確認饋線有功功率；power-gauge／consumption | kW | 第二階段選配；不由累積 kWh 直接改單位 |
+| 沖壓工程 | `stamping` | `factory/guanyin/power/stamping` | `factoryCircuit.stampingPower` |
+| 車身工程 | `body` | `factory/guanyin/power/body` | `factoryCircuit.bodyPower` |
+| 塗裝工程 | `painting` | `factory/guanyin/power/painting` | `factoryCircuit.paintingPower` |
+| 裝配工程 | `assembly` | `factory/guanyin/power/assembly` | `factoryCircuit.assemblyPower` |
+| 原動力 | `utility` | `factory/guanyin/power/utility` | `factoryCircuit.utilityPower` |
+| 事務系 | `office` | `factory/guanyin/power/office` | `factoryCircuit.officePower` |
+| 大車工程 | `heavy_vehicle` | `factory/guanyin/power/heavy_vehicle` | `factoryCircuit.heavyVehiclePower` |
+| ED電著 | `ed_coating` | `factory/guanyin/power/ed_coating` | `factoryCircuit.edCoatingPower` |
 
-上述 topic 為 opc/v1/kn/raw/ 加預留 tagId。`<ID>` 是**不可發送的模板**，必須先替換成已登錄的真正邏輯 ID。每列 sourceItem=null、meterId=null、enabled=false；不填假的 PLC address、OPC NodeId、DDE Item、廠區 IP、分錶數量或數值。對應完整步驟見 KN-POWER-ROLLOUT。
+上表為既有power topic與metric對照；daily/cumulative提案及最小欄位見 [KN-ENGINEERING-CONTRACT](KN-ENGINEERING-CONTRACT.md)。registry每列mode=null、publisherId=null、enabled=false，不宣稱現場已發布。工程成果可為上游計算的正式值，禁止的是同工程再加其raw而不是禁止彙整。
 
 ## 6. v1 raw 封包
 
@@ -104,14 +108,18 @@ site 精確 cl/kn；raw tagId 使用批准的 `[A-Z0-9_]+`，virtual/publisher I
 
 actual MQTT retain/dup/qos 與 Player receivedAt/origin 由接收端 transport 取得，不相信 payload 自報。合法 raw value、schema/site/tag 正確，也不等於必定進 E1；source-required 仍要求可信 source time。沒有 source time 的 DDE 通道只有經逐 source revision 審核 allow-receive-time-estimate、真實非 retained/non-dup production packet 才走既有受限估計，仍保留 unknown device quality 的限制；source timestamp 不變成 receiver time。[S26/S27]
 
-## 7. 運行、精度與遷移
+## 7. Physical profile 運行、精度與遷移
 
-30 秒發布／90 秒 stale 是初始提案，需按逐點實際更新週期與延遲調整；不可把所有慢速電錶判斷為同一固定品質。先量測時鐘誤差與 read-to-receive age，再訂批准上限；超限／無法驗證採隔離。相同 value 可是新讀取，sampleId 才識別重送；去重持久窗口至少覆蓋批准 replay age，窗口外不補灌。
+以下只屬physical/raw profile，不套KN工程。30 秒發布／90 秒 stale 是初始提案，需按逐點實際更新週期與延遲調整；不可把所有慢速電錶判斷為同一固定品質。先量測時鐘誤差與 read-to-receive age，再訂批准上限；超限／無法驗證採隔離。相同 value 可是新讀取，sampleId 才識別重送；去重持久窗口至少覆蓋批准 replay age，窗口外不補灌。
 
 目前 DDE/engine/state 用 float64，virtual 會 round，publisher ts 是發布時重建；v1 必須把原始 decimal lexeme 從 DDE reader 一路保留，不能只替 JSON 增加幾個欄位就宣稱完成精確計量。原來已捨去的精度不能重建；legacy 數據限制保留在遷移紀錄。[S20/S21/S28]
 
-無新成功 read 不產生新量測；item failure 不發假 0／舊值新時間。空的 virtual formula 應判 invalid，不能輸出總量 0。第一版不做離線歷史排隊補傳；斷線恢復先重新取樣，UI 標 gap。publisher ACK、receiver SUBACK、收到包、解析成功、E1 accepted 分別驗證。
+無新成功 read 不產生新量測；item failure 不發假 0／舊值新時間。空的 virtual formula 應判 invalid，不能輸出總量 0。第一版physical live不做離線歷史排隊補傳；G的daily報表允許有界真實成果補收；斷線恢復先重新取樣，UI 標 gap。publisher ACK、receiver SUBACK、收到包、解析成功、E1 accepted 分別驗證。
 
 先保留 legacy opc/{中文名} 與 opc/raw/{ID}，加 v1 shadow，比對後經 E 的 guarded writer 切換同一物理 channel 的唯一 accepted binding。active/legacy 不同 topic 不能被當成不同物理錶重複算。回退只關新 routing，不刪歷史或清除 retained Solar；也不偷偷降回盲目全量覆寫。
 
 sourceQuality 未提供時，額外協議 gate 的 unreportedQualityPolicy 預設 block；allow-with-limitation 必須逐來源審核、記錄風險並綁 protocol/source review revision，不是封包自報可用。發布端 broker／Client ID 等連線設定若尚無可驗證熱切換，就標 restart-required，不因保存成功顯示新連線已生效。
+
+## 2026-09-16 Review
+
+KN工程模式、期間、更正、到件與補收以G規格及KN-ENGINEERING-CONTRACT為準；本檔raw的quality/time/retain預設不得排除合法工程成果。舊REVIEW與planning-checks只描述8beacbd，最新檢查見REVIEW-ENGINEERING。

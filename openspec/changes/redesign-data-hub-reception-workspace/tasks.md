@@ -1,6 +1,6 @@
 ## 0. 跨發布端前置契約
-- [ ] 0.1 對齊 MQTT-OWNERSHIP 與 PUBLISH-TAG-REGISTER，實作 DHR-R5、DHR-R6，以對應 PM/KN 驗收案例證明責任不跨界。
-- [ ] 0.2 接收資料必須區分 Solar 託管、電力原始點、電力計算結果與診斷訊息；批准範圍須對應 Solar／OPC 實際 namespace，不沿用 factory/ 範圍假稱涵蓋所有資料。
+- [ ] 0.1 對齊最新 MQTT-OWNERSHIP、PUBLISH-TAG-REGISTER 與 G 的 KNE/EPR 工程契約，實作 DHR-R5、DHR-R6，以對應 PM/KN 驗收案例證明責任不跨界。
+- [ ] 0.2 固定八工程列表與已觀測集合分開；KN使用批准的factory/guanyin工程topic，不要求搬opc/raw。沒有逐錶資料不阻擋工程成果；未到件保持缺件。驗證 DHR-R5、DHR-R6 及 G 對應情境；產品實作不因本次文件提交而勾選。
 
 ## 1. 路由與資料模型
 - [ ] 1.1 建立 configured/received view resolver 與舊 task/selection URL 相容測試（U1-R8、DHR-R1）。

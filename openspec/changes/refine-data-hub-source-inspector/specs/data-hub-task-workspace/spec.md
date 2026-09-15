@@ -116,7 +116,7 @@ The inspector SHALL allow a complex editing task to expand into a full workspace
 ### Requirement: Inspector identifies publisher and source family without offering upstream mutation
 <!-- requirement-id: DHI-R4 -->
 
-The inspector SHALL distinguish the upstream publisher from the Player production subscriber and the temporary discovery subscriber. It SHALL show whether a source is managed Solar, an individually reviewed power channel, a publisher-calculated aggregate, or diagnostic-only evidence. A publisher-declared ID SHALL remain a claim unless authenticated metadata proves it. Publisher configuration SHALL remain outside receiver edit controls.
+The inspector SHALL distinguish the upstream publisher from the Player production subscriber and the temporary discovery subscriber. It SHALL distinguish managed Solar, reviewed physical power, authoritative engineering results and unreviewed calculation-only evidence. Reviewed engineering results SHALL be usable without physical meter/Item inputs, with engineering identity, mode, usable period and data revisions visible; detailed engineering behavior SHALL follow KNE/EPR. A publisher-declared ID SHALL remain a claim unless authenticated metadata proves it. Publisher configuration SHALL remain outside receiver edit controls.
 
 #### Scenario: Managed Solar selection
 <!-- scenario-id: DHI-R4-S01 -->
@@ -128,9 +128,9 @@ The inspector SHALL distinguish the upstream publisher from the Player productio
 #### Scenario: Virtual power aggregate
 <!-- scenario-id: DHI-R4-S02 -->
 
-- **GIVEN** a publisher emits a sum of several raw counters
+- **GIVEN** a publisher emits an unreviewed comparison sum of several raw counters
 - **WHEN** its detail opens
-- **THEN** the formula membership and calculation-only status are shown rather than counting it as another physical meter
+- **THEN** the comparison-only status is shown rather than counting it as another physical meter; a separately reviewed engineering result is not rejected merely because it was calculated upstream
 
 #### Scenario: DDE timing limitation
 <!-- scenario-id: DHI-R4-S03 -->

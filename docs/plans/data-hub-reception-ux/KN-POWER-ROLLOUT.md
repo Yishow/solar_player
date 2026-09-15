@@ -1,46 +1,35 @@
-# 觀音 KN 電力導入計畫
+# 觀音工程別導入：依成果接收，不以逐錶重建為前提
 
-## 目前已知與尚未確認
+2026-09-16修訂，取代8beacbd的SITE_LOAD／FEEDER先行與KN必填DDE／meterId計畫。詳規為G的KNE/EPR、F的KNP啟用關卡，以及 [交接契約](KN-ENGINEERING-CONTRACT.md)。此文件沒有聲稱已確認實際payload或已部署。
 
-使用者已確認：電力資料由上游 server 交給 opc_mqtt 發布，Player 訂閱。使用者亦明確表示觀音電力尚未規畫。因此本檔只預留邏輯 tag 與驗收步驟，不代表現場已有這些設備。最新 bridge 用 DDE；KN 是否也具備同一 InTouch／DDE 介面，尚待現場核對。[S18/S20]
+## 最小成果
 
-## 先做哪個最小成果
+先接一個已確認工程的成果，再擴至八個既有工程：stamping、body、painting、assembly、utility、office、heavy_vehicle、ed_coating。上游自行處理工程內來源；Player不重算同一工程內的raw加總，不要求先找總錶或複製CL點表。
 
-第一個目標是**可追蹤到實際電錶的單一累積通道**。優先核對 SITE_LOAD_KWH 的全廠負載邊界；若現場暫時只有 GRID_IMPORT_KWH，先明確顯示「電網購入電量」，全廠總用電保持未完成。沒有即時功率點就不顯示 kW；沒有分錶清單就不做部門百分比。
+每工程mode由實樣決定：kW功率、每日已算好kWh、或連續累積kWh。發布頻率不是mode。八工程來源可以逐一啟用；缺件列保留。SITE_LOAD/GRID_IMPORT等其他量測可日後明確提出，但不是本次八工程的必要來源。
 
-Solar 是發電資料，不是用電。購電＋發電也不一定等於負載用電：外送、儲能、量測邊界可能不同。此案不硬寫新的能源公式；由有電氣知識的現場負責人確認邊界，再依既有 E1 role/E6 profile 支援的配置審核。[S26]
+## 交付關卡
 
-## 階段與出口條件
-
-| 階段 | 工作與負責角色 | 完成證據／未通過時 |
+| Gate | 要做什麼 | 通過證據 |
 |---|---|---|
-| 0 現場盤點 | 現場電力負責人提供來源協定、VIEW Session、精確 Item、物理錶號、上下游關係、方向、CT/PT 是否已乘、單位與更新週期；整合工程師登錄 | 每個候選有審核表；缺 Item/邊界的項目維持 disabled，不複製 CL |
-| 1 唯讀取得 | 整合工程師在批准的 source host 測讀，不寫 PLC/SCADA；DDE 與 VIEW 同使用者同 Session，或先確認另一 acquisition adapter | 原始 text＋逐點時間＋品質限制；正常數字不等於已完成 MQTT |
-| 2 發布契約 | 實作獨立 publisher/site/Client ID、v1 schema、sampleId、decimal、live retain=false、診斷分流 | 隔離 Broker 檢查 exact topic／payload／ACK；CL 同時在線不互踢 |
-| 3 Player shadow | 實作共同 v1 gate，設定批准 KN profile；只檢視與預覽，不寫 accepted history／baseline | topic/site/tag/publisher 對得上；時間、單位、scaling、virtual/raw 清楚；preview=零 domain writes |
-| 4 E1 審核啟用 | 審核物理 meter/channel/epoch、role、來源時間／估計政策及品質限制；只開一條 canonical writer | 原始與 normalized 值一致；same sample 重送／restart 不重複寫；無 source time 不假裝精確 |
-| 5 E6／區間 | 確認 siteTotal、部門與 shareBasis；不把 main+child 或 raw+virtual 重複算；siteTimeZone=Asia/Taipei 經 profile 審核 | 足夠 baseline 才有日／月區間；新起算的月資料標 coverage 不足，不能填滿過往月份 |
-| 6 展示接線 | 經既有 display editor 綁定 KN scoped metrics，不改畫面硬碼 | 展示值與明確來源／單位／時間／coverage 一致；缺 power 仍不可用 |
-| 7 受控切換 | 現場負責人簽認；整合工程師留配置備份與回退方式 | 只有通過的 KN 通道啟用，CL/Solar 不受影響；未確認的保持未配置 |
+| K0 工程交接 | 確認engineeringId、publisher、實樣、mode/unit、範圍及definition | 不需要每顆錶／Item；未知欄位明示，source draft停用 |
+| K1 合約 | 批准exact topic、calendar、quality、delivery/replay與更正權限 | identity與欄位完整，不用上游發送時間猜所屬期別 |
+| K2 隔離驗證 | preview與shared gate、錯topic、日界／版本、duplicate、partial | fixture／隔離Broker結果明列；不發正式測試值 |
+| K3 Shadow | 原始上游成果與Player解析/結果比對，零canonical寫入 | 日量直接比、counter看連續性、power看observedAt；各自證据 |
+| K4 接收啟用 | reviewed source、SUBACK、正式到件／usable period分開 | 單authority、無fake meter、可見7/8缺件、不等待全廠總錶 |
+| K5 會計與展示 | typed profile/provider與period-aware display binding | raw/工程擇一層；不覆寫kW、日月期別一致，缺件不0 |
+| K6 回退演練 | 停新來源、版本更正／補收故障檢查 | history保留、其他工程／CL／Solar不變 |
 
-角色是責任分工，不是已指派的人名。階段依賴順序是 0→1→2→3→4→5→6→7；UI 外觀與模擬 fixture 可獨立前進，不能用它們跳過現場 gate。
+操作責任：上游成果owner提供樣本、定義、訂正與可補收期間；Player管理者批准source/calendar／authority；整合工程師驗證正反例與readers；現場責任人核對工程涵蓋範圍。這些角色尚未指派姓名，不填虛構owner。
 
-## 需取得的點位審核欄位
+## 觀察目標按模式，不一律72小時
 
-每列記錄：logical tag、exact source Item、site/physical meter/channel、盤別與上游/下游、原始數值與單位、方向、CT/PT/乘數是否已套、設備 reset/rollover 行為、來源事件時間或缺失、source quality 可用性、更新週期、最大讀取／傳送延遲、時鐘同步證據、reviewer/date、enabled 與停用理由。實體 meterRole／部門歸屬只存 E6，不塞入 E1 的另一份帳務定義。
+功率依批准cadence/freshness驗證；累積模式需有效baseline與definition/epoch連續性；daily至少測兩個不同期間、一次同期間修正、一次缺件／補收，且確認日界歸屬。需要連續現場天數由選定mode和上游頻率審核；舊72小時是舊raw計畫建議，不是所有工程接入前提，也不是已完成的測量。每日100與120應合計220；首筆完整日成果不等下一筆counter。
 
-## 觀察與對帳計畫（尚未執行）
+## 停止與回退
 
-提案以至少 72 小時且涵蓋兩個 Asia/Taipei 午夜邊界作首輪 shadow／受控觀察目標；這不是承諾目前已量測或資料已完整。將來源表值、bridge exact value、Player accepted value 逐筆比對；區間誤差容許值由儀表精度與採樣時差審核，不任意寫 1% 就通過。
+錯工程／錯單位、未知definition或雙authority、期間重疊、同版異值、舊projection偽current時阻擋對應新結果。未收到或報表partial不能改成0。停用只影響此receiver來源，不下上游控制命令；history與修正紀錄保留，raw fallback不得暗中啟動。
 
-掉線、重啟、重送、舊 retained、單點失敗、公式改組、跨廠誤標測試，先在隔離 Broker 和 synthetic fixtures 執行，不能為驗證去中斷正式設備。現場測試另經授權，只讀觀察；保留測試環境、版本、時間、原始證據與結果。72 小時不能補足當月月初 baseline，缺的仍標不可用或覆蓋不完整。
+## 尚待上游確認
 
-## 立即停止條件與回退
-
-site/physical mapping 不確定、數值方向／單位錯誤、重複 Client ID、topic 多主、品質無法評估、來源時間被偽造成發布時間、raw/virtual 重複入帳，任一出現就停止該新通道啟用。關閉新 KN admission，不替換成 CL 值、不刪既有 accepted rows、不重設基線、不解除 Solar managed 訂閱。
-
-回退前保存兩個發布端與 Player 的配置快照；各自只復原自己的設定。既有 legacy admission 恢復須再次確認 single-writer，不能靠兩路全開後看哪個比較快來「容錯」。
-
-## 尚缺的現場資料
-
-KN source 協定／主機與操作 Session、精確 Item、物理錶號、全廠負載和購電邊界、分錶階層、CT/PT、事件時間／品質與更新週期都未取得。上述缺口不以猜測填滿；tag-register 中 reserved rows 保持 null 和 disabled，文件提交不代表 commissioning 通過。
+實際mode/payload、工程範圍定義、發布責任、deadline/grace、可補收期間、訂正與換發布者的權限。這些是工程成果交接，不是要求提供DDE/OPC或所有物理錶；未確認的保持未配置，文件提交不是現場驗收。

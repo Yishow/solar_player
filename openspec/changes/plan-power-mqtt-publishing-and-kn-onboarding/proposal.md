@@ -1,30 +1,29 @@
-# 電力發布契約與觀音接入計畫
+# 實體電力發布契約與觀音工程別接入邊界
 
 ## Why
 
-使用者確認兩條資料流：solar_mqtt_go 擷取 Solar server 後發布 MQTT；opc_mqtt 由電力 server 取得資料後發布 MQTT；solar_player 訂閱並展示。最新 main 的 opc_mqtt 實際使用 Windows InTouch DDE view/tagname，仍以 opc 為預設 topic prefix，固定 Client ID，封包只有 value/unit/發布時間 ts。觀音點位尚未盤點；不能把中壢候選清單複製到 KN 就宣布完成。
+`8beacbd` 已盤點 opc_mqtt 的 active Windows DDE 路徑、20 raw／10 virtual 程式預設及發布端問題，但把 KN 工程成果誤套逐實體錶前提。本次以 main `818fa0da` 重審，保留實體發布修正，將觀音接入改為工程別。
 
 ## What Changes
 
-- 定義既有 Solar 託管資料、電力 raw、publisher virtual 與診斷訊息的發布／訂閱責任。
-- 提案新增 opc/v1/{site} 發布契約與逐點 tag register，保留 legacy topic 明確遷移而非原地改義。
-- 補 per-publisher Client ID、精確數值、來源／讀取／發布／接收時間、品質、重送與斷線規則。
-- 規畫 KN 現場盤點、最小資料接入、並行比對、計量審查與逐階段啟用；預留 tag 全部停用。
-- 新增有界 v1 admission gate；其後重用既有 M2/E1/E2/E6，不重做能源算法、不建立第二條 accepted writer。
+- 保留 Solar publisher／Player 訂閱分工與 opc_mqtt 實體profile的 site topic、唯一Client ID、精確decimal、時間品質、sample重送及安全cutover。
+- PMQ-R1～R8 只約束選用physical/raw profile的部署；CL預設仍需現場審查，不宣稱是已啟用設備。
+- KN 的工程主體不需 meterId、DDE Item 或 raw逐錶發布；已批准工程成果可正式使用。受控成果不等於未審查virtual。
+- KNP-R1～R4 改為工程啟用關卡；其詳細來源與期間規格交由 `add-kn-engineering-mqtt-sources` 的 KNE/EPR，避免同一能力由兩份change重寫。
 
 ## Capabilities
 
 ### New Capabilities
-- `power-mqtt-publishing-contract`：電力發布端到 Player 的有版本封包、命名、品質、遷移與接收守衛。
-- `kn-power-onboarding`：待盤點的 KN 點位登錄、計量邊界與啟用門檻。
+- `power-mqtt-publishing-contract`：選用physical/raw profile時的bridge發布與遷移。
+- `kn-power-onboarding`：工程成果交接與逐工程啟用關卡。
 
 ### Modified Capabilities
-無；既有 UI 與 receiver ownership 的增補分別由 A–E delta 擁有，現行 meter-reading-contracts 保持約束。
+無；原正式 physical E1 契約不被放寬，G新增種類安全的工程成果與整合能力。
 
 ## Impact
 
-未來實作涉及 opc_mqtt config/DDE reader/engine/publisher、Player 既有 MQTT dispatch/preview/ingest 與 source registry、接收 profile 管理。確切檔案與接口見 design。這次只交付規格、計畫與離線例子，不修改 runtime、設定檔、現場 tags 或歷史。
+未來實作涉及 opc_mqtt reader/config/state/engine/publisher及Player的physical profile gate。工程source/provider由G擁有；A–E只消費。此次只文件，不啟用現場topic、不改配置或歷史。
 
 ## Non-goals
 
-不把 DDE 當 OPC UA，不替 KN 虛構 Item/NodeId/IP/設備數，不把 Windows Session 0 Service 當目前 DDE 的部署方式，不遠端寫 PLC/SCADA，不開 Broker 全站掃描，不讓電力 virtual 與 raw 雙算，不把電网購電直接等同廠區總用電。
+不要求觀音逐錶、不把KN工程publisher固定成DDE/OPC、不強制將工程topic搬到opc/raw、不把上游工程彙整全面降為診斷。現行DDE部署同VIEW Session限制只用於真的執行此bridge，不是所有工程訂閱的前置。

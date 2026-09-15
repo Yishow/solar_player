@@ -1,0 +1,22 @@
+{
+  "exampleOnly": true,
+  "schemaVersion": 1,
+  "sourceKind": "engineering",
+  "mode": "daily-report",
+  "site": "kn",
+  "engineeringId": "painting",
+  "publisherId": "example-kn-engineering",
+  "definitionRevision": 1,
+  "calendarRevision": 1,
+  "measurementKind": "interval-energy",
+  "unit": "kWh",
+  "value": "100.125",
+  "periodStart": "2026-09-15T00:00:00+08:00",
+  "periodEnd": "2026-09-16T00:00:00+08:00",
+  "periodStatus": "final",
+  "coverage": "complete",
+  "quality": "valid",
+  "dataRevision": 1,
+  "publishedAt": "2026-09-16T01:00:00+08:00",
+  "reason": null
+}

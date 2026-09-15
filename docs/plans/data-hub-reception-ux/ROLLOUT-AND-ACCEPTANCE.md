@@ -89,13 +89,13 @@ E service 與 A UI 的整合不是互相阻塞的循環：E 先提供可獨立�
 
 回退關閉新介面與新增入口，但保留已遷移stable id／revision、既有欄位、history與guard。停止capture只關臨時subscriber，不unsubscribe正式來源、不清retained訊息。任何功能flag必須在實作時有真實reader與測試，不能只寫在文件上。
 
-## 6. F：發布契約與觀音接入（本輪新增）
+## 6. F：選用實體發布契約與觀音交接關卡（工程別範圍已修訂）
 
-**Supersedes**：原 A–E 相依圖只有 Player UI/交易範圍；新增 F 是 v1 電力與 KN 啟用的前置，而非要求 A 的焦點／版型工作等待現場。
+原 A–E 相依圖只有 Player UI/交易範圍；F physical v1 是選用該實體協議的前置，G 是 KN 工程結果的前置。A 的焦點／版型不等待現場，KN 工程也不等待 CL 實體點位盤點。
 
-A 純 UI/C 接收端標示可先做；E receiver writer 與 F protocol／publisher 工作可並行。B 的 Solar managed reuse 不依賴 OPC v1；B 新電力候選與 D v1 apply 必須等待 F 共同gate與批准registry。F 基礎不依賴 B/D UI，可用隔離contract tests獨立驗證，因此沒有循環依賴。KN 現場 gate 不完成，不開 KN 真實來源。
+A 純 UI/C 接收端標示可先做；E receiver writer 與 F protocol／publisher 工作可並行。B 的 Solar managed reuse 不依賴 OPC v1；B/D 明確選用 physical v1 的候選與 apply 必須等待 F 的 gate 與批准 registry；工程模式改依 G。F 基礎不依賴 B/D UI，可用隔離contract tests獨立驗證，因此沒有循環依賴。每個 KN 工程的成果契約未批准時，只擋該工程啟用，不要求實體名冊。
 
-F ownership：publisher topic/Client ID、decimal/time/quality、v1 gate、legacy cutover與KN盤點計畫；不能接管 E 的generic writer、Solar adapter或 E1/E2/E6 算法。原 AC01–AC32 保留，以下新增案例目前均**尚未執行產品驗收**。
+F ownership：選用 physical bridge 的 topic/Client ID、decimal/time/quality、gate、legacy cutover及KNP工程交接關卡；不能接管 G 的工程期間成果、E 的generic writer、Solar adapter或 E1/E2/E6 算法。原 AC01–AC32 保留，以下新增案例目前均**尚未執行產品驗收**。
 
 | Case | 條件 | 預期 | Owner |
 |---|---|---|---|
@@ -107,7 +107,7 @@ F ownership：publisher topic/Client ID、decimal/time/quality、v1 gate、legac
 | PM06 | production mixed filters＋capture stop | 只關 capture client；managed/generic 都保留；WebUI subscriber 不受影響 | B/E |
 | PM07 | Player reconnect | 新 generation 恢復 Solar managed + enabled raw；不借舊 SUBACK | C/E |
 | PM08 | collector reconnect／WebUI subscription-sent | daemon恢復配置廠區 command topics；WebUI sent 不冒充 Player ACK | B/C |
-| PM09 | DDE read 成功但無 device time/quality | source time=null、source quality=unknown；預设 source-required 不准假時戳入庫 | D/F |
+| PM09 | DDE read 成功但無 device time/quality | source time=null、source quality=unknown；預設 source-required 不准假時戳入庫 | D/F |
 | PM10 | 明確審核估計＋retain/dup 變化 | 只按既有 E1 transport predicate；retained/dup/缺flags 不能自行降級 | D/F |
 | PM11 | 大數 .000→.125 | reader到wire到E1保留 decimal lexeme，精確差0.125，不round後補字串 | F |
 | PM12 | 同sample重送／same value新sample | 前者持久去重；後者不因value相同被誤丟；same-id不同body隔離 | F |
@@ -119,13 +119,19 @@ F ownership：publisher topic/Client ID、decimal/time/quality、v1 gate、legac
 | PM18 | publish timeout或source停更但heartbeat正常 | unknown outcome／measurement stale 分開；不顯示全部健康 | A/C/F |
 | PM19 | 修改 publisher broker 但尚無熱切換 | 顯示 saved/restart-required，effective target 不偽裝切換；同 Session 受控重啟後另驗證 | F |
 | PM20 | DDE unknown quality 未批准／已批准 | 預設阻擋；limitation approval 綁source/review，仍不繞 E1 time/transport | D/F |
-| KN01 | reserved tag沒有Item或meterId | 維持null/disabled；不可匯入為runtime source | B/D/F |
-| KN02 | 只有GRID_IMPORT_KWH | 只顯購電；全廠總用電不可用，不把Solar發電直接加成負載 | F |
+| KN01 | 已知工程沒有mode/payload批准 | 工程列保留但不可啟用；不要求Item/meterId | B/D/G |
+| KN02 | 只有一工程成果 | 可先接此工程，合計coverage缺其他工程；不等全廠總錶 | G |
 | KN03 | 只有kWh沒有kW | 功率不可用，不用累積值或改單位填滿 | D/F |
 | KN04 | CL raw/default分類複製到KN | 拒絕未審跨廠物理身份／公式；不虛構KN部門 | B/E/F |
-| KN05 | DDE bridge不在VIEW同Session | 清楚阻擋同Session前置，非Windows stub不可代替現場驗證 | F |
-| KN06 | 首筆或72小時觀測 | 日/月baseline不足仍不可用或coverage不足，不回填月初 | F |
+| KN05 | 工程結果無底層DDE／錶名冊 | 可按工程契約審查；DDE限制只適用真的選用physical bridge | F/G |
+| KN06 | 首筆完整日報／counter首筆 | 前者可用完整日，後者仍需baseline；不捏造其他日期 | G |
 | KN07 | main/feeder及raw/virtual一起挑 | E6邊界審核拒絕默認重複計入；無部門保持未配置 | D/F |
 | KN08 | 一KN來源驗收失敗／roll back | 只停該新通道；CL及Solar保留，不替換CL數值、不刪accepted history | E/F |
 
-提交規劃文件只證明已保存規格；需要 Windows/DDE、隔離 Broker、Player focused tests、最終 pnpm verify 與正式 CLI analyze/validate 的 gates 仍須完成。額外 Go modules 測試要獨立記錄，不能假設 root verify 已代跑。
+提交規劃文件只證明已保存規格；適用 physical bridge 時才需要 Windows/DDE 驗證。隔離 Broker、Player focused tests、最終 pnpm verify 與正式 CLI analyze/validate 依實際實作範圍另行完成。額外 Go modules 測試要獨立記錄，不能假設 root verify 已代跑。
+
+## 2026-09-16 工程別更新
+
+G=add-kn-engineering-mqtt-sources，獨立完成工程source/period/provider，無須等CL physical現場盤點。A/B/C/D/E新增工程分支依G的gate與來源服務；F的KNP只擁有工程啟用關卡，PMQ只擁有選用physical profile。下列舊PM案例按physical前提保留；KN舊raw/SITE_LOAD/FEEDER前提不再適用，工程驗收以G所有KNE/EPR情境及KN-POWER-ROLLOUT為準。八工程UI與模式草稿可以先做，實際activation依每工程合約批准。舊72小時不當所有mode的硬門檻。
+
+詳見 [新工程別契約](KN-ENGINEERING-CONTRACT.md) 與 [本輪Review](REVIEW-ENGINEERING.md)。

@@ -68,10 +68,16 @@ confirmation過期、revision變更、值更改後不得沿用舊token；server�
 
 **Supersedes**：先前「共享中央 Broker」只代表 Player receiver 的共用連線，不再容許解讀為全系統同時改設定。上游責任與各 client 訂閱詳見 [MQTT-OWNERSHIP](MQTT-OWNERSHIP.md)。
 
-新增 sourceFamily：managed-solar／power-raw／power-virtual／diagnostic。managed canonical 直接重用，power-raw 進 reviewed M2/E1，virtual/snapshot/control/state 不作物理錶。非標準 Solar generic 在非 owned identity 下仍可審核使用；不 blanket-block 所有 solar topics。
+新增 sourceFamily：managed-solar／power-raw／power-virtual／diagnostic。managed canonical 直接重用，physical power-raw進reviewed M2/E1；G工程成果走typed工程provider；未批准virtual/snapshot/control/state不作正式會計輸入。非標準 Solar generic 在非 owned identity 下仍可審核使用；不 blanket-block 所有 solar topics。
 
 F 將新增 protocol profile／registry binding 與 envelope validator，是**尚未實作**的 server/shared 合約。必須先驗證 site/publisher/tag/config revision、schema、readStatus、時間、sampleId 與 value/unit，再交既有 M2 selector/E1；任何失敗不能 fallback 到只讀 value。previewToken 必須綁此登錄版本，避免 preview 時是 A publisher、apply 變 B。
 
 publisherConfigRevision、Player config revision、E1 sourceRevision、epoch 與採集 sampleId 是不同概念。sample 去重與 mutation idempotency 也不共用語意；normal packet 不讓設定 dirty。封包自報 retain/dup/qos 不採信，只有 MQTT transport 證據有效。
 
 無 sourceTimestamp 的 DDE 不能將 legacy ts/readAt/publishedAt 搬成來源時間。已有 E1 source-required／受審核 allow-receive-time-estimate 規則完全保留；尚無 v1 gate 的 server 必須顯示「契約未支援，不能啟用」，不宣稱 UI 名稱改完就接通。
+
+## 2026-09-16 工程別更新
+
+新增sourceKind=engineering／KNE/EPR。原第6節的power-raw與virtual限制只屬physical或未批准comparison；權威工程成果可正式接入，不進physical M2/E1 identity。G提供typed source、daily報表交易、SiteEnergyProfileV2與common provider；新route/欄位見G design，不宣稱現況已實作。Source配置冪等與report資料更正分開；禁止generic timestamp fallback猜工程期間。
+
+詳見 [新工程別契約](KN-ENGINEERING-CONTRACT.md) 與 [本輪Review](REVIEW-ENGINEERING.md)。

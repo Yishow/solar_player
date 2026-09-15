@@ -38,4 +38,10 @@ DataHub 的可寫欄位只屬 Player receiver。solar_config.json、opc_config.j
 
 ## 語意邊界
 
-Solar canonical summary/whole-zone 不建立第二個 generic writer；非標準 Solar topic 在非託管 identity 下仍可經明確審查使用，不能一刀切封鎖所有 solar/*。OPC raw 才是可審查的單點量測；virtual 是計算結果，不是新實體錶。停 discovery、改 receiver、停 OPC publisher 是三個不同動作，必須分別顯示副作用。
+Solar canonical summary/whole-zone 不建立第二個 generic writer；非標準 Solar topic 在非託管 identity 下仍可經明確審查使用，不能一刀切封鎖所有 solar/*。Physical raw可按實體量測審查；工程成果則按G審查為工程來源，不要求是實體錶。未批准virtual仍只比較，不是正式會計輸入。停 discovery、改 receiver、停 OPC publisher 是三個不同動作，必須分別顯示副作用。
+
+## 2026-09-16 工程別更新
+
+KN工程成果新增獨立種類，由上游按八工程發布；Player以批准exact topics訂閱，不要求逐錶或opc/raw。power/daily/cumulative路由見KN-ENGINEERING-CONTRACT，G的authority與report gate負責；原表的OPC raw說明只代表選用physical bridge，不代表KN發布者一定是它。工程到件與publisher liveness獨立，180秒capture無資料不阻擋合約草稿。
+
+詳見 [新工程別契約](KN-ENGINEERING-CONTRACT.md) 與 [本輪Review](REVIEW-ENGINEERING.md)。

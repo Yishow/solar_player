@@ -123,7 +123,7 @@ Actual MQTT publish diagnostics SHALL be visually and operationally separate fro
 ### Requirement: Onboarding respects upstream publication contracts and accounting identity
 <!-- requirement-id: DHM-R4 -->
 
-Onboarding SHALL reuse managed Solar canonical sources, admit power raw channels only through the registered protocol and reviewed E1 semantics, and exclude virtual sums, snapshots and control/health messages from physical-meter admission. The proposed opc-power-v1 envelope SHALL require F protocol validation before existing M2 extraction and SHALL NOT be considered supported by a value-only selector. Source event time SHALL NOT be fabricated from legacy ts, readAt or publishedAt. Actual test publish SHALL be denied for managed canonical Solar and control/state targets and SHALL use an explicitly authorized test target rather than default production measurements.
+Onboarding SHALL reuse managed Solar canonical sources, admit physical raw channels through their reviewed E1 protocol, and admit authoritative engineering results through the typed KNE/EPR workflow without fake physical identities. Unreviewed comparison sums, snapshots and control/health messages SHALL not become accounting inputs. Calculated engineering results SHALL not be excluded solely because they aggregate upstream measurements. The proposed opc-power-v1 envelope SHALL require F protocol validation before existing M2 extraction and SHALL NOT be considered supported by a value-only selector. Source event time SHALL NOT be fabricated from legacy ts, readAt or publishedAt. Engineering daily reports SHALL instead validate explicit report periods; counter/power modes SHALL validate genuine upstream aggregate checkpoints. Their handlers SHALL disable automatic timestamp-name fallback and use mode-specific semantics. Actual test publish SHALL be denied for managed canonical Solar and control/state targets and SHALL use an explicitly authorized test target rather than default production measurements.
 
 #### Scenario: Legacy publication timestamp
 <!-- scenario-id: DHM-R4-S01 -->
@@ -149,6 +149,6 @@ Onboarding SHALL reuse managed Solar canonical sources, admit power raw channels
 #### Scenario: Virtual membership changes
 <!-- scenario-id: DHM-R4-S04 -->
 
-- **GIVEN** a publisher changes a virtual sum membership
+- **GIVEN** a publisher changes an unreviewed comparison-sum membership
 - **WHEN** the next aggregate is selected
-- **THEN** the configuration revision is visible and the sum cannot be differenced as a continuous physical counter or auto-selected as site total
+- **THEN** the configuration revision is visible and the sum cannot be differenced as a continuous physical counter or auto-selected as site total; separately approved engineering definitions follow G effective-period rules

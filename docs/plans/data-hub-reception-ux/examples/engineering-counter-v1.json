@@ -1,0 +1,18 @@
+{
+  "exampleOnly": true,
+  "schemaVersion": 1,
+  "sourceKind": "engineering",
+  "mode": "cumulative-energy",
+  "site": "kn",
+  "engineeringId": "painting",
+  "publisherId": "example-kn-engineering",
+  "definitionRevision": 1,
+  "measurementKind": "cumulative-energy",
+  "unit": "kWh",
+  "value": "1120.125",
+  "observedAt": "2026-09-16T00:00:00+08:00",
+  "counterEpoch": "example-definition-1-counter-1",
+  "sampleId": "example-observation-2",
+  "quality": "valid",
+  "publishedAt": "2026-09-16T00:00:01+08:00"
+}

@@ -92,3 +92,9 @@ GuidedOnboardingPanel、GuidedMqttMappingPanel、source entry points 與 safe pu
 Solar 已託管資料直接重用；電力 raw 與 virtual 不能重複入帳。新版電力封包須先經 F 的有界驗證，再沿用 M2/E1；觀音預留 tag 不可直接套用。
 
 本輪具體實作責任與驗收由 DHM-R4 約束；不得把新增發布契約當作現行 API 已支援，也不將隔離 fixture 當現場測試。
+
+## 2026-09-16 工程別修訂（取代舊 KN 逐錶前提）
+
+三階段先選sourceKind/mode，再走工程preview/period/版本，不要求meterId。不將已算好日量再差分；G共用gate及typed provider就緒前不可fallback。
+
+觀音結果契約由 [`add-kn-engineering-mqtt-sources`](../add-kn-engineering-mqtt-sources/proposal.md) 的 KNE/EPR 要求負責；本文件舊段落中的 DDE/physical/raw 與 F v1 前置僅適用明確選擇的物理來源，不得套成工程別必要條件。A 的焦點、B 的路由、C 的連線責任、D 的預覽及 E 的配置安全依原規格保留。需要逐來源核對的是工程成果模式與涵蓋範圍，不是上游每顆錶。

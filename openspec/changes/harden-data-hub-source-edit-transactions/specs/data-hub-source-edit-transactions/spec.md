@@ -60,7 +60,7 @@ The server SHALL validate authorization, scope, ownership, supported semantics, 
 <!-- scenario-id: DHT-R2-S04 -->
 
 - **GIVEN** a user opened an authorized source but lost permission
-- **WHEN** a later read or mutation occurs
+- **WHEN** the user performs a later read or mutation
 - **THEN** access is denied without exposing another site or committing configuration
 
 ### Requirement: Mutation outcomes are idempotent and separate runtime reconciliation
@@ -151,7 +151,7 @@ The client SHALL keep independent draft and baseline state per source, preserve 
 ### Requirement: Receiver mutations preserve subscriber ownership and single physical-channel authority
 <!-- requirement-id: DHT-R6 -->
 
-Receiver source edits SHALL reconcile only Player-owned subscriptions while preserving the union with managed Solar filters. They SHALL NOT mutate upstream publisher configuration, issue collector commands or remove another client subscription. Legacy and versioned power bindings for the same reviewed physical channel SHALL have at most one accepted canonical writer. Publisher configuration revision, Player configuration revision, E1 source revision and meter epoch SHALL remain distinct; normal samples SHALL NOT advance configuration revisions.
+Receiver source edits SHALL reconcile only Player-owned subscriptions while preserving the union with managed Solar filters. They SHALL NOT mutate upstream publisher configuration, issue collector commands or remove another client subscription. Legacy and versioned physical bindings SHALL have at most one accepted canonical writer for the same channel. Engineering bindings SHALL likewise have one authority per site/engineering/purpose/effective period under KNE-R7. Report corrections SHALL use EPR transactions, not this generic configuration PATCH, and SHALL not require or create physical meter identity. Publisher configuration revision, Player configuration revision, E1 source revision, meter epoch, engineering definition and report data revision SHALL remain distinct; normal samples SHALL NOT advance configuration revisions.
 
 #### Scenario: Remove one power mapping
 <!-- scenario-id: DHT-R6-S01 -->

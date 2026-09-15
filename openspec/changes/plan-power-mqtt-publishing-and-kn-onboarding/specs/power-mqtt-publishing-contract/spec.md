@@ -1,5 +1,7 @@
 ## ADDED Requirements
 
+Applicability: PMQ requirements govern the explicitly selected physical/raw bridge profile, including CL candidates. They do not require KN engineering results to publish raw meters, use DDE, use opc/v1, suppress report replay, or enter E1. Authoritative engineering results follow KNE/EPR; the receiver/upstream ownership protections still apply to both.
+
 ### Requirement: Power acquisition remains upstream and independently operated
 <!-- requirement-id: PMQ-R1 -->
 
@@ -12,11 +14,11 @@ The system SHALL preserve solar server to solar_mqtt_go to MQTT to Player manage
 - **WHEN** the bridge deployment is prepared
 - **THEN** same-user same-session startup is required and unsupported service-mode startup is blocked
 
-#### Scenario: KN source technology not established
+#### Scenario: Optional KN physical source technology not established
 <!-- scenario-id: PMQ-R1-S02 -->
 
-- **GIVEN** KN has no confirmed acquisition interface
-- **WHEN** the plan is prepared
+- **GIVEN** an optional KN physical/raw deployment has no confirmed acquisition interface
+- **WHEN** that optional physical deployment is prepared
 - **THEN** DDE is conditional on verified availability; no invented OPC Item, NodeId or remote connection is activated
 
 #### Scenario: No implicit upstream migration
@@ -88,7 +90,7 @@ V1 readings SHALL preserve original decimal lexemes before float conversion or d
 ### Requirement: Failed or replayed acquisitions cannot become new healthy measurements
 <!-- requirement-id: PMQ-R4 -->
 
-Each actual acquisition SHALL generate a stable sampleId reused on retransmission with original acquisition evidence. Player SHALL perform bounded durable deduplication for registered site/publisher/tag/sampleId before E1 admission and retain deduplication state for at least the allowed replay interval; expired observations SHALL be rejected after records expire. Equal values from distinct real acquisitions SHALL NOT be deduplicated solely by value. Reuse of the same sample identity with different value or acquisition evidence SHALL be quarantined as a conflict rather than silently ignored. Failed reads, stale caches, nonfinite data and unavailable items SHALL NOT be published as valid zero or re-timestamped healthy readings. The initial live path SHALL not backfill buffered outage data on reconnect. Timeouts SHALL remain unknown outcomes, and bounded publish acknowledgements SHALL not imply receiver parsing or accepted readings.
+Each actual acquisition SHALL generate a stable sampleId reused on retransmission with original acquisition evidence. Player SHALL perform bounded durable deduplication for registered site/publisher/tag/sampleId before E1 admission and retain deduplication state for at least the allowed replay interval; expired observations SHALL be rejected after records expire. Equal values from distinct real acquisitions SHALL NOT be deduplicated solely by value. Reuse of the same sample identity with different value or acquisition evidence SHALL be quarantined as a conflict rather than silently ignored. Failed reads, stale caches, nonfinite data and unavailable items SHALL NOT be published as valid zero or re-timestamped healthy readings. This physical live path SHALL not backfill buffered outage data on reconnect; this restriction SHALL NOT prohibit the bounded engineering-report replay defined in EPR-R5. Timeouts SHALL remain unknown outcomes, and bounded publish acknowledgements SHALL not imply receiver parsing or accepted readings.
 
 #### Scenario: Same sample after restart
 <!-- scenario-id: PMQ-R4-S01 -->
@@ -121,7 +123,7 @@ Each actual acquisition SHALL generate a stable sampleId reused on retransmissio
 ### Requirement: Virtual publication remains distinct from physical accounting
 <!-- requirement-id: PMQ-R5 -->
 
-Publisher virtual outputs SHALL carry their own stable ID, member tags and publisherConfigRevision, and SHALL be marked calculation-only rather than a physical cumulative meter. A formula SHALL have at least one member. Every required member SHALL be valid within the approved acquisition window; missing, failed, stale or dimensionally incompatible members SHALL invalidate the complete aggregate, not trigger a partial sum. Formula changes and physical counter resets SHALL NOT be differenced as a continuous aggregate counter. Formal period totals and department membership SHALL remain based on reviewed raw channels and existing E1/E2/E6 contracts. A main counter, feeder counters and their virtual representations SHALL NOT be summed together as independent consumption.
+Unreviewed comparison-only publisher virtual outputs under this physical profile SHALL carry their own stable ID, member tags and publisherConfigRevision, and SHALL be marked calculation-only rather than a physical cumulative meter. A formula SHALL have at least one member. Every required member SHALL be valid within the approved acquisition window; missing, failed, stale or dimensionally incompatible members SHALL invalidate the complete aggregate, not trigger a partial sum. Formula changes and physical counter resets SHALL NOT be differenced as a continuous aggregate counter. For this physical profile, formal period totals and department membership SHALL remain based on reviewed raw channels and existing E1/E2/E6 contracts. This restriction SHALL NOT exclude a registered authoritative engineering result following KNE/EPR. A main counter, feeder counters and their virtual representations SHALL NOT be summed together as independent consumption.
 
 #### Scenario: Missing member
 <!-- scenario-id: PMQ-R5-S01 -->
@@ -185,7 +187,7 @@ New v1 raw and virtual publications SHALL use QoS 1 and retain=false by default,
 #### Scenario: Existing Solar retained summary
 <!-- scenario-id: PMQ-R7-S02 -->
 
-- **GIVEN** a standard retained Solar summary has valid original source time
+- **GIVEN** a standard solar retained summary has valid original source time
 - **WHEN** Player reconnects
 - **THEN** the existing managed adapter remains authoritative and freshness stays based on original time
 

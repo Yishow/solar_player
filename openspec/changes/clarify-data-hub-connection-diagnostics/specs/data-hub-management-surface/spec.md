@@ -64,7 +64,7 @@ Every test result SHALL be associated with the request, candidate revision and o
 
 - **GIVEN** candidate B passed a test
 - **WHEN** the host or credentials change to C
-- **THEN** B remains a historical result and C is visibly untested
+- **THEN** the prior result no longer applies and C is visibly untested
 
 #### Scenario: Late result
 <!-- scenario-id: DHC-R3-S02 -->
@@ -109,7 +109,7 @@ Connection shortcuts SHALL preserve the authorized site and supported return con
 ### Requirement: Broker editing is receiver scoped and upstream health stays independent
 <!-- requirement-id: DHC-R5 -->
 
-The connection surface SHALL name Solar Player as the receiver configuration owner. It SHALL NOT imply that changing this connection migrates the broker service or the solar_mqtt_go and opc_mqtt publishers. Publisher broker targets, authentication, prefix and local startup remain publisher-owned. Optional read-only upstream health SHALL identify its evidence age, client and source; receiver health, publisher liveness, source acquisition and per-source reception SHALL remain distinct.
+The connection surface SHALL name Solar Player as the receiver configuration owner. It SHALL NOT imply that changing this connection migrates the broker service or the solar_mqtt_go and opc_mqtt publishers. Publisher broker targets, authentication, prefix and local startup remain publisher-owned. Optional read-only upstream health SHALL identify its evidence age, client and source; receiver health, publisher liveness, source acquisition and per-source reception SHALL remain distinct. Engineering report delivery SHALL use the reviewed calendar/deadline and completeness evidence defined by G, not a physical-meter stale timer; an unknown delivery schedule SHALL remain unknown.
 
 #### Scenario: Receiver moves alone
 <!-- scenario-id: DHC-R5-S01 -->

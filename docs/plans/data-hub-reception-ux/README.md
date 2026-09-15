@@ -1,16 +1,11 @@
-# 資料中樞接收、轉換與雙發布端整合計畫
+# 資料中樞與觀音工程別 OpenSpec 規畫
 
-本包基於 main `fd405ebc2957232b6c622071622b9c7d830a3a42`，更新原五份 UX/交易提案，新增一份電力發布與觀音導入提案。只有 planning artifacts，沒有產品實作、部署、MQTT 發送或現場啟用。
+目前修訂基準main `818fa0da`；重審`8beacbd`，已修掉KN逐錶前提。沒有產品實作／部署，只有規格與合成驗證資料。
 
-先讀 [REVIEW](REVIEW.md) 查看查核、修正與未驗證事項；再讀 [MQTT-OWNERSHIP](MQTT-OWNERSHIP.md)、[PUBLISH-TAG-REGISTER](PUBLISH-TAG-REGISTER.md) 與 [KN-POWER-ROLLOUT](KN-POWER-ROLLOUT.md)。[tag-register.json](tag-register.json) 是離線計畫資料，不可當 runtime config 匯入。
+優先讀 [本輪Review](REVIEW-ENGINEERING.md)、[工程交接契約](KN-ENGINEERING-CONTRACT.md)、[觀音導入計畫](KN-POWER-ROLLOUT.md)。工程ID沿用八個既有slot；publisher payload/mode/deadline尚未確認，registry維持停用。
 
-| Change | 範圍 |
-|---|---|
-| [refine-data-hub-source-inspector](../../../openspec/changes/refine-data-hub-source-inspector/proposal.md) | 側欄、焦點、來源與發布端辨識 |
-| [redesign-data-hub-reception-workspace](../../../openspec/changes/redesign-data-hub-reception-workspace/proposal.md) | 已接入／已接收、批准範圍、資料分類 |
-| [clarify-data-hub-connection-diagnostics](../../../openspec/changes/clarify-data-hub-connection-diagnostics/proposal.md) | 只管理 Player 接收端、測試與實際生效分開 |
-| [streamline-data-hub-mapping-journey](../../../openspec/changes/streamline-data-hub-mapping-journey/proposal.md) | 三階段、共用 gate、Solar 重用與 raw/virtual 邊界 |
-| [harden-data-hub-source-edit-transactions](../../../openspec/changes/harden-data-hub-source-edit-transactions/proposal.md) | 單筆版本／草稿／single-writer 與訂閱保留 |
-| [plan-power-mqtt-publishing-and-kn-onboarding](../../../openspec/changes/plan-power-mqtt-publishing-and-kn-onboarding/proposal.md) | opc_mqtt DDE→MQTT v1 契約、tag 清單、觀音分階段導入 |
+新增G：[add-kn-engineering-mqtt-sources](../../../openspec/changes/add-kn-engineering-mqtt-sources/proposal.md)，含工程source與period-results規範、design及14項有依賴的實作任務。原A–F的spec/proposal/design/tasks已同步工程邊界；F保留physical publishing與KN啟用關卡，不再擁有工程期間演算法。
 
-共用 API/狀態見 [STATE-AND-API-CONTRACTS](STATE-AND-API-CONTRACTS.md)；交付順序與 AC/PM/KN 驗收案例見 [ROLLOUT-AND-ACCEPTANCE](ROLLOUT-AND-ACCEPTANCE.md)；逐檔依據見 [SOURCES](SOURCES.md)。所有 tasks 保持待執行，不以提交文件代替實作、CLI 驗證或人工驗收。
+[MQTT責任](MQTT-OWNERSHIP.md)、[CL/KN tag登錄](PUBLISH-TAG-REGISTER.md)、[機器可讀模板](tag-register.json)、[共用API/狀態](STATE-AND-API-CONTRACTS.md)、[驗收與交付](ROLLOUT-AND-ACCEPTANCE.md)與[固定來源](SOURCES.md)一併對齊。
+
+`planning-checks.json`及REVIEW是舊commit歷史證據；本輪結果在engineering-validation.json。`python docs/plans/data-hub-reception-ux/check_engineering_plan.py`只跑離線文件／合約範例檢查，不能代替官方CLI、產品tests或MQTT現場驗收。

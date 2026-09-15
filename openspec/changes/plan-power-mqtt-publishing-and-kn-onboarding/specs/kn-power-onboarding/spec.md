@@ -1,91 +1,91 @@
 ## ADDED Requirements
 
-### Requirement: KN registry begins as an explicitly uncommissioned plan
+### Requirement: KN registry begins with engineering results rather than physical points
 <!-- requirement-id: KNP-R1 -->
 
-The KN plan SHALL separate reserved logical tag names from confirmed physical devices and source items. Unconfirmed entries SHALL have null source item and meter identity, disabled activation and an explicit planned status. The site inventory SHALL record source technology/session, physical identity, electrical boundary, direction, unit, CT/PT scaling provenance, timestamp/quality evidence, polling rate and responsible reviewer. The existing CL candidate/default list SHALL NOT be copied as confirmed KN equipment.
+KN SHALL use the eight existing engineering identities and the G KNE/EPR source contracts. Logical engineering IDs are known product vocabulary, not proof of active messages. Initial mode, publisher authority and real payload agreement SHALL remain unconfigured until reviewed. Player SHALL NOT require meterId, DDE Item, NodeId or CL device inventories for engineering activation. Upstream acquisition technology SHALL remain outside the receiver commissioning prerequisite.
 
-#### Scenario: Reserved name
+#### Scenario: Known engineering no payload
 <!-- scenario-id: KNP-R1-S01 -->
 
-- **GIVEN** SITE_LOAD_KWH is reserved but its source item is unknown
-- **WHEN** the register is delivered
-- **THEN** the entry stays disabled with null source item and meter identity, not a usable runtime config
+- **GIVEN** painting is a known slot but no real result contract is provided
+- **WHEN** the plan is opened
+- **THEN** the row is visible and unconfigured without pretending an actual source exists
 
-#### Scenario: Site source differs
+#### Scenario: Aggregate without item inventory
 <!-- scenario-id: KNP-R1-S02 -->
 
-- **GIVEN** KN does not provide the confirmed CL DDE interface
-- **WHEN** integration is planned
-- **THEN** acquisition selection remains a prerequisite and no invented OPC NodeId, Item or host is inserted
+- **GIVEN** the publisher provides a reviewed engineering result and definition summary
+- **WHEN** receiver commissioning is reviewed
+- **THEN** absence of bottom-level meter or DDE Item lists does not block this source kind
 
-### Requirement: KN starts with verified measurement boundaries rather than guessed totals
+### Requirement: KN begins per engineering and chooses measurement meaning explicitly
 <!-- requirement-id: KNP-R2 -->
 
-KN onboarding SHALL prioritize a verified consumption cumulative channel where available and MAY separately track grid-import cumulative energy. Grid import SHALL NOT be labeled full site consumption merely because it is the first or largest counter. Instantaneous kW SHALL remain unavailable until an actual power gauge is verified. Solar generation, grid export, storage effects and overlapping main/feeder boundaries SHALL be explicitly reviewed before site-total or share-basis configuration. No generic arithmetic shortcut SHALL replace the existing E6 profile validator.
+Each engineering MAY be commissioned independently using a confirmed power, daily-result or cumulative-result contract. Cadence SHALL NOT determine meaning. A site-main meter, grid purchase source or complete department device topology SHALL not be required to receive an engineering result. The chosen modes, units, total coverage and overlap rules SHALL follow G. Full-site consumption SHALL remain distinct from engineering-only totals, grid purchase and Solar generation.
 
-#### Scenario: Only grid purchase available
+#### Scenario: One engineering ready
 <!-- scenario-id: KNP-R2-S01 -->
 
-- **GIVEN** only GRID_IMPORT_KWH has a verified item
-- **WHEN** the first view is enabled
-- **THEN** it is labeled grid purchase, while full site consumption and unavailable power remain explicitly unavailable
+- **GIVEN** painting is reviewed and other engineering modes are unconfigured
+- **WHEN** painting is enabled
+- **THEN** it becomes available independently while missing engineering rows and factory coverage remain explicit
 
-#### Scenario: No power gauge
+#### Scenario: No actual power
 <!-- scenario-id: KNP-R2-S02 -->
 
-- **GIVEN** only a kWh counter exists
-- **WHEN** a screen asks for kW
-- **THEN** the value is unavailable, not the same number with another unit
+- **GIVEN** engineering daily kWh exists without kW
+- **WHEN** the power slot is rendered
+- **THEN** it remains unavailable and no energy-to-power relabeling occurs
 
-#### Scenario: Departments not inventoried
+#### Scenario: No total meter
 <!-- scenario-id: KNP-R2-S03 -->
 
-- **GIVEN** one site-total candidate is verified but feeder boundaries are not
-- **WHEN** the onboarding milestone completes
-- **THEN** department allocation remains unconfigured without cloning CL formulas
+- **GIVEN** all engineering results have approved contracts but no site-main source exists
+- **WHEN** engineering reporting is configured
+- **THEN** report reception and engineering totals can proceed with explicit coverage labels rather than demanding a fake main meter
 
-### Requirement: KN commissioning progresses through explicit evidence gates
+### Requirement: KN commissioning follows report and mode-specific evidence gates
 <!-- requirement-id: KNP-R3 -->
 
-The plan SHALL gate source inventory, read-only acquisition, versioned publication, isolated receiver verification, shadow parity, reviewed E1 activation, E6 configuration and display binding separately. The proposed observation window SHALL include at least two Asia/Taipei midnight boundaries and recorded outages/replay tests in isolation; it SHALL be described as an acceptance target rather than completed measurement. Source time or explicitly approved estimation limitations SHALL be recorded before accepted ingestion. Lacking day/month baselines SHALL remain unavailable, not synthesized from lifetime counters or capture samples.
+KN SHALL separately verify contract preview, isolated message/revision handling, source subscription, usable results, typed accounting profile and display binding. Daily results SHALL be tested for original period, corrections, partial/missing dates and bounded replay; counter and power modes SHALL use their own continuity/freshness tests. A valid complete daily result SHALL not wait for counter baselines. Field observation targets SHALL be approved for the selected mode and SHALL not be represented as completed acceptance. Missing actual payload or schedule SHALL block only the affected capability.
 
-#### Scenario: Read success only
+#### Scenario: One complete daily result
 <!-- scenario-id: KNP-R3-S01 -->
 
-- **GIVEN** DDE succeeds and MQTT publishes
-- **WHEN** a milestone is reported
-- **THEN** acquisition and publishing can be marked verified only with evidence, while Player subscription, parsing and E1 admission remain separate gates
+- **GIVEN** a daily result has valid full-period evidence
+- **WHEN** the period is read
+- **THEN** it can be complete without two physical observations
 
-#### Scenario: First cumulative sample
+#### Scenario: Result not due
 <!-- scenario-id: KNP-R3-S02 -->
 
-- **GIVEN** one newly approved reading is available
-- **WHEN** a daily or monthly widget is viewed
-- **THEN** insufficient baseline or coverage is shown rather than lifetime energy relabeled as a period total
+- **GIVEN** a daily report has not reached its reviewed deadline
+- **WHEN** readiness refreshes
+- **THEN** the receiver distinguishes not-due from missed delivery rather than applying a 90-second raw timeout
 
-#### Scenario: Not enough field evidence
+#### Scenario: Only documents verified
 <!-- scenario-id: KNP-R3-S03 -->
 
-- **GIVEN** Windows/DDE or actual KN meter evidence is missing
-- **WHEN** the planning review completes
-- **THEN** the documents may be committed but KN deployment and live acceptance stay blocked
+- **GIVEN** new artifacts pass static checks
+- **WHEN** deployment status is reported
+- **THEN** runtime, publisher handoff and field acceptance remain unverified
 
-### Requirement: KN rollout has a bounded and reversible operational plan
+### Requirement: KN rollout is independently reversible and preserves records
 <!-- requirement-id: KNP-R4 -->
 
-KN rollout SHALL have an identified commissioning owner and configuration backups, one publisher topic owner, explicit stop/rollback criteria and no writes to upstream PLC/SCADA. Changes to live publishers, production broker tests or display bindings SHALL require implementation/deployment authorization beyond this planning commit. Failures SHALL disable affected new channels without substituting CL data or deleting accepted history. Roles and physical mappings SHALL be approved individually before enabling placeholder entries.
+KN rollout SHALL require engineering contract owners, approved effective authorities, configuration backups and stop criteria, not upstream control writes. Unapproved modes or definitions SHALL not activate. Failure SHALL disable only the affected new engineering admission and retain report revisions, CL physical data and Solar subscriptions. G owns detailed replay/correction/projection behavior; this onboarding capability SHALL not create another writer or silently restore legacy physical fallback.
 
-#### Scenario: KN test fails
+#### Scenario: One source fails
 <!-- scenario-id: KNP-R4-S01 -->
 
-- **GIVEN** a KN channel fails quality or boundary checks
-- **WHEN** rollout stops
-- **THEN** the affected KN activation remains disabled, CL and Solar operation continue, and no fake fallback values are produced
+- **GIVEN** painting fails a contract check
+- **WHEN** rollout stops it
+- **THEN** other engineering/CL/Solar owners continue and painting records are preserved
 
-#### Scenario: Reserved feeder template
+#### Scenario: Mode changes
 <!-- scenario-id: KNP-R4-S02 -->
 
-- **GIVEN** FEEDER_<ID>_KWH names a template
-- **WHEN** an operator prepares a real feeder
-- **THEN** the placeholder is replaced only by a reviewed unique logical ID and exact physical/source-item mapping before activation
+- **GIVEN** a source moves from engineering cumulative to daily at an approved day boundary
+- **WHEN** cutover is applied
+- **THEN** only one energy authority contributes for each period and missing continuity remains explicit

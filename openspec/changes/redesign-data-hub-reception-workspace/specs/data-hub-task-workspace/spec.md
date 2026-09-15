@@ -44,7 +44,7 @@ The workspace SHALL keep supported scope, search, filter, view and selection sta
 <!-- scenario-id: DHR-R1-S02 -->
 
 - **GIVEN** a CL request is pending and the operator switches to KN
-- **WHEN** the CL response arrives after the KN request
+- **WHEN** the CL response arrives
 - **THEN** no CL payload, candidate, count or draft appears in the KN view
 
 #### Scenario: Direct link closes safely
@@ -64,7 +64,7 @@ The workspace SHALL keep supported scope, search, filter, view and selection sta
 ### Requirement: Source families preserve managed reuse and explicit power onboarding
 <!-- requirement-id: DHR-R5 -->
 
-The workspace SHALL classify configured and observed sources using registered contracts and reviewed site metadata, not solely topic spelling. Standard Solar summary and whole-zone canonical sources SHALL be reused through SolarSourceAdapter. Power raw channels MAY enter reviewed M2 onboarding; publisher virtual sums and control/health messages SHALL remain non-meter evidence. Nonstandard Solar topics MAY retain explicitly reviewed generic use under non-owned metric identities; a blanket ban on all solar-prefixed topics SHALL NOT replace ownership checks.
+The workspace SHALL classify configured and observed sources using registered contracts and reviewed site metadata, not solely topic spelling. Standard Solar summary and whole-zone canonical sources SHALL be reused through SolarSourceAdapter. Physical raw channels MAY enter reviewed M2 onboarding. Authoritative engineering results SHALL use the G engineering workflow without requiring raw-meter publication. Unreviewed virtual sums and control/health messages SHALL remain non-meter evidence, while approved engineering results MAY contribute through the typed engineering provider. Nonstandard Solar topics MAY retain explicitly reviewed generic use under non-owned metric identities; a blanket ban on all solar-prefixed topics SHALL NOT replace ownership checks.
 
 #### Scenario: Solar data already ingested
 <!-- scenario-id: DHR-R5-S01 -->
@@ -78,11 +78,11 @@ The workspace SHALL classify configured and observed sources using registered co
 
 - **GIVEN** one physical counter appears as raw and within a publisher virtual total
 - **WHEN** the workspace counts or selects meters
-- **THEN** only reviewed physical channels count as meters and the virtual aggregate is not another accounting input
+- **THEN** physical-meter counts and engineering-result counts remain separate; only the approved accounting layer contributes, never both the engineering result and its raw members
 
 #### Scenario: KN reserved name only
 <!-- scenario-id: DHR-R5-S03 -->
 
-- **GIVEN** a tag is reserved in the KN plan but has no approved source item
+- **GIVEN** an engineering slot has no approved result contract or selected mode
 - **WHEN** onboarding opens
-- **THEN** the planned row is labeled not configured and activation is unavailable without inserting a real source or fabricated zero
+- **THEN** the engineering row is labeled not configured; activating it requires an engineering contract, not a physical meter ID or Item, and no numeric zero is fabricated

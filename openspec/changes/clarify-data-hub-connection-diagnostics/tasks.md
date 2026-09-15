@@ -1,6 +1,6 @@
 ## 0. 跨發布端前置契約
-- [ ] 0.1 對齊 MQTT-OWNERSHIP 與 PUBLISH-TAG-REGISTER，實作 DHC-R5，以對應 PM/KN 驗收案例證明責任不跨界。
-- [ ] 0.2 本頁只改 Solar Player 的接收端設定；不會修改 Broker 服務本身、solar_mqtt_go、opc_mqtt 或兩者 WebUI 的設定。發布端健康與本接收 client 狀態分開。
+- [ ] 0.1 對齊最新 MQTT-OWNERSHIP、PUBLISH-TAG-REGISTER 與 G 的 KNE/EPR 工程契約，實作 DHC-R5，以對應 PM/KN 驗收案例證明責任不跨界。
+- [ ] 0.2 只修改Player receiver原則不變。工程報表到件依各自排程，與MQTT連線、publisher存活和DDE健康分開；未定排程顯示unknown。驗證 DHC-R5 及 G 對應情境；產品實作不因本次文件提交而勾選。
 
 ## 1. 模型與合約
 - [ ] 1.1 定位目前 Connections controller，盤點 effective/candidate/test 三種資料來源（DHC-R1）。

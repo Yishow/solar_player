@@ -97,3 +97,9 @@ Received 列：來源名稱或 payload 宣告識別、exact topic、觀測 tag/f
 接收資料必須區分 Solar 託管、電力原始點、電力計算結果與診斷訊息；批准範圍須對應 Solar／OPC 實際 namespace，不沿用 factory/ 範圍假稱涵蓋所有資料。
 
 本輪具體實作責任與驗收由 DHR-R5、DHR-R6 約束；不得把新增發布契約當作現行 API 已支援，也不將隔離 fixture 當現場測試。
+
+## 2026-09-16 工程別修訂（取代舊 KN 逐錶前提）
+
+固定八工程列表與已觀測集合分開；KN使用批准的factory/guanyin工程topic，不要求搬opc/raw。沒有逐錶資料不阻擋工程成果；未到件保持缺件。
+
+觀音結果契約由 [`add-kn-engineering-mqtt-sources`](../add-kn-engineering-mqtt-sources/proposal.md) 的 KNE/EPR 要求負責；本文件舊段落中的 DDE/physical/raw 與 F v1 前置僅適用明確選擇的物理來源，不得套成工程別必要條件。A 的焦點、B 的路由、C 的連線責任、D 的預覽及 E 的配置安全依原規格保留。需要逐來源核對的是工程成果模式與涵蓋範圍，不是上游每顆錶。

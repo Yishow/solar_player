@@ -81,3 +81,9 @@ ConnectionsView、ConnectionStatusCard、BrokerForm、MqttSettings/useMqttSettin
 本頁只改 Solar Player 的接收端設定；不會修改 Broker 服務本身、solar_mqtt_go、opc_mqtt 或兩者 WebUI 的設定。發布端健康與本接收 client 狀態分開。
 
 本輪具體實作責任與驗收由 DHC-R5 約束；不得把新增發布契約當作現行 API 已支援，也不將隔離 fixture 當現場測試。
+
+## 2026-09-16 工程別修訂（取代舊 KN 逐錶前提）
+
+只修改Player receiver原則不變。工程報表到件依各自排程，與MQTT連線、publisher存活和DDE健康分開；未定排程顯示unknown。
+
+觀音結果契約由 [`add-kn-engineering-mqtt-sources`](../add-kn-engineering-mqtt-sources/proposal.md) 的 KNE/EPR 要求負責；本文件舊段落中的 DDE/physical/raw 與 F v1 前置僅適用明確選擇的物理來源，不得套成工程別必要條件。A 的焦點、B 的路由、C 的連線責任、D 的預覽及 E 的配置安全依原規格保留。需要逐來源核對的是工程成果模式與涵蓋範圍，不是上游每顆錶。

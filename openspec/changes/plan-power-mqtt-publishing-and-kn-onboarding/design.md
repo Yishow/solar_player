@@ -1,72 +1,49 @@
-# Design: Power publishing and KN onboarding
+# Design: 實體發布保護與工程別接入分工
 
 ## Context
 
-基準 main `fd405ebc2957232b6c622071622b9c7d830a3a42`；來源與變更差異見 [SOURCES](../../../docs/plans/data-hub-reception-ux/SOURCES.md)。程式命名 opc_mqtt 保留，但 active main.go 使用 internal/dde。電力 server 指上游 InTouch/SCADA 主機，不是要求 Player Fastify 直接讀取 DDE。
+以 main `818fa0da` 重新review `8beacbd`。opc_mqtt/main.go 現在使用 internal/dde；publisher.go 固定 opc_mqtt_bridge、legacy raw/virtual topic及發布ts；defaults.go的20 raw/10 virtual是程式預設，不是KN現場清單。舊誤解及修正見 [REVIEW-ENGINEERING](../../../docs/plans/data-hub-reception-ux/REVIEW-ENGINEERING.md)。
 
 ## Goals / Non-Goals
 
-In scope：有界、可驗證的發布封包、topic／tag register、接收側驗證與 KN 導入門檻。Out of scope：本輪產品實作、現場啟用、實體點位猜測、修改能源計算算法、修改 Solar 已託管格式、部署或發送正式 MQTT。
+In scope：保留raw bridge所需可驗證發布改善與單一writer，釐清不適用工程成果的限制。Out of scope：本次產品實作／部署、改Solar、強制KN取數技術、重做工程內公式及現場點位猜測。
 
 ## Technical Approach
 
-### F1. 保留資料方向與所有權
+### F1. 兩類來源，不互相冒充
 
-Solar server → solar_mqtt_go → MQTT → Player SolarSourceAdapter。
-電力 server（目前 InTouch DDE）→ opc_mqtt → MQTT → Player protocol gate → M2 reviewed source → E1/E2；E6 單獨決定總錶與部門。
-詳細 topic／client 責任見 [MQTT-OWNERSHIP](../../../docs/plans/data-hub-reception-ux/MQTT-OWNERSHIP.md)。Player 管理連線不更改發布端或 Broker daemon。opc_mqtt 是 publisher，這個提案不為它加入 MQTT 控制訂閱。
+Solar仍 solar_mqtt_go→MQTT→managed adapter。選用實體profile時，InTouch→opc_mqtt→MQTT→physical gate/M2/E1。KN則由使用者上游工程成果→MQTT→G工程gate／typed provider；Player不要求其底層錶清單。publisher由誰提供及topic匹配由工程registry批准，不因資料是計算結果就禁止正式使用。
 
-### F2. 有版本的 topic 與來源登錄
+### F2. Physical profile 保留的改善
 
-詳見 [PUBLISH-TAG-REGISTER](../../../docs/plans/data-hub-reception-ux/PUBLISH-TAG-REGISTER.md) 及 [tag-register.json](../../../docs/plans/data-hub-reception-ux/tag-register.json)。正式 raw：opc/v1/{cl|kn}/raw/{tagId}；virtual：opc/v1/{site}/virtual/{virtualId}；diagnostic snapshot/status/heartbeat 分離。raw/virtual 預設 QoS 1、retain=false；snapshot 才 retained。Solar summary/whole-zone 既有 retain 行為不變。
+新增 opc/v1/{site}/raw/{tagId} 與 virtual/{id} 不改legacy原義；部署唯一且重啟穩定的Client ID，同topic一個active publisher。CL+KN可同時執行physical bridge的能力不代表KN一定要選它。DDE同登入Session／禁止Windows Service只限此bridge。未有可驗證熱切換則broker改後標saved/restart-required，不能假裝effective target已變。
 
-publisherId 與 MQTT Client ID 必須部署唯一、重啟穩定；同一 site/topic owner 只有一個 active publisher。多 server 只有經登錄分配不重疊 tags，否則拒絕雙主；備援 failover 需獨立審核，不在本輪自動完成。tag label 可改、tagId 不隨名稱改；改實體點位需版本／epoch 審查。大小寫、namespace、site 與封包 register 一致，身分宣告本身不是驗證過的 publisher 身份。
+從DDE原始文字保存decimal，禁止float64/round後再stringify聲稱精確。逐點readAt/sourceTimestamp/publishedAt/receivedAt及device quality分開；DDE成功不造Good或來源事件時間。CL raw的source-required及受審查估計沿用E1；unknown quality policy預設block、逐來源allow-with-limitation不放寬transport/time gate。
 
-### F3. 值、時間與品質
+sampleId跟實際採集綁定，重送不改acquisition證據；同ID異內容衝突。durable dedup須與accepted寫入原子協作，不能先記已見再丟失domain write。有限等待、重送與逾時unknown不宣稱下游已計量。初版raw live不離線補灌，30秒/90秒是raw設計預設；兩條限制均不適用G日報。
 
-v1 保留 DDE 原始十進位字串後再計算；不先 float64、round 再 stringify。decimals 只供顯示。逐點保存 readAt、sourceTimestamp（可 null）、publishedAt、readStatus、sourceQuality；來源設備品質不存在就 unknown。單次批次成功不等於每個點都成功。舊版 ts 是發佈時間，不作 sourceTimestamp。
+### F3. Raw virtual 與權威工程成果
 
-DDE 無來源時間時：sourceTimestamp=null；readAt 是採集證據，不能偽裝設備事件時間。E1 source-required 預設擋下；只有管理者明確審核該 source revision 的 allow-receive-time-estimate，且實際 production retain=false、dup=false、qos=0/1/2 時，才由 E1 使用 Player 的 receivedAt，仍標估計；封包不能自行開啟此權限。採集成功不證明上游裝置更新，未知品質限制必須另列於 review evidence，不能轉 good。
+未審查comparison virtual保留member tags／公式revision，非空且每個成員在批准window有效，否則整組invalid。物理raw的父子與virtual不得重複加總，不直接對跨組員改變的lifetime sum做差分。
 
-時間皆帶 offset/Z。readAt 至 publish/receive 的允許延遲、時鐘誤差、逐點 staleThreshold 在登錄審查，超限／無法驗證時隔離。初始 publish 30 秒、stale 90 秒是設計預設（30 秒沿用現行 defaults），不是現場 SLA；以現場更新頻率／延遲量測後調整。
+但上游已定義、批准的工程成果可在G成為正式sourceKind=engineering，無需還原raw才能進Player。G按daily/counter/power做相應計算，定義／資料更正版／涵蓋範圍分開。F的virtual診斷限制不能用來擋G的正式工程來源。
 
-### F4. 重送、失敗與虛擬值
+### F4. 共用工具、分開的domain
 
-每次成功實際讀取產生 sampleId，重送同次讀取保留 sampleId/readAt/sourceTimestamp；只有 publish time 可改。Player 以已授權 site/publisher/tag/sampleId 做持久、有界去重；不得只相信 MQTT DUP，也不以值相同判重（相同讀值可來自兩次真實讀取）。保留窗口至少覆蓋允許 replay age；超齡即隔離，不因去重紀錄清掉再接受。sampleId 不是 E1 實體身份／epoch。
+Physical v1 gate在generic fallback前驗schema、publisher/site/tag/revision、unit、readStatus、sample/time；同gate供preview/runtime。G提供工程gate與自己的typed source，不能把engineeringId塞meterId或只用$.value。A–E UI依sourceKind分流，共用guard/preview primitives，不共用會產生雙寫的domain handler。
 
-初版不積壓離線讀值補灌；重連後重新採集，停更期間標 gap。失敗點不發布假 0/NaN/舊值換新時間；有限 diagnostic snapshot 可保留 last known value 與其原時間。virtual 一個成員失敗就整組 invalid，不部分加總；公式變更增加 publisherConfigRevision 並列 member tags。virtual lifetime sums 只作診斷／比對，不作 E1 物理累積錶；正式部門量從各 raw 已接受的區間資料透過既有 E6/E2 計算，避免某分錶 reset 或組員改變造成錯誤差值。
+### F5. 遷移與回退
 
-### F5. Player 整合的必要增補
-
-新增有界 opc-power-v1 envelope validator，放在所登錄 topic 的 generic fallback 之前；schema/site/tag/publisher/config revision、unit、read status、時間、sample identity 驗證失敗即 diagnostics，不能改走 $.value 的弱驗證路徑。M2 預覽與 production 使用同一 validator，mapping 將 protocol profile、允許 publisher、tag 與 source revision 一併納入 canonicalDraft/token；需要新增 server/shared 欄位與測試，現況並不已支援。
-
-validator 成功後才交 M2 selector path=[value]；timestampPath 只有真實來源時間才指定 sourceTimestamp，不指定 legacy ts/readAt/publishedAt。保留 transport retain/dup/qos/receivedAt/origin。quality unknown 的明示審查不得放寬 E1 的時間／transport gate；無法維持既有 admission 時停止啟用，不改造既有算法來讓畫面變綠。
-
-### F6. 遷移與部署
-
-中壢現有預設點位、10 組 virtual 及 20 raw 的對照均標 code-default-unverified；不是已查驗實體錶。先建立批准 register，再於隔離／shadow 模式比對 legacy 與 v1；接收側 canonical binding 原子切換。雙發時不能兩邊都寫 accepted；連續性以既有 revision/epoch 審查。舊 opc/中文名 topic 不在同次發佈中改義或刪 retained。
-
-KN 執行步驟與資料缺口見 [KN-POWER-ROLLOUT](../../../docs/plans/data-hub-reception-ux/KN-POWER-ROLLOUT.md)。沿用 DDE 只在已證明存在 InTouch VIEW 的同登入 Session；沒有此條件就先選定 read-only acquisition adapter，不能因 repo 有 internal/opc 就宣稱 OPC 取數已接通。
+CL raw逐點legacy→v1 shadow、確認精度/單位/時間/consumer後single-writer guarded cutover；未核對連續性不跨sourceRevision/epoch減值。backout停新admission，不刪history、不清Solar retained、不回到blind replace。KN工程不必跟隨CL完成20 raw盤點；先完成單工程結果contract即可試接。每類回退互不改設定。
 
 ## File Changes
 
-opc_mqtt/internal/config/{config,defaults}.go：publisher/site/tag 登錄與版本協商；internal/dde/reader*.go：原始 decimal 與逐點時間；internal/engine/engine.go：exact decimal 與 member validity；internal/mqtt/publisher.go、main.go：v1、唯一 Client ID、bounded retry 與診斷。
-Player：既有 MQTT dispatch、guidedMqttMappingService/mqttMeterIngest、source registry 與 shared mapping token 合約的 additive profile gate，復用現有解析／能源接收鏈，不多建一個可寫 canonical history 的 adapter。A–E 只消費這些能力；確切新檔名在 apply 時依最新 main 定位。
-
-## Risks / Trade-offs
-
-DDE 返回數字無法證明設備品質／事件時間；選擇明示 unknown 或經審核估計，不偽裝精確。legacy float precision 無法事後還原。新增 protocol gate 是必要實作成本，不將此案標成純 CSS。register 及示意封包不是部署 config。
+未來physical：opc_mqtt/internal/config、internal/dde、internal/state、internal/engine、internal/mqtt/publisher.go及main.go；Player的protocol profile/dispatch整合。G工程部分見其design；此清單不是已實作或完整caller inventory。
 
 ## Validation
 
-PM01–PM20、KN01–KN08 詳見共用驗收矩陣；測試要涵蓋 CL+KN client 同時在線、保留 replay、缺時間、同樣值不同 sample、同 sample 重送、單點失敗、虛擬缺成員、跨廠誤標、raw/virtual 雙算、切換 provenance、DDE 同 Session。Windows+DDE 與隔離 Broker 的真實證據必須另補；不得拿文件 lint 代替。
+PM01–PM20按明確physical情境驗證，KN01–KN08改按工程交接。isolated broker與Windows/DDE只驗其適用來源，不得以Linux stub冒充現場。需要同source重送/兩worker/crash結果、same-session、失敗成員、unit/reset/版本cutover證據。產品碼交付才跑focused tests及pnpm verify；本次只文件checks。
 
-## Open Questions
+## Cross-change contract / Open Decisions
 
-KN 來源協定、實際 Item、物理錶號、CT/PT、時區、更新頻率、總用電／購電邊界與部門階層待現場提供。這些會阻擋對應點位啟用，但不阻擋本輪文件與未啟用的命名計畫交付。正式 CLI analyze/validate 與 runtime 驗收狀態見 REVIEW。
-
-## Review clarification
-
-空 virtual formula 必須 invalid；same sampleId 不同 body／acquisition evidence 必須衝突隔離。exampleOnly 封包只准離線 fixture；production gate 拒絕，不因貼例子就承認 KN 有來源。inflight MQTT retries 可重送同 sample，但不新增離線 domain-history 補傳；允許 replay age 以已審核設定為準，sample dedup retention 不短於它，超齡資料 fail closed。
-
-發布端設定保存與 effective connection 必須分開：本提案不假設現有 opc_mqtt 主迴圈會在改 broker 後自動 reconnect；未實作可驗證熱切換時，明示需要同 Session 的受控重啟。unreportedQualityPolicy 預設 block；僅逐來源審核 allow-with-limitation 才能通過額外品質 gate，且不可放寬 E1 時間／transport 規則。
+[KN-ENGINEERING-CONTRACT](../../../docs/plans/data-hub-reception-ux/KN-ENGINEERING-CONTRACT.md) 與G規範觀音；[PUBLISH-TAG-REGISTER](../../../docs/plans/data-hub-reception-ux/PUBLISH-TAG-REGISTER.md)保留CL對照。KN真payload/mode/deadline/replay仍未提供，initial來源停用；需要確認的是工程成果，不是強制DDE點位。Spectra CLI未取得，官方分析未完成。

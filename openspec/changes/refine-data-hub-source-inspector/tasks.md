@@ -1,6 +1,6 @@
 ## 0. 跨發布端前置契約
-- [ ] 0.1 對齊 MQTT-OWNERSHIP 與 PUBLISH-TAG-REGISTER，實作 DHI-R4，以對應 PM/KN 驗收案例證明責任不跨界。
-- [ ] 0.2 來源側欄另顯示發布端、訂閱擁有者、原始／計算來源、時間證據與上游設定責任；Solar 託管來源維持唯讀。
+- [ ] 0.1 對齊最新 MQTT-OWNERSHIP、PUBLISH-TAG-REGISTER 與 G 的 KNE/EPR 工程契約，實作 DHI-R4，以對應 PM/KN 驗收案例證明責任不跨界。
+- [ ] 0.2 側欄以觀音／工程別為標題，sourceKind=engineering 可為正式來源；物理錶欄位只屬physical分支，期間與dataRevision不混入設定dirty。未批准virtual仍只診斷。驗證 DHI-R4 及 G 對應情境；產品實作不因本次文件提交而勾選。
 
 ## 1. 基線與回歸
 - [ ] 1.1 建立既有 focus effect、背景保存位置、窄容器欄位的 regression cases（U1-R6）。

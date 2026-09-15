@@ -88,3 +88,9 @@ KN／觀音  ·  自訂／系統託管  ·  已儲存／有未儲存修改
 來源側欄另顯示發布端、訂閱擁有者、原始／計算來源、時間證據與上游設定責任；Solar 託管來源維持唯讀。
 
 本輪具體實作責任與驗收由 DHI-R4 約束；不得把新增發布契約當作現行 API 已支援，也不將隔離 fixture 當現場測試。
+
+## 2026-09-16 工程別修訂（取代舊 KN 逐錶前提）
+
+側欄以觀音／工程別為標題，sourceKind=engineering 可為正式來源；物理錶欄位只屬physical分支，期間與dataRevision不混入設定dirty。未批准virtual仍只診斷。
+
+觀音結果契約由 [`add-kn-engineering-mqtt-sources`](../add-kn-engineering-mqtt-sources/proposal.md) 的 KNE/EPR 要求負責；本文件舊段落中的 DDE/physical/raw 與 F v1 前置僅適用明確選擇的物理來源，不得套成工程別必要條件。A 的焦點、B 的路由、C 的連線責任、D 的預覽及 E 的配置安全依原規格保留。需要逐來源核對的是工程成果模式與涵蓋範圍，不是上游每顆錶。

@@ -81,7 +81,7 @@ The candidate list SHALL distinguish exact topics, tag-qualified candidates, can
 ### Requirement: Discovery scope and subscription evidence belong to their actual client
 <!-- requirement-id: DHR-R6 -->
 
-Reception profiles SHALL explicitly distinguish the approved standard Solar filters, site-scoped power raw filters and diagnostic filters. Existing factory/cl/ and factory/kn/ defaults SHALL NOT be presented as coverage of solar or opc topics. A profile and source registry change SHALL require authorized review before capture; the UI SHALL NOT widen to # or opc/#. Each subscription result SHALL identify its owning client and connection generation. Stopping discovery SHALL release only that discovery client; subscription-sent from a collector WebUI SHALL NOT stand for Player SUBACK evidence.
+Reception profiles SHALL explicitly distinguish the approved standard Solar filters, optional physical raw filters, engineering-result exact topics and diagnostic filters. Existing factory/cl/ and factory/kn/ defaults SHALL NOT be presented as coverage of solar, opc or factory/guanyin engineering topics. Approved KN engineering profiles SHALL preserve the eight existing identities and separately configured power/daily/cumulative semantics; daily onboarding SHALL not depend on packets appearing within a short discovery window. A profile and source registry change SHALL require authorized review before capture; the UI SHALL NOT widen to # or opc/#. Each subscription result SHALL identify its owning client and connection generation. Stopping discovery SHALL release only that discovery client; subscription-sent from a collector WebUI SHALL NOT stand for Player SUBACK evidence.
 
 #### Scenario: Different namespaces
 <!-- scenario-id: DHR-R6-S01 -->

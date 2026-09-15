@@ -36,3 +36,9 @@ Sources/SourcesModel/sourceWorkspace/draftGuard/workspaceContext、settings-mqtt
 本輪基準為 `fd405ebc2957232b6c622071622b9c7d830a3a42`。本 change 仍是未實作提案，不勾選產品驗收、不歸檔。與本輪新增的 `plan-power-mqtt-publishing-and-kn-onboarding` 共用 [MQTT-OWNERSHIP](../../../docs/plans/data-hub-reception-ux/MQTT-OWNERSHIP.md) 與 [PUBLISH-TAG-REGISTER](../../../docs/plans/data-hub-reception-ux/PUBLISH-TAG-REGISTER.md)。
 
 單筆操作只修改 Player 來源配置；不退訂 Solar 託管 filters、不修改發布端。另守住同一實體通道的 legacy/v1 雙寫衝突與配置版本／讀值版本分離。
+
+## 2026-09-16 工程別修訂（取代舊 KN 逐錶前提）
+
+單筆來源配置與報表更正版分開。工程purpose/effective window最多一個authority；E管receiver配置，G管報表交易與投影，更正不走generic PATCH。
+
+觀音結果契約由 [`add-kn-engineering-mqtt-sources`](../add-kn-engineering-mqtt-sources/proposal.md) 的 KNE/EPR 要求負責；本文件舊段落中的 DDE/physical/raw 與 F v1 前置僅適用明確選擇的物理來源，不得套成工程別必要條件。A 的焦點、B 的路由、C 的連線責任、D 的預覽及 E 的配置安全依原規格保留。需要逐來源核對的是工程成果模式與涵蓋範圍，不是上游每顆錶。

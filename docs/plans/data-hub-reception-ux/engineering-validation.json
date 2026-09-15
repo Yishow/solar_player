@@ -1,0 +1,247 @@
+{
+  "scope": "offline artifact and synthetic daily-contract reference checks only",
+  "baselineCommit": "818fa0da0d24d26ce9f847a5fdf6a9871c57bc0f",
+  "reviewedCommit": "8beacbd4ce50c393079308b17a2008835e7f8f24",
+  "changes": 7,
+  "requirements": 55,
+  "scenarios": 185,
+  "pendingTasks": {
+    "refine-data-hub-source-inspector": 18,
+    "redesign-data-hub-reception-workspace": 20,
+    "clarify-data-hub-connection-diagnostics": 17,
+    "streamline-data-hub-mapping-journey": 20,
+    "harden-data-hub-source-edit-transactions": 23,
+    "plan-power-mqtt-publishing-and-kn-onboarding": 13,
+    "add-kn-engineering-mqtt-sources": 14
+  },
+  "pendingTaskTotal": 125,
+  "relativeLinksChecked": 69,
+  "syntheticChecks": 54,
+  "passed": 54,
+  "cases": [
+    {
+      "case": "daily-valid",
+      "passed": true
+    },
+    {
+      "case": "true-zero",
+      "passed": true
+    },
+    {
+      "case": "offline-example",
+      "passed": true
+    },
+    {
+      "case": "production-example-rejected",
+      "passed": true
+    },
+    {
+      "case": "unknown-engineering",
+      "passed": true
+    },
+    {
+      "case": "wrong-site",
+      "passed": true
+    },
+    {
+      "case": "wrong-unit",
+      "passed": true
+    },
+    {
+      "case": "unknown-version",
+      "passed": true
+    },
+    {
+      "case": "negative-energy",
+      "passed": true
+    },
+    {
+      "case": "numeric-instead-of-decimal",
+      "passed": true
+    },
+    {
+      "case": "nonfinite",
+      "passed": true
+    },
+    {
+      "case": "exponent",
+      "passed": true
+    },
+    {
+      "case": "precision-overflow",
+      "passed": true
+    },
+    {
+      "case": "too-many-digits",
+      "passed": true
+    },
+    {
+      "case": "offset-free",
+      "passed": true
+    },
+    {
+      "case": "invalid-date",
+      "passed": true
+    },
+    {
+      "case": "unexpected-field",
+      "passed": true
+    },
+    {
+      "case": "wrong-mode",
+      "passed": true
+    },
+    {
+      "case": "unknown-publisher",
+      "passed": true
+    },
+    {
+      "case": "unapproved-source",
+      "passed": true
+    },
+    {
+      "case": "definition-mismatch",
+      "passed": true
+    },
+    {
+      "case": "calendar-mismatch",
+      "passed": true
+    },
+    {
+      "case": "wrong-topic",
+      "passed": true
+    },
+    {
+      "case": "half-day",
+      "passed": true
+    },
+    {
+      "case": "reversed-period",
+      "passed": true
+    },
+    {
+      "case": "future-final",
+      "passed": true
+    },
+    {
+      "case": "null-complete",
+      "passed": true
+    },
+    {
+      "case": "correction-without-reason",
+      "passed": true
+    },
+    {
+      "case": "partial-with-reason",
+      "passed": true
+    },
+    {
+      "case": "withdrawn-with-value",
+      "passed": true
+    },
+    {
+      "case": "duplicate-json-key",
+      "passed": true
+    },
+    {
+      "case": "first-report",
+      "passed": true
+    },
+    {
+      "case": "repeat-1",
+      "passed": true
+    },
+    {
+      "case": "repeat-2",
+      "passed": true
+    },
+    {
+      "case": "repeat-3",
+      "passed": true
+    },
+    {
+      "case": "same-revision-conflict",
+      "passed": true
+    },
+    {
+      "case": "higher-complete-snapshot",
+      "passed": true
+    },
+    {
+      "case": "late-lower-revision",
+      "passed": true
+    },
+    {
+      "case": "approved-sender-same-result",
+      "passed": true
+    },
+    {
+      "case": "offset-normalized-business-key",
+      "passed": true
+    },
+    {
+      "case": "new-partial-replaces-final",
+      "passed": true
+    },
+    {
+      "case": "partial-is-not-usable",
+      "passed": true
+    },
+    {
+      "case": "withdrawal-contract",
+      "passed": true
+    },
+    {
+      "case": "withdrawal-head",
+      "passed": true
+    },
+    {
+      "case": "withdrawal-not-usable",
+      "passed": true
+    },
+    {
+      "case": "restore-higher",
+      "passed": true
+    },
+    {
+      "case": "daily-sum-not-counter-difference",
+      "passed": true
+    },
+    {
+      "case": "counter-difference",
+      "passed": true
+    },
+    {
+      "case": "large-decimal-difference",
+      "passed": true
+    },
+    {
+      "case": "replay-batch-bound",
+      "passed": true
+    },
+    {
+      "case": "eight-known-engineerings",
+      "passed": true
+    },
+    {
+      "case": "all-engineering-contracts-unconfirmed",
+      "passed": true
+    },
+    {
+      "case": "cl-raw-preserved-count",
+      "passed": true
+    },
+    {
+      "case": "cl-virtual-preserved-count",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "notRun": [
+    "Spectra/OpenSpec official validation (spectra exit 127)",
+    "product tests/pnpm verify",
+    "SQLite crash or concurrency tests",
+    "MQTT/DDE/field tests",
+    "actual publisher payload acceptance"
+  ]
+}

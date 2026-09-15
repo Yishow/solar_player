@@ -1,6 +1,6 @@
 ## 0. 跨發布端前置契約
-- [ ] 0.1 對齊 MQTT-OWNERSHIP 與 PUBLISH-TAG-REGISTER，實作 DHT-R6，以對應 PM/KN 驗收案例證明責任不跨界。
-- [ ] 0.2 單筆操作只修改 Player 來源配置；不退訂 Solar 託管 filters、不修改發布端。另守住同一實體通道的 legacy/v1 雙寫衝突與配置版本／讀值版本分離。
+- [ ] 0.1 對齊最新 MQTT-OWNERSHIP、PUBLISH-TAG-REGISTER 與 G 的 KNE/EPR 工程契約，實作 DHT-R6，以對應 PM/KN 驗收案例證明責任不跨界。
+- [ ] 0.2 單筆來源配置與報表更正版分開。工程purpose/effective window最多一個authority；E管receiver配置，G管報表交易與投影，更正不走generic PATCH。驗證 DHT-R6 及 G 對應情境；產品實作不因本次文件提交而勾選。
 
 ## 1. 合約與相容性
 - [ ] 1.1 盤點所有 full-list PUT callers、background writes、來源 identity 使用處（DHT-R4）。

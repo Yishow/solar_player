@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Proposed KN engineering daily contract; structural validation only",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sourceKind",
+    "mode",
+    "site",
+    "engineeringId",
+    "publisherId",
+    "definitionRevision",
+    "calendarRevision",
+    "measurementKind",
+    "unit",
+    "value",
+    "periodStart",
+    "periodEnd",
+    "periodStatus",
+    "coverage",
+    "quality",
+    "dataRevision",
+    "publishedAt",
+    "reason"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "sourceKind": {
+      "const": "engineering"
+    },
+    "mode": {
+      "const": "daily-report"
+    },
+    "site": {
+      "const": "kn"
+    },
+    "engineeringId": {
+      "enum": [
+        "stamping",
+        "body",
+        "painting",
+        "assembly",
+        "utility",
+        "office",
+        "heavy_vehicle",
+        "ed_coating"
+      ]
+    },
+    "publisherId": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,64}$"
+    },
+    "definitionRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "calendarRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "measurementKind": {
+      "const": "interval-energy"
+    },
+    "unit": {
+      "const": "kWh"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[0-9]+(\\.[0-9]{1,9})?$"
+        }
+      ]
+    },
+    "periodStart": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "periodEnd": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "periodStatus": {
+      "enum": [
+        "preliminary",
+        "final",
+        "withdrawn"
+      ]
+    },
+    "coverage": {
+      "enum": [
+        "complete",
+        "partial",
+        "unknown"
+      ]
+    },
+    "quality": {
+      "enum": [
+        "valid",
+        "partial",
+        "invalid",
+        "unknown"
+      ]
+    },
+    "dataRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "publishedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 500
+    },
+    "exampleOnly": {
+      "const": true
+    }
+  }
+}

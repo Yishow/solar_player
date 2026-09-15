@@ -1,6 +1,6 @@
 ## 0. 跨發布端前置契約
-- [ ] 0.1 對齊 MQTT-OWNERSHIP 與 PUBLISH-TAG-REGISTER，實作 DHM-R4，以對應 PM/KN 驗收案例證明責任不跨界。
-- [ ] 0.2 Solar 已託管資料直接重用；電力 raw 與 virtual 不能重複入帳。新版電力封包須先經 F 的有界驗證，再沿用 M2/E1；觀音預留 tag 不可直接套用。
+- [ ] 0.1 對齊最新 MQTT-OWNERSHIP、PUBLISH-TAG-REGISTER 與 G 的 KNE/EPR 工程契約，實作 DHM-R4，以對應 PM/KN 驗收案例證明責任不跨界。
+- [ ] 0.2 三階段先選sourceKind/mode，再走工程preview/period/版本，不要求meterId。不將已算好日量再差分；G共用gate及typed provider就緒前不可fallback。驗證 DHM-R4 及 G 對應情境；產品實作不因本次文件提交而勾選。
 
 ## 1. 流程骨架
 - [ ] 1.1 將 connection/site prerequisites 與 M2 三階段分離，保留既有 task links（M2-R1）。
@@ -8,7 +8,7 @@
 - [ ] 1.3 接 B 候選及 C preflight；有 reviewed evidence 時跳過重接收。
 
 ## 2. 選值與審查
-- [ ] 2.1 整合 visual field/tag picker、sample provenance/revision 與完整工作区（DHM-R1）。
+- [ ] 2.1 整合 visual field/tag picker、sample provenance/revision 與完整工作區（DHM-R1）。
 - [ ] 2.2 顯示語意／unit/scaling/timestampPolicy 的必要審查，復用 domain validator。
 - [ ] 2.3 保留 numeric lexeme/partial input，修正 multiplier 的 silent fallback。
 - [ ] 2.4 實作批次適用／不相容／未選取行的明確差異。
