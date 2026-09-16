@@ -70,6 +70,13 @@ test("Data Hub Sources loads only the managed and generic source surface", () =>
   );
 });
 
+test("Data Hub Engineering Sources is reachable through its route loader", () => {
+  assert.match(
+    routerSource,
+    /path:\s*"engineering-sources",[\s\S]*loadKnEngineeringSourcesRoute[\s\S]*KnEngineeringSourcesRoute/s
+  );
+});
+
 test("Data Hub keeps MQTT and data source operations as guarded lazy child routes", () => {
   assert.match(
     routerSource,

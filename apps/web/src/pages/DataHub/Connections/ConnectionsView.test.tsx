@@ -24,21 +24,28 @@ const mockStatus: MqttStatus = {
   updatedAt: "2026-08-31T18:00:00.000Z"
 };
 
-test("ConnectionsView renders two-column layout with toolbar actions", () => {
+import { MemoryRouter } from "react-router-dom";
+
+test("ConnectionsView renders two-column layout with toolbar actions and receiver broker summary", () => {
   const html = renderToStaticMarkup(
-    <ConnectionsView
-      settings={mockSettings}
-      status={mockStatus}
-      lastConnectionTest={null}
-      onChange={() => {}}
-      onTestConnection={() => {}}
-      onSaveSettings={() => {}}
-    />
+    <MemoryRouter>
+      <ConnectionsView
+        settings={mockSettings}
+        status={mockStatus}
+        lastConnectionTest={null}
+        onChange={() => {}}
+        onTestConnection={() => {}}
+        onSaveSettings={() => {}}
+      />
+    </MemoryRouter>
   );
 
   assert.match(html, /data-data-hub-connections-view/);
+  assert.match(html, /data-connections-summary="receiver-broker"/);
+  assert.match(html, /Solar Player 接收端 Broker/);
   assert.match(html, /<em>Connections<\/em>/);
   assert.match(html, /data-connections-action="test"/);
+  assert.match(html, /測試這份設定/);
   assert.match(html, /data-connections-action="save"/);
   assert.match(html, /data-connections-panel="settings"/);
   assert.match(html, /data-connections-panel="diagnostics"/);
@@ -47,15 +54,17 @@ test("ConnectionsView renders two-column layout with toolbar actions", () => {
 
 test("U1-R3-S01 Connections under KN labels the broker as shared infrastructure", () => {
   const html = renderToStaticMarkup(
-    <ConnectionsView
-      settings={mockSettings}
-      status={mockStatus}
-      lastConnectionTest={null}
-      managementScope="kn"
-      onChange={() => {}}
-      onTestConnection={() => {}}
-      onSaveSettings={() => {}}
-    />
+    <MemoryRouter>
+      <ConnectionsView
+        settings={mockSettings}
+        status={mockStatus}
+        lastConnectionTest={null}
+        managementScope="kn"
+        onChange={() => {}}
+        onTestConnection={() => {}}
+        onSaveSettings={() => {}}
+      />
+    </MemoryRouter>
   );
 
   assert.match(html, /data-shared-infrastructure="broker"/);
@@ -65,16 +74,18 @@ test("U1-R3-S01 Connections under KN labels the broker as shared infrastructure"
 
 test("ConnectionsView displays dirty state and message alerts", () => {
   const html = renderToStaticMarkup(
-    <ConnectionsView
-      settings={mockSettings}
-      status={mockStatus}
-      lastConnectionTest={null}
-      isDirty={true}
-      message="設定已同步。"
-      onChange={() => {}}
-      onTestConnection={() => {}}
-      onSaveSettings={() => {}}
-    />
+    <MemoryRouter>
+      <ConnectionsView
+        settings={mockSettings}
+        status={mockStatus}
+        lastConnectionTest={null}
+        isDirty={true}
+        message="設定已同步。"
+        onChange={() => {}}
+        onTestConnection={() => {}}
+        onSaveSettings={() => {}}
+      />
+    </MemoryRouter>
   );
 
   assert.match(html, /data-connections-dirty="true"/);

@@ -34,345 +34,61 @@ The management application SHALL provide a task-oriented Data Hub landing worksp
 
 ---
 ### Requirement: Connections presents the central broker as infrastructure
+<!-- requirement-id: DHC-R1 -->
 
-The Connections area SHALL expose the configured central Mosquitto/MQTT connection state and safe editable broker settings already supported by the product. Broker password/credentials MUST remain masked according to existing security behavior. The UI SHALL NOT require one broker connection per CL/KN site when both sites use the same central broker.
+The Connections area SHALL expose the configured central Mosquitto/MQTT connection state and safe editable broker settings already supported by the product. Broker password/credentials MUST remain masked according to existing security behavior. The UI SHALL NOT require one broker connection per CL/KN site when both sites use the same central broker. It SHALL distinguish effective shared Player receiver runtime settings from the editable candidate and state that a site filter does not limit the effects within that receiver. Saving SHALL NOT change the broker daemon, upstream solar_mqtt_go collector, opc_mqtt bridge, or their separate WebUI connection settings.
 
 #### Scenario: Both sites use one central broker
-- **WHEN** CL and KN data are arriving through the configured central Mosquitto connection
-- **THEN** Connections shows one broker connection and its health
-- **AND** site separation is represented on sources/metrics rather than by duplicating broker connections
+<!-- scenario-id: DHC-R1-S01 -->
+
+- **GIVEN** CL and KN use the configured central Mosquitto connection
+- **WHEN** data arrive through that connection
+- **THEN** Connections shows one broker and its health, with site separation represented on sources/metrics rather than duplicate brokers
+
+#### Scenario: Shared edit under KN
+<!-- scenario-id: DHC-R1-S02 -->
+
+- **GIVEN** KN is the selected management scope
+- **WHEN** the operator reviews a broker change
+- **THEN** the review identifies the shared impact without implying KN-only configuration
+
+#### Scenario: Masked password is retained
+<!-- scenario-id: DHC-R1-S03 -->
+
+- **GIVEN** the existing password is masked
+- **WHEN** the operator changes only the host and chooses to retain credentials
+- **THEN** the existing secret is preserved without revealing or persisting its plaintext in the client
 
 
 <!-- @trace
-source: improve-data-management-workflows
-updated: 2026-08-31
+source: clarify-data-hub-connection-diagnostics
+updated: 2026-09-16
 code:
-  - apps/web/src/pages/DisplayPagesEditor/dataInspector.tsx
-  - docs/runbooks/pc-server-deploy.md
-  - apps/server/src/services/derivedMetricCatalogService.ts
-  - apps/web/src/pages/DataHub/WeatherModel.ts
-  - apps/server/src/mqtt/MqttClientService.ts
-  - .agents/skills/.openspec-target
-  - solar_mqtt_go/internal/tray/logfile.go
-  - apps/web/src/pages/DataHub/Metrics.tsx
-  - apps/server/src/db/migrations/035_scoped_metric_identity.sql
-  - apps/server/src/server-startup.ts
-  - apps/web/src/app/dataHubCompatibility.ts
-  - apps/web/src/services/socket.ts
-  - apps/server/src/db/migrate.ts
-  - .agents/skills/openspec-archive-change/SKILL.md
-  - start.ps1
-  - apps/server/src/services/MetricHistoryRetentionService.ts
-  - apps/server/src/services/displayDataPreviewService.ts
-  - apps/server/src/services/derivedMetricRegistryService.ts
-  - apps/server/src/services/calculationSettingsService.ts
-  - apps/web/src/pages/FactoryCircuit/viewModel.ts
-  - apps/web/src/pages/DeviceFleet/loadModel.ts
-  - apps/web/src/pages/DeviceStatus/formatters.ts
-  - apps/web/src/pages/DeviceStatus/localization.ts
-  - solar_mqtt_go/internal/display/display.go
-  - apps/server/src/routes/metric-provenance.ts
-  - solar_mqtt_go/internal/tray/instance_windows.go
-  - apps/web/src/pages/DataHub/DerivedMetrics.tsx
-  - apps/server/src/services/sustainabilityStoryService.ts
-  - packages/shared/src/derivedMetric.ts
-  - solar_mqtt_go/internal/webui/web/styles/theme.css
-  - solar_mqtt_go/internal/config/config.go
-  - apps/web/src/pages/FactoryCircuit/displayPageConfig.ts
-  - packages/shared/src/playbackMetricContract.ts
-  - solar_mqtt_go/internal/discovery/discovery.go
-  - apps/server/src/routes/metrics-inventory.ts
-  - apps/web/src/pages/DataHub/CardDataDiagnosticsModel.ts
-  - apps/web/src/pages/DeviceFleet/PairingDialog.tsx
-  - .agents/skills/openspec-apply-change/SKILL.md
-  - apps/web/src/pages/DataSourceSettings/index.tsx
-  - apps/web/src/services/api.ts
-  - apps/server/src/services/displayCardDataService.ts
-  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.tsx
-  - apps/server/src/mqtt/ManagedSourceAdapter.ts
-  - apps/web/src/pages/Solar/runtimeContent.tsx
-  - apps/server/src/services/factoryGenerationAggregateService.ts
-  - solar_mqtt_go/internal/service/control.go
-  - apps/server/src/services/safeDiagnosticText.ts
-  - apps/web/src/app/router.tsx
-  - apps/server/src/realtime/SocketService.ts
-  - apps/web/src/hooks/useLiveMetrics.ts
-  - apps/web/src/pages/DataSourceSettings/DataSourceOperationsView.tsx
-  - solar_mqtt_go/internal/webui/web/styles/components.css
-  - apps/server/src/services/metricUsageService.ts
-  - apps/web/src/pages/DataHub/Usage.tsx
-  - solar_mqtt_go/internal/anomaly/anomaly.go
-  - apps/web/src/pages/DataHub/SourcesModel.ts
-  - apps/web/src/pages/DeviceFleet/DeviceFleetContent.tsx
-  - apps/server/src/db/scopedMetricMigration.ts
-  - apps/web/src/pages/DataSourceSettings/DataSourceOperations.tsx
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.tsx
-  - apps/server/src/services/playbackMetricAuthorizationService.ts
-  - apps/web/src/pages/Overview/displayPageConfig.ts
-  - apps/web/src/pages/MqttSettings/loadModel.ts
-  - .agents/skills/openspec-sync-specs/SKILL.md
-  - apps/server/src/db/migrations/037_derived_metric_registry.sql
-  - apps/server/src/routes/calculation-settings.ts
-  - solar_mqtt_go/internal/webui/web/js/factory-view.js
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.tsx
-  - solar_mqtt_go/build.ps1
-  - apps/server/src/routes/metric-usage.ts
-  - solar_mqtt_go/internal/mosquitto/mosquitto.go
-  - .agents/skills/openspec-explore/SKILL.md
-  - solar_mqtt_go/internal/webui/web/js/app.js
-  - apps/web/src/pages/DataHub/UsageModel.ts
-  - apps/web/src/pages/DeviceStatus/layout.ts
-  - apps/server/src/services/metricInventoryService.ts
-  - apps/web/src/pages/DeviceStatus/RightWingMetricsPanel.tsx
-  - apps/server/src/routes/settings-mqtt.ts
-  - apps/server/src/testing/deviceContextTestSupport.ts
-  - solar_mqtt_go/internal/tray/run_nocgo.go
-  - packages/shared/src/displayReadiness.ts
-  - solar_mqtt_go/internal/webui/web/styles.css
-  - solar_mqtt_go/internal/webui/web/js/config-view.js
-  - apps/web/src/pages/DataHub/DiagnosticsModel.ts
-  - packages/shared/src/displayStory.ts
-  - apps/server/src/routes/metrics-history.ts
-  - apps/web/src/pages/Overview/viewModel.ts
-  - apps/web/src/pages/Overview/runtimeContent.tsx
-  - apps/web/src/components/AppFooterNav.tsx
-  - apps/server/src/services/displayStoryService.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.tsx
-  - apps/server/src/services/displayValueOverrideService.ts
-  - solar_mqtt_go/internal/webui/web/js/mqtt-manager.js
-  - apps/web/src/pages/MqttSettings/factoryTopicSites.ts
-  - apps/web/src/pages/DeviceStatus/LeftWingTriagePanel.tsx
-  - apps/web/src/app/routeMeta.ts
-  - apps/server/src/routes/display-card-data.ts
-  - apps/web/src/pages/DeviceFleet/GroupEditDialog.tsx
-  - apps/server/src/services/MockMetricsFeedService.ts
-  - apps/web/src/pages/DisplayPagesEditor/index.tsx
-  - apps/server/src/mqtt/SolarSourceAdapter.ts
-  - apps/web/src/pages/DataHub/MetricsModel.ts
-  - start.sh
-  - solar_mqtt_go/internal/webui/web/vendor/mqtt.min.js
-  - apps/server/src/services/displayOpsService.ts
-  - apps/web/src/pages/DataHub/Sources.tsx
-  - packages/shared/src/displayCardData.ts
-  - solar_mqtt_go/start.sh
-  - apps/server/src/routes/derived-metrics.ts
-  - solar_mqtt_go/go.mod
-  - apps/server/src/metrics/liveMetrics.ts
-  - apps/server/src/services/MetricsAccumulatorService.ts
-  - apps/web/src/pages/DeviceStatus/device.css
-  - solar_mqtt_go/internal/mosquitto/proc_windows.go
-  - solar_mqtt_go/internal/mqttbus/bus.go
-  - apps/web/src/pages/DataHub/index.tsx
-  - apps/server/src/services/displayPreviewContextService.ts
-  - packages/shared/src/metricScope.ts
-  - apps/web/src/pages/DeviceStatus/index.tsx
-  - apps/web/src/pages/DeviceFleet/viewModel.ts
-  - apps/web/src/pages/DisplayPagesEditor/sourceConnectionPanel.tsx
-  - solar_mqtt_go/internal/tray/instance_unix.go
-  - solar_mqtt_go/internal/webui/web/styles/layout.css
   - apps/server/src/app.ts
-  - solar_mqtt_go/internal/webui/web/js/local-config-view.js
-  - apps/server/src/services/MetricResolver.ts
-  - apps/server/src/db/migrations/038_derived_metric_site_scopes.sql
-  - apps/web/src/pages/DataHub/links.ts
-  - apps/web/src/pages/DataHub/Diagnostics.tsx
-  - solar_mqtt_go/assets/assets.go
-  - apps/server/src/services/deviceGroupService.ts
-  - packages/shared/src/displayEditorSchema.ts
-  - apps/web/src/pages/Solar/viewModel.ts
-  - apps/web/src/pages/DataHub/Weather.tsx
-  - apps/server/src/routes/metrics.ts
-  - .env.example
-  - apps/server/src/services/householdEquivalenceService.ts
-  - solar_mqtt_go/internal/webui/web/index.html
-  - apps/web/src/pages/DataHub/placeholder.tsx
-  - apps/web/src/pages/EnergyHistory/index.tsx
-  - apps/web/src/pages/MqttSettings/weatherFieldPresets.ts
-  - apps/web/src/components/AppHeader.tsx
-  - apps/web/src/pages/MqttSettings/viewModel.ts
-  - solar_mqtt_go/build.sh
-  - apps/web/src/pages/DeviceFleet/deviceFleet.css
-  - solar_mqtt_go/go.sum
-  - apps/web/src/pages/DataHub/CardDataDiagnostics.tsx
-  - solar_mqtt_go/internal/heartbeat/heartbeat.go
-  - apps/web/src/pages/DataHub/liveActivity.ts
-  - apps/web/src/pages/DeviceFleet/route.ts
-  - solar_mqtt_go/main.go
-  - packages/shared/src/widgetDataBinding.ts
-  - apps/web/src/pages/DeviceFleet/index.tsx
-  - apps/server/src/services/displayPagePublishingService.ts
-  - solar_mqtt_go/internal/webui/web/styles/forms.css
-  - packages/shared/src/displayOps.ts
-  - solar_mqtt_go/internal/storage/storage.go
-  - apps/server/src/services/displayReadinessService.ts
-  - apps/web/src/hooks/liveMetricsStore.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/services/sourceEditValidationService.ts
   - packages/shared/src/index.ts
-  - solar_mqtt_go/commands.go
-  - solar_mqtt_go/internal/service/service.go
-  - apps/web/src/app/dataHub.ts
-  - apps/web/src/pages/Solar/displayPageConfig.ts
-  - solar_mqtt_go/assets/tray.ico
-  - apps/web/src/pages/DataHub/sectionState.tsx
-  - apps/server/src/services/SnapshotWriterService.ts
-  - solar_mqtt_go/internal/schedule/schedule.go
-  - solar_mqtt_go/internal/tray/run.go
-  - apps/server/src/services/displayRotationService.ts
-  - packages/shared/src/displayPageFreshness.ts
-  - apps/server/src/services/metricProvenanceService.ts
-  - apps/web/src/pages/MqttSettings/index.tsx
-  - apps/server/src/services/deviceCredentialService.ts
-  - apps/web/src/pages/EnergyHistory/history.css
-  - apps/server/src/routes/data-source.ts
-  - .agents/skills/openspec-propose/SKILL.md
-  - apps/server/src/routes/display-pages.ts
-  - apps/web/src/pages/EnergyHistory/viewModel.ts
-  - apps/server/src/db/migrations/036_remove_managed_solar_topic_mappings.sql
-  - solar_mqtt_go/start.ps1
-  - scripts/deploy.test.mjs
-  - solar_mqtt_go/internal/webui/webui.go
-  - solar_mqtt_go/internal/tray/app.go
-  - apps/web/src/pages/DeviceStatus/viewModel.ts
-  - solar_mqtt_go/internal/mosquitto/proc_unix.go
-  - apps/web/src/pages/FactoryCircuit/runtimeContent.tsx
-  - apps/server/src/db/seed.ts
-  - apps/server/src/services/DailySummaryService.ts
-  - apps/server/src/services/derivedMetricExpression.ts
-  - apps/web/src/pages/runtimeRefreshRegistry.ts
-  - solar_mqtt_go/internal/scraper/scraper.go
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
 tests:
-  - apps/web/src/pages/FactoryCircuit/viewModel.test.ts
-  - apps/server/src/db/migrations/scopeLiveMetricsMigration.test.ts
-  - solar_mqtt_go/internal/mosquitto/mosquitto_test.go
-  - apps/server/src/services/carbonReductionConsistency.test.ts
-  - solar_mqtt_go/internal/storage/storage_test.go
-  - solar_mqtt_go/internal/service/control_contract_test.go
-  - apps/web/src/pages/Solar/runtimeIsolation.test.tsx
-  - apps/web/src/pages/DataHub/Diagnostics.test.tsx
-  - apps/web/src/pages/Solar/configRender.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/index.test.tsx
-  - packages/shared/src/derivedMetric.test.ts
-  - apps/web/src/pages/DataHub/sectionState.test.tsx
-  - apps/web/src/pages/DataHub/UsageModel.test.ts
-  - apps/server/src/routes/playback.test.ts
-  - solar_mqtt_go/build_test.go
-  - apps/server/src/services/factoryGenerationAggregateService.test.ts
-  - apps/server/src/services/sustainabilityStoryService.test.ts
-  - apps/web/src/pages/MqttSettings/index.test.ts
-  - apps/server/src/services/DailySummaryService.test.ts
-  - apps/web/src/pages/Solar/viewModel.test.ts
-  - solar_mqtt_go/internal/schedule/schedule_test.go
-  - apps/server/src/services/MockMetricsFeedService.test.ts
-  - apps/web/src/pages/EnergyHistory/viewModel.test.ts
-  - apps/web/src/pages/DataHub/links.test.ts
-  - apps/server/src/routes/sustainability-story.test.ts
-  - apps/web/src/pages/DeviceStatus/viewModel.test.ts
-  - solar_mqtt_go/internal/webui/webui_test.go
-  - apps/web/src/pages/DeviceFleet/loadModel.test.ts
-  - apps/server/src/routes/display-preview-context.test.ts
-  - apps/server/src/services/MetricResolver.test.ts
-  - apps/web/src/pages/shared/widgetDataBinding.test.ts
-  - apps/server/src/services/playbackMetricAuthorizationService.test.ts
-  - apps/web/src/services/socket.test.ts
-  - apps/server/src/services/derivedMetricRegistryService.test.ts
-  - apps/server/src/mqtt/metricKeyIngestion.test.ts
-  - apps/server/src/routes/display-pages.test.ts
-  - apps/server/src/routes/device-pairing.test.ts
-  - apps/server/src/mqtt/SolarSourceAdapter.test.ts
-  - apps/web/src/pages/DataSourceSettings/viewModel.test.ts
-  - apps/server/src/services/displayStoryTopicNames.test.ts
-  - packages/shared/src/metricScope.test.ts
-  - apps/server/src/routes/calculation-settings.test.ts
-  - apps/web/src/pages/DeviceFleet/index.test.tsx
-  - apps/web/src/components/shellFoundation.test.ts
-  - apps/web/src/pages/DeviceFleet/contracts.test.ts
-  - solar_mqtt_go/internal/discovery/discovery_test.go
-  - apps/web/src/hooks/useDisplayStoryRuntime.test.ts
-  - apps/server/src/mqtt/MqttClientService.test.ts
-  - apps/web/src/pages/DeviceStatus/layout.test.ts
-  - apps/server/src/app.test.ts
-  - solar_mqtt_go/internal/service/service_test.go
-  - apps/server/src/services/SnapshotWriterService.test.ts
-  - apps/server/src/routes/data-source.test.ts
-  - apps/web/src/pages/DataHub/DerivedMetrics.test.tsx
-  - apps/server/src/routes/device-context-playback.test.ts
-  - apps/server/src/services/managementSessionService.test.ts
-  - apps/server/src/services/managementPasswordService.test.ts
-  - apps/web/src/components/AppFooterNav.icons.test.tsx
-  - apps/web/src/hooks/displayPageDraftSession.test.ts
-  - apps/server/src/services/householdEquivalenceService.test.ts
-  - apps/web/src/services/api.test.ts
-  - apps/server/src/db/migrations/clKnGenerationSummaryTopics.test.ts
-  - apps/web/src/pages/DataHub/Sources.test.tsx
-  - apps/server/src/routes/metrics-inventory.test.ts
-  - apps/server/src/services/displayStoryService.test.ts
-  - solar_mqtt_go/internal/tray/app_test.go
-  - apps/web/src/app/router.test.ts
-  - apps/web/src/pages/DataHub/CardDataDiagnostics.test.tsx
-  - solar_mqtt_go/internal/scraper/scraper_test.go
-  - apps/web/src/pages/DeviceFleet/viewModel.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/sourceConnectionPanel.test.tsx
-  - solar_mqtt_go/internal/tray/logfile_test.go
-  - apps/web/src/pages/DeviceStatus/DeviceStatusContent.test.tsx
-  - solar_mqtt_go/internal/config/applyset_test.go
-  - packages/shared/src/displayPageFreshness.test.ts
-  - apps/server/src/routes/settings-mqtt.test.ts
-  - apps/server/src/routes/metrics-history.test.ts
-  - apps/web/src/pages/shared/playbackMetricContract.test.ts
-  - apps/web/src/pages/DisplayPagesEditor/dataInspector.test.tsx
-  - apps/server/src/routes/device-group-management.test.ts
-  - apps/web/src/pages/DataHub/DiagnosticsModel.test.ts
-  - apps/web/src/pages/Overview/configRender.test.tsx
-  - solar_mqtt_go/assets/assets_test.go
-  - solar_mqtt_go/internal/mqttbus/control_contract_test.go
-  - apps/web/src/pages/DataSourceSettings/index.test.tsx
-  - solar_mqtt_go/internal/mqttbus/bus_test.go
-  - apps/web/src/pages/DisplayPagesEditor/dataBindingCapability.test.ts
-  - apps/server/src/routes/management-auth.test.ts
-  - apps/server/src/routes/metric-usage.test.ts
-  - packages/shared/src/displayStory.test.ts
-  - solar_mqtt_go/internal/tray/instance_windows_test.go
-  - apps/server/src/routes/metric-provenance.test.ts
-  - solar_mqtt_go/internal/config/config_test.go
-  - apps/web/src/app/dataHub.test.ts
-  - apps/web/src/pages/DataSourceSettings/DataSourceOperations.test.tsx
-  - apps/server/src/routes/display-story.test.ts
-  - apps/web/src/app/dataHubCompatibility.test.ts
-  - apps/web/src/pages/FactoryCircuit/runtimeIsolation.test.tsx
-  - apps/web/src/pages/Overview/runtimeIsolation.test.tsx
-  - apps/web/src/pages/DataHub/Weather.test.tsx
-  - solar_mqtt_go/main_test.go
-  - apps/web/src/pages/MqttSettings/TopicWorkspaceRow.test.ts
-  - solar_mqtt_go/internal/heartbeat/heartbeat_test.go
-  - apps/server/src/routes/display-card-data.test.ts
-  - apps/web/src/pages/Overview/render.test.ts
-  - apps/web/src/pages/MqttSettings/loadModel.test.ts
-  - apps/server/src/db/migrations/calculationSettings.test.ts
-  - apps/web/src/layouts/brandBootstrap.test.ts
-  - apps/web/src/pages/CircuitSettings/viewModel.test.ts
-  - apps/web/src/pages/DataHub/WeatherModel.test.ts
-  - apps/server/src/routes/derived-metrics.test.ts
-  - apps/web/src/pages/runtimeRefreshRegistry.test.ts
-  - solar_mqtt_go/internal/anomaly/anomaly_test.go
-  - apps/server/src/services/derivedMetricExpression.test.ts
-  - apps/server/src/db/migrations/derivedMetricRegistry.test.ts
-  - apps/web/src/pages/MqttSettings/MqttSettingsContent.test.ts
-  - apps/web/src/pages/MqttSettings/viewModel.test.ts
-  - apps/web/src/hooks/liveMetricsStore.test.ts
-  - apps/web/src/pages/DataHub/Metrics.test.tsx
-  - apps/web/src/components/AppHeader.test.ts
-  - solar_mqtt_go/internal/display/display_test.go
-  - apps/web/src/pages/EnergyHistory/index.test.ts
-  - apps/web/src/pages/DeviceFleet/route.test.ts
-  - apps/server/src/services/MetricsAccumulatorService.test.ts
-  - apps/server/src/services/displayReadinessService.test.ts
-  - apps/web/src/pages/FactoryCircuit/configRender.test.ts
-  - apps/web/src/pages/Overview/viewModel.test.ts
-  - apps/server/src/routes/display-data-preview.test.ts
-  - apps/web/src/pages/DataHub/Usage.test.tsx
-  - apps/server/src/realtime/SocketService.test.ts
-  - apps/web/src/pages/DataSourceSettings/DerivedMetricRegistryPanel.test.tsx
-  - apps/server/src/routes/display-readiness.test.ts
-  - apps/server/src/services/MetricHistoryRetentionService.test.ts
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
 -->
 
 ---
@@ -3683,4 +3399,239 @@ tests:
   - apps/web/src/app/router.test.ts
   - apps/web/src/pages/DataHub/TaskHome.test.tsx
   - apps/web/src/app/dataHubCompatibility.test.ts
+-->
+
+---
+### Requirement: Connection actions state their real side effects
+<!-- requirement-id: DHC-R2 -->
+
+The interface SHALL distinguish reading current runtime status, testing an editable connection candidate, and saving shared settings. Reading status SHALL not be called a candidate connection test. A candidate test SHALL not persist settings, publish MQTT or disrupt the production client. Successful persistence SHALL not be reported as proven runtime connection success.
+
+#### Scenario: Preflight only reads status
+<!-- scenario-id: DHC-R2-S01 -->
+
+- **GIVEN** onboarding checks the current runtime with a read request
+- **WHEN** the operation completes
+- **THEN** its label and result describe a current-status check rather than a test of unsaved fields
+
+#### Scenario: Candidate test leaves production intact
+<!-- scenario-id: DHC-R2-S02 -->
+
+- **GIVEN** runtime A is connected and draft B is entered
+- **WHEN** B is tested
+- **THEN** A settings and production session remain unchanged and no MQTT publication occurs
+
+#### Scenario: Save before reconnect
+<!-- scenario-id: DHC-R2-S03 -->
+
+- **GIVEN** the server saves a new configuration before runtime reconnection completes
+- **WHEN** the client receives the save response
+- **THEN** it shows saved and awaiting runtime confirmation rather than connected to the new target
+
+
+<!-- @trace
+source: clarify-data-hub-connection-diagnostics
+updated: 2026-09-16
+code:
+  - apps/server/src/app.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/services/sourceEditValidationService.ts
+  - packages/shared/src/index.ts
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
+tests:
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
+-->
+
+---
+### Requirement: Connection test results are bound to the tested candidate
+<!-- requirement-id: DHC-R3 -->
+
+Every test result SHALL be associated with the request, candidate revision and observed time. Editing connection-affecting fields SHALL invalidate its applicability to the current draft. Late results SHALL not overwrite newer candidate state or imply that the current untested settings passed.
+
+#### Scenario: Edit after passing test
+<!-- scenario-id: DHC-R3-S01 -->
+
+- **GIVEN** candidate B passed a test
+- **WHEN** the host or credentials change to C
+- **THEN** the prior result no longer applies and C is visibly untested
+
+#### Scenario: Late result
+<!-- scenario-id: DHC-R3-S02 -->
+
+- **GIVEN** B is being tested while C is now the active draft
+- **WHEN** B response returns
+- **THEN** it cannot mark C as tested or clear C edits
+
+#### Scenario: Unknown diagnostic layer
+<!-- scenario-id: DHC-R3-S03 -->
+
+- **GIVEN** the API reports only a generic connection failure
+- **WHEN** the UI explains the failure
+- **THEN** it uses that supported reason and does not invent DNS, TCP or TLS evidence
+
+
+<!-- @trace
+source: clarify-data-hub-connection-diagnostics
+updated: 2026-09-16
+code:
+  - apps/server/src/app.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/services/sourceEditValidationService.ts
+  - packages/shared/src/index.ts
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
+tests:
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
+-->
+
+---
+### Requirement: Connection diagnostics preserve task context and honest data mode
+<!-- requirement-id: DHC-R4 -->
+
+Connection shortcuts SHALL preserve the authorized site and supported return context using guarded in-app navigation. Production connection status, simulation mode and source reception evidence SHALL remain distinct. Missing or stale status SHALL be shown as unknown or stale, not fresh success.
+
+#### Scenario: KN shortcut
+<!-- scenario-id: DHC-R4-S01 -->
+
+- **GIVEN** Connections was opened from a KN mapping task
+- **WHEN** the operator opens received sources or returns to the task
+- **THEN** KN and the supported task draft context are retained
+
+#### Scenario: Mock is not production
+<!-- scenario-id: DHC-R4-S02 -->
+
+- **GIVEN** the effective data mode is mock
+- **WHEN** the connection summary renders
+- **THEN** it labels simulation and does not claim real meter reception
+
+#### Scenario: Status retrieval fails
+<!-- scenario-id: DHC-R4-S03 -->
+
+- **GIVEN** a previously green status cannot be refreshed
+- **WHEN** the query fails
+- **THEN** the last known value is dated and marked stale/unknown rather than silently kept as fresh
+
+
+<!-- @trace
+source: clarify-data-hub-connection-diagnostics
+updated: 2026-09-16
+code:
+  - apps/server/src/app.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/services/sourceEditValidationService.ts
+  - packages/shared/src/index.ts
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
+tests:
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
+-->
+
+---
+### Requirement: Broker editing is receiver scoped and upstream health stays independent
+<!-- requirement-id: DHC-R5 -->
+
+The connection surface SHALL name Solar Player as the receiver configuration owner. It SHALL NOT imply that changing this connection migrates the broker service or the solar_mqtt_go and opc_mqtt publishers. Publisher broker targets, authentication, prefix and local startup remain publisher-owned. Optional read-only upstream health SHALL identify its evidence age, client and source; receiver health, publisher liveness, source acquisition and per-source reception SHALL remain distinct. Engineering report delivery SHALL use the reviewed calendar/deadline and completeness evidence defined by G, not a physical-meter stale timer; an unknown delivery schedule SHALL remain unknown.
+
+#### Scenario: Receiver moves alone
+<!-- scenario-id: DHC-R5-S01 -->
+
+- **GIVEN** both publishers still send to broker A
+- **WHEN** the operator saves receiver broker B
+- **THEN** the review warns that publishers are not migrated and B connectivity is not evidence that Solar or power data arrived
+
+#### Scenario: Unavailable DDE source
+<!-- scenario-id: DHC-R5-S02 -->
+
+- **GIVEN** the opc_mqtt MQTT session is connected but VIEW.exe or a DDE item is unavailable
+- **WHEN** status is shown
+- **THEN** the upstream acquisition failure is distinct from MQTT connectivity and no current meter value is fabricated
+
+#### Scenario: Independent publisher configuration
+<!-- scenario-id: DHC-R5-S03 -->
+
+- **GIVEN** the operator reviews Player settings
+- **WHEN** the save completes
+- **THEN** solar_config.json, opc_config.json, their environment credentials and collector command topics are unchanged
+
+<!-- @trace
+source: clarify-data-hub-connection-diagnostics
+updated: 2026-09-16
+code:
+  - apps/server/src/app.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/services/sourceEditValidationService.ts
+  - packages/shared/src/index.ts
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/routes/settings-mqtt.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
+tests:
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
 -->

@@ -23,6 +23,7 @@ export type MqttSettingsResponse = {
 };
 
 export type TopicMappingsResponse = {
+  collectionRevision: number;
   status: MqttStatus;
   topics: TopicMapping[];
 };
@@ -32,6 +33,7 @@ type MqttEditableModelLoadOptions = {
 };
 
 export type MqttEditableModel = {
+  collectionRevision: number;
   settings: MqttSettingsForm;
   status: MqttStatus;
   topics: TopicMapping[];
@@ -157,6 +159,7 @@ export async function loadMqttEditableModel(
     getWeatherSettings()
   ]);
   const model = {
+    collectionRevision: topicsResponse.collectionRevision,
     settings: toFormState(settingsResponse.settings),
     status: settingsResponse.status,
     topics: topicsResponse.topics,

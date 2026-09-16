@@ -4,7 +4,9 @@ import test from "node:test";
 import Database from "better-sqlite3";
 import type { MeterSourceDefinition } from "@solar-display/shared";
 import { isSolarAdapterManagedMetricIdentity } from "../mqtt/SolarSourceAdapter.js";
-import { applyGuidedMapping, previewGuidedMapping } from "./guidedMqttMappingService.js";
+import {
+  applyGuidedMapping, applyGuidedMappingBatch, previewGuidedMapping, previewGuidedMappingBatch
+} from "./guidedMqttMappingService.js";
 import { readMetricUsage } from "./metricUsageService.js";
 import { saveMeterSource, syncSourceTopicMapping } from "./meterSourceCatalogService.js";
 
@@ -78,6 +80,99 @@ test("M2 source and mapping commit atomically and reject a stale target", () => 
   db.exec("DROP TRIGGER reject_mapping");
   db.prepare("INSERT INTO topic_mappings (metric_scope, metric_key, topic) VALUES (?, ?, ?)").run("kn", "consumptionEnergy", "changed/topic");
   assert.throws(() => applyGuidedMapping(db, request), /PREVIEW_STALE/);
+  db.close();
+});
+
+function batchDraft(suffix: string) {
+  const batchSource: MeterSourceDefinition = {
+    ...source,
+    channelId: `kn-batch-${suffix}`,
+    meterId: `meter-batch-${suffix}`,
+    metricKey: `batch-${suffix}`
+  };
+  return {
+    channelId: batchSource.channelId,
+    metricScope: batchSource.metricScope,
+    measurementKind: batchSource.measurementKind,
+    energyFlowRole: batchSource.energyFlowRole,
+    timestampPolicy: batchSource.timestampPolicy,
+    selector: { path: ["value"], tagEquals: suffix.toUpperCase() },
+    source: batchSource,
+    topic: `factory/kn/batch/${suffix}`
+  };
+}
+
+function batchApplyInput(preview: ReturnType<typeof previewGuidedMappingBatch>, idempotencyKey: string) {
+  return {
+    batchToken: preview.batchToken,
+    idempotencyKey,
+    items: preview.items.map(({ canonicalDraft, previewToken, rowId }) => ({
+      canonicalDraft,
+      idempotencyKey,
+      meterId: canonicalDraft.source!.meterId,
+      previewToken,
+      rowId,
+      source: canonicalDraft.source!,
+      topic: canonicalDraft.topic
+    }))
+  };
+}
+
+test("M2-R7 batch preview assigns distinct reviewed targets and applies atomically", () => {
+  const db = database();
+  const preview = previewGuidedMappingBatch(db, [
+    { rowId: "main", draft: batchDraft("main") },
+    { rowId: "aux", draft: batchDraft("aux") }
+  ]);
+  assert.equal(preview.items.length, 2);
+  assert.ok(preview.batchToken);
+  const result = applyGuidedMappingBatch(db, batchApplyInput(preview, "batch-atomic"));
+  assert.equal(result.items.length, 2);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM meter_sources").get() as { count: number }).count, 2);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM topic_mappings").get() as { count: number }).count, 2);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM mapping_apply_receipts").get() as { count: number }).count, 1);
+  db.close();
+});
+
+test("M2-R7 a failed batch mapping leaves every source and receipt untouched", () => {
+  const db = database();
+  const preview = previewGuidedMappingBatch(db, [
+    { rowId: "main", draft: batchDraft("main") },
+    { rowId: "aux", draft: batchDraft("aux") }
+  ]);
+  db.exec("CREATE TRIGGER reject_batch_mapping BEFORE INSERT ON topic_mappings WHEN NEW.metric_key = 'batch-aux' BEGIN SELECT RAISE(ABORT, 'batch mapping unavailable'); END");
+  assert.throws(() => applyGuidedMappingBatch(db, batchApplyInput(preview, "batch-rollback")), /batch mapping unavailable/);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM meter_sources").get() as { count: number }).count, 0);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM topic_mappings").get() as { count: number }).count, 0);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM mapping_apply_receipts").get() as { count: number }).count, 0);
+  db.close();
+});
+
+test("M2-R7 duplicate target assignment is rejected before any preview token is written", () => {
+  const db = database();
+  const first = batchDraft("main");
+  const duplicate = { ...batchDraft("aux"), source: { ...first.source }, channelId: first.channelId };
+  assert.throws(
+    () => previewGuidedMappingBatch(db, [
+      { rowId: "first", draft: first },
+      { rowId: "duplicate", draft: duplicate }
+    ]),
+    /MAPPING_BATCH_TARGET_CONFLICT/
+  );
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM mapping_preview_tokens").get() as { count: number }).count, 0);
+  db.close();
+});
+
+test("M2-R7 rerunning an identical batch reuses existing bindings without duplicates", () => {
+  const db = database();
+  const draft = batchDraft("main");
+  const firstPreview = previewGuidedMappingBatch(db, [{ rowId: "main", draft }]);
+  applyGuidedMappingBatch(db, batchApplyInput(firstPreview, "batch-first"));
+  const secondPreview = previewGuidedMappingBatch(db, [{ rowId: "main", draft }]);
+  assert.equal(secondPreview.items[0]?.reused, true);
+  applyGuidedMappingBatch(db, batchApplyInput(secondPreview, "batch-second"));
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM meter_sources").get() as { count: number }).count, 1);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM topic_mappings").get() as { count: number }).count, 1);
   db.close();
 });
 

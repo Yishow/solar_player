@@ -122,6 +122,7 @@ function createEditableModel(
       reason: null,
       updatedAt: "2026-09-10T00:00:00.000Z"
     },
+    collectionRevision: 1,
     topics: [],
     weatherSettings
   };
@@ -176,7 +177,11 @@ function createFakeApi(model: MqttEditableModel): FakeApi {
       }
       case "/api/settings/mqtt/topics": {
         const next = topicReads.shift();
-        return jsonResponse(next ? await next : { status: model.status, topics: model.topics });
+        return jsonResponse(next ? await next : {
+          collectionRevision: model.collectionRevision,
+          status: model.status,
+          topics: model.topics
+        });
       }
       case "/api/weather/settings": {
         const next = weatherReads.shift();

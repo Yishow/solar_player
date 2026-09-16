@@ -8,16 +8,21 @@ const tempDir = mkdtempSync(join(tmpdir(), "solar-display-mqtt-test-"));
 process.env.DATA_DIR = tempDir;
 process.env.DATABASE_PATH = join(tempDir, "solar-display.sqlite");
 
-const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }] = await Promise.all([
+const [{ buildApp }, { migrateDatabase }, { seedDatabase }, { getDatabase }, { readCollectionRevision }] = await Promise.all([
   import("../app.js"),
   import("../db/migrate.js"),
   import("../db/seed.js"),
-  import("../db/index.js")
+  import("../db/index.js"),
+  import("../services/sourceEditTransactionService.js")
 ]);
 const { createPairedDeviceTestContext } = await import("../testing/deviceContextTestSupport.js");
 
 function deviceCookies() {
   return { solar_device_credential: createPairedDeviceTestContext("cl").credential };
+}
+
+function currentCollectionRevision() {
+  return readCollectionRevision(getDatabase());
 }
 
 after(() => {
@@ -341,6 +346,7 @@ test("PUT /api/settings/mqtt/topics rejects enabled mappings that collide with d
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           {
             metricKey: "selfConsumptionRatio",
@@ -359,7 +365,7 @@ test("PUT /api/settings/mqtt/topics rejects enabled mappings that collide with d
     assert.equal(response.statusCode, 409);
     const body = response.json() as { code: string; error: string; success: boolean };
     assert.equal(body.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
-    assert.match(body.error, /cl:selfConsumptionRatio/);
+    assert.equal(body.error, "DERIVED_METRIC_IDENTITY_CONFLICT");
     assert.equal(body.success, false);
 
     const stored = getDatabase()
@@ -417,13 +423,14 @@ test("PUT /api/settings/mqtt/topics rejects mappings onto disabled derived ident
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [{ metricKey, metricScope: "cl", topic: "solar/disabled-derived" }],
       },
     });
     assert.equal(response.statusCode, 409);
     const body = response.json() as { code: string; error: string; success: boolean };
     assert.equal(body.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
-    assert.match(body.error, new RegExp(`cl:${metricKey}`));
+    assert.equal(body.error, "DERIVED_METRIC_IDENTITY_CONFLICT");
     assert.equal(body.success, false);
     assert.equal(
       getDatabase().prepare("SELECT 1 FROM topic_mappings WHERE metric_scope = 'cl' AND metric_key = ?").get(metricKey),
@@ -473,6 +480,7 @@ test("PUT /api/settings/mqtt/topics reserves disabled derived identities for dis
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           {
             enabled: false,
@@ -491,7 +499,7 @@ test("PUT /api/settings/mqtt/topics reserves disabled derived identities for dis
     assert.equal(response.statusCode, 409);
     const body = response.json() as { code: string; error: string; success: boolean };
     assert.equal(body.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
-    assert.match(body.error, new RegExp(`cl:${metricKey}`));
+    assert.equal(body.error, "DERIVED_METRIC_IDENTITY_CONFLICT");
     assert.equal(body.success, false);
     assert.deepEqual(
       getDatabase()
@@ -535,6 +543,7 @@ test("PUT /api/settings/mqtt/topics honors restricted Factory Circuit output sco
         method: "PUT",
         url: "/api/settings/mqtt/topics",
         payload: {
+          expectedCollectionRevision: currentCollectionRevision(),
           topics: [{
             metricKey: candidate.metricKey,
             metricScope: candidate.rejectedScope,
@@ -545,13 +554,14 @@ test("PUT /api/settings/mqtt/topics honors restricted Factory Circuit output sco
       assert.equal(rejected.statusCode, 409);
       const rejectedBody = rejected.json() as { code: string; error: string; success: boolean };
       assert.equal(rejectedBody.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
-      assert.match(rejectedBody.error, new RegExp(`${candidate.rejectedScope}:${candidate.metricKey}`));
+      assert.equal(rejectedBody.error, "DERIVED_METRIC_IDENTITY_CONFLICT");
       assert.equal(rejectedBody.success, false);
 
       const allowed = await app.inject({
         method: "PUT",
         url: "/api/settings/mqtt/topics",
         payload: {
+          expectedCollectionRevision: currentCollectionRevision(),
           topics: [{
             metricKey: candidate.metricKey,
             metricScope: candidate.allowedScope,
@@ -599,13 +609,14 @@ test("PUT /api/settings/mqtt/topics rejects both site scopes when a definition o
         method: "PUT",
         url: "/api/settings/mqtt/topics",
         payload: {
+          expectedCollectionRevision: currentCollectionRevision(),
           topics: [{ metricKey, metricScope, topic: `solar/default/${metricScope}` }]
         }
       });
       assert.equal(response.statusCode, 409);
       const body = response.json() as { code: string; error: string; success: boolean };
       assert.equal(body.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
-      assert.match(body.error, new RegExp(`${metricScope}:${metricKey}`));
+      assert.equal(body.error, "DERIVED_METRIC_IDENTITY_CONFLICT");
       assert.equal(body.success, false);
     }
   } finally {
@@ -646,19 +657,21 @@ test("PUT /api/settings/mqtt/topics keeps global derived collisions global-scope
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [{ metricKey, metricScope: "global", topic: "solar/global-derived" }]
       }
     });
     assert.equal(rejected.statusCode, 409);
     const rejectedBody = rejected.json() as { code: string; error: string; success: boolean };
     assert.equal(rejectedBody.code, "DERIVED_METRIC_IDENTITY_CONFLICT");
-    assert.match(rejectedBody.error, new RegExp(`global:${metricKey}`));
+    assert.equal(rejectedBody.error, "DERIVED_METRIC_IDENTITY_CONFLICT");
     assert.equal(rejectedBody.success, false);
 
     const allowed = await app.inject({
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [{ metricKey, metricScope: "cl", topic: "solar/global-key-at-cl" }]
       }
     });
@@ -681,6 +694,7 @@ test("PUT /api/settings/mqtt/topics persists custom names and preserves them whe
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           {
             metricKey: "realTimePower",
@@ -711,6 +725,7 @@ test("PUT /api/settings/mqtt/topics persists custom names and preserves them whe
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           {
             metricKey: "realTimePower",
@@ -746,6 +761,7 @@ test("PUT /api/settings/mqtt/topics stores multiplier from mapping payload", asy
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           {
             metricKey: "factoryPeakMultiplier",
@@ -797,6 +813,7 @@ test("PUT /api/settings/mqtt/topics canonicalizes units and updates existing liv
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           {
             metricKey: "todayGeneration",
@@ -851,6 +868,7 @@ test("PUT /api/settings/mqtt/topics clears a name when an empty string is sent",
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           {
             metricKey: "realTimePower",
@@ -1856,6 +1874,7 @@ test("PUT /api/settings/mqtt/topics requires metricScope and permits CL and KN s
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           { metricKey: "sharedPower", topic: "solar/cl/power", enabled: true, metricScope: "cl" },
           { metricKey: "sharedPower", topic: "solar/kn/power", enabled: true, metricScope: "kn" }
@@ -1887,8 +1906,8 @@ test("PUT /api/settings/mqtt/topics rejects invalid scopes and duplicate scoped 
 
   try {
     for (const payload of [
-      { topics: [{ metricKey: "missingScope", topic: "solar/power", enabled: true }] },
-      { topics: [{ metricKey: "allScope", topic: "solar/power", enabled: true, metricScope: "all" }] }
+      { expectedCollectionRevision: currentCollectionRevision(), topics: [{ metricKey: "missingScope", topic: "solar/power", enabled: true }] },
+      { expectedCollectionRevision: currentCollectionRevision(), topics: [{ metricKey: "allScope", topic: "solar/power", enabled: true, metricScope: "all" }] }
     ]) {
       const response = await app.inject({ method: "PUT", url: "/api/settings/mqtt/topics", payload });
       assert.equal(response.statusCode, 400);
@@ -1899,6 +1918,7 @@ test("PUT /api/settings/mqtt/topics rejects invalid scopes and duplicate scoped 
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           { metricKey: "duplicateScope", topic: "solar/a", enabled: true, metricScope: "cl" },
           { metricKey: "duplicateScope", topic: "solar/b", enabled: true, metricScope: "cl" }
@@ -1947,7 +1967,7 @@ test("PUT /api/settings/mqtt/topics rejects enabled mappings that compete with m
       const response = await app.inject({
         method: "PUT",
         url: "/api/settings/mqtt/topics",
-        payload: { topics: [mapping] }
+        payload: { expectedCollectionRevision: currentCollectionRevision(), topics: [mapping] }
       });
 
       assert.equal(response.statusCode, 409);
@@ -1975,6 +1995,7 @@ test("PUT /api/settings/mqtt/topics allows unrelated and disabled legacy Solar m
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: [
           {
             enabled: true,
@@ -2052,6 +2073,7 @@ test("PUT /api/settings/mqtt/topics accepts the topic list read back from an upg
       method: "PUT",
       url: "/api/settings/mqtt/topics",
       payload: {
+        expectedCollectionRevision: currentCollectionRevision(),
         topics: topics.map((topic) => ({
           enabled: topic.enabled,
           metricKey: topic.metricKey,
@@ -2095,6 +2117,28 @@ test("PUT /api/settings/mqtt/topics accepts the topic list read back from an upg
   }
 });
 
+test("PUT /api/settings/mqtt/topics rejects unversioned full-list writes", async () => {
+  migrateDatabase();
+  seedDatabase();
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: { topics: [] }
+    });
+
+    assert.equal(response.statusCode, 409);
+    assert.equal(
+      response.json<{ code: string }>().code,
+      "LEGACY_WRITE_REQUIRES_REVISION"
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 
 test("legacy mapping writes cannot bypass registered source revisions or erase selectors", async () => {
   migrateDatabase(); seedDatabase();
@@ -2114,12 +2158,20 @@ test("legacy mapping writes cannot bypass registered source revisions or erase s
     const topics: Array<Record<string, unknown>> = (read.json().topics as Array<Record<string, unknown>>).map(t => ({ ...t, nameZh: t.nameZh ?? "", nameEn: t.nameEn ?? "" }));
     const before = database.prepare("SELECT * FROM topic_mappings ORDER BY id").all();
     for (const proposed of [topics.filter(t => t.metricKey !== "guardEnergy"), topics.map(t => t.metricKey === "guardEnergy" ? {...t, topic:"other/topic"} : t)]) {
-      const denied = await app.inject({ method: "PUT", url: "/api/settings/mqtt/topics", payload: { topics: proposed } });
+      const denied = await app.inject({
+        method: "PUT",
+        url: "/api/settings/mqtt/topics",
+        payload: { expectedCollectionRevision: currentCollectionRevision(), topics: proposed }
+      });
       assert.equal(denied.statusCode, 409, denied.body);
       assert.equal(denied.json().code, "E1_SOURCE_REVISION_REQUIRED");
       assert.deepEqual(database.prepare("SELECT * FROM topic_mappings ORDER BY id").all(), before);
     }
-    const saved = await app.inject({ method: "PUT", url: "/api/settings/mqtt/topics", payload: { topics } });
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/api/settings/mqtt/topics",
+      payload: { expectedCollectionRevision: currentCollectionRevision(), topics }
+    });
     assert.equal(saved.statusCode, 200, saved.body);
     assert.deepEqual(JSON.parse((database.prepare("SELECT selector_json FROM topic_mappings WHERE metric_key='guardEnergy'").get() as {selector_json:string}).selector_json), {path:["value"],tagEquals:"MAIN"});
   } finally { await app.close(); }

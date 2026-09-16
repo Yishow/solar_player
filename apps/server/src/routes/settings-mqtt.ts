@@ -10,10 +10,9 @@ import {
 import { normalizeMetricTimestamp } from "../metrics/metricTimestamp.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "../mqtt/settings-source.js";
 import { readDisplayReadinessReport } from "../services/displayReadinessService.js";
-import { listDerivedMetricDestinationIdentities } from "../services/metricDestinationOwnershipService.js";
 import { resetFactoryGenerationBaseline } from "../services/factoryGenerationAggregateService.js";
-import { isSolarAdapterManagedMetricIdentity } from "../mqtt/SolarSourceAdapter.js";
-import { checkLegacyMappingMeterSourceConflict } from "../services/meterSourceCatalogService.js";
+import { replaceTopicMappingsCollection } from "../services/sourceEditCollectionService.js";
+import { readCollectionRevision, toSourceEditDomainError } from "../services/sourceEditTransactionService.js";
 
 type MqttSettingsResponse = {
   dataMode: "mqtt" | "mock";
@@ -27,21 +26,23 @@ type MqttSettingsResponse = {
 };
 
 type TopicMappingResponse = {
-  id: number;
-  metricScope: MetricScope;
-  metricKey: string;
-  topic: string;
-  nameZh: string | null;
-  nameEn: string | null;
-  unit: string;
-  valuePath: string;
-  multiplier: number;
+  configRevision?: number;
   enabled: boolean;
-  updatedAt: string | null;
+  id: number;
   lastReceivedAt: string | null;
   lastValue: number | null;
+  metricKey: string;
+  metricScope: MetricScope;
+  multiplier: number;
+  nameEn: string | null;
+  nameZh: string | null;
   quality: string | null;
   rawPayload: string | null;
+  sourceRef?: string;
+  topic: string;
+  unit: string;
+  updatedAt: string | null;
+  valuePath: string;
 };
 
 type SettingsBody = Partial<MqttSettingsResponse>;
@@ -75,22 +76,6 @@ type TopicMappingInput = {
   enabled?: boolean;
 };
 
-type ExistingTopicMappingRow = {
-  topic: string;
-  unit: string | null;
-  value_path: string | null;
-  selector_json: string | null;
-  enabled: number;
-  created_at: string | null;
-  decimal_places: number | null;
-  metric_key: string;
-  metric_scope: MetricScope;
-  multiplier: number | null;
-  name_en: string | null;
-  name_zh: string | null;
-  offset: number | null;
-};
-
 const factorySummaryMetricKeyPattern = /^factoryGeneration\.(todayMwh|monthMwh|totalMwh)$/u;
 const factorySummaryFieldBySuffix = {
   monthMwh: "month_mwh",
@@ -100,50 +85,6 @@ const factorySummaryFieldBySuffix = {
 
 function toBoolean(value: unknown) {
   return value === true || value === 1;
-}
-
-/**
- * 解析 topic 自訂名稱:input 未帶(undefined)時保留既有值;
- * 帶空字串視為清除(NULL);帶非空字串則去除前後空白後存入。
- */
-function resolveCustomName(input: string | undefined, existing: string | null) {
-  if (input === undefined) {
-    return existing;
-  }
-
-  return input.trim() || null;
-}
-
-function resolveMultiplier(input: number | undefined, existing: number) {
-  return typeof input === "number" && Number.isFinite(input) ? input : existing;
-}
-
-function canonicalizeMetricUnit(unit: string | undefined) {
-  const trimmed = unit?.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  switch (trimmed.toLowerCase()) {
-    case "kw":
-      return "kW";
-    case "kwh":
-      return "kWh";
-    case "mwh":
-      return "MWh";
-    case "gwh":
-      return "GWh";
-    case "wh":
-      return "Wh";
-    case "kg":
-      return "kg";
-    case "t":
-      return "t";
-    case "%":
-      return "%";
-    default:
-      return trimmed;
-  }
 }
 
 function buildTopicPublishPayload(
@@ -273,6 +214,8 @@ function readTopicMappings() {
           topic_mappings.multiplier,
           topic_mappings.enabled,
           topic_mappings.updated_at,
+          topic_mappings.source_ref,
+          topic_mappings.config_revision,
           live_metric_values.timestamp AS last_received_at,
           live_metric_values.value AS last_value,
           live_metric_values.quality,
@@ -285,43 +228,46 @@ function readTopicMappings() {
       `
     )
     .all() as Array<{
-    id: number;
-    metric_scope: MetricScope;
-    metric_key: string;
-    topic: string;
-    name_zh: string | null;
-    name_en: string | null;
-    unit: string | null;
-    value_path: string | null;
-    multiplier: number | null;
+    config_revision: number | null;
     enabled: number;
-    updated_at: string | null;
+    id: number;
     last_received_at: string | null;
     last_value: number | null;
+    metric_key: string;
+    metric_scope: MetricScope;
+    multiplier: number | null;
+    name_en: string | null;
+    name_zh: string | null;
     quality: string | null;
     raw_payload: string | null;
+    source_ref: string | null;
+    topic: string;
+    unit: string | null;
+    updated_at: string | null;
+    value_path: string | null;
   }>;
 }
 
 function serializeTopicMappings(): TopicMappingResponse[] {
   return readTopicMappings().map((mapping) => ({
+    configRevision: mapping.config_revision ?? 1,
     enabled: toBoolean(mapping.enabled),
     id: mapping.id,
-    metricScope: mapping.metric_scope,
-    // Same normalization as the live metrics read path: the MQTT settings view
-    // compares this against a live reading as a string, so a mixed form would
-    // make that comparison independent of the actual instant.
     lastReceivedAt:
       mapping.last_received_at === null
         ? null
         : normalizeMetricTimestamp(mapping.last_received_at),
     lastValue: mapping.last_value,
     metricKey: mapping.metric_key,
+    metricScope: mapping.metric_scope,
     multiplier: mapping.multiplier ?? 1,
     nameEn: mapping.name_en,
     nameZh: mapping.name_zh,
     quality: mapping.quality,
     rawPayload: mapping.raw_payload,
+    sourceRef:
+      mapping.source_ref
+      ?? `src_${mapping.metric_scope}_${mapping.metric_key.replace(/[^a-zA-Z0-9_]/gu, "_")}`,
     topic: mapping.topic,
     unit: mapping.unit ?? "",
     updatedAt: mapping.updated_at,
@@ -455,9 +401,14 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     }
 
     return {
+      capabilities: {
+        legacyReplaceSupported: true,
+        versionedSourceEditing: true
+      },
+      collectionRevision: readCollectionRevision(getDatabase()),
+      readiness: readDisplayReadinessReport(),
       status: app.mqttClientService.getStatus(),
-      topics: serializeTopicMappings(),
-      readiness: readDisplayReadinessReport()
+      topics: serializeTopicMappings()
     };
   });
 
@@ -652,145 +603,52 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.put<{ Body: { topics?: TopicMappingInput[] } }>("/api/settings/mqtt/topics", async (request, reply) => {
-    const database = getDatabase();
-    const topics = request.body?.topics ?? [];
-    const derivedMetricIdentities = listDerivedMetricDestinationIdentities(database);
-    const existingMappings = new Map<string, ExistingTopicMappingRow>(
-      (
-        database
-          .prepare(
-            `
-              SELECT
-                metric_key,
-                metric_scope,
-                topic, unit, value_path, selector_json, enabled,
-                multiplier,
-                offset,
-                decimal_places,
-                name_zh,
-                name_en,
-                created_at
-              FROM topic_mappings
-            `
-          )
-          .all() as ExistingTopicMappingRow[]
-      ).map((mapping) => [`${mapping.metric_scope}:${mapping.metric_key}`, mapping])
-    );
+  app.put<{ Body: { expectedCollectionRevision?: number; topics?: TopicMappingInput[] } }>(
+    "/api/settings/mqtt/topics",
+    async (request, reply) => {
+      const database = getDatabase();
+      const topics = request.body?.topics ?? [];
+      const expectedRev = typeof request.body?.expectedCollectionRevision === "number"
+        ? request.body.expectedCollectionRevision
+        : (request.headers["if-match"] ? Number.parseInt(String(request.headers["if-match"]), 10) : undefined);
 
-    const resolvedTopics: Array<TopicMappingInput & { metricScope: MetricScope }> = [];
-    const seen = new Set<string>();
-    for (const topic of topics) {
-      const candidates = [...existingMappings.values()].filter(
-        (mapping) => mapping.metric_key === topic.metricKey
-      );
-      const metricScope = topic.metricScope === undefined && candidates.length === 1
-        ? candidates[0]?.metric_scope
-        : topic.metricScope;
-      if (!isMetricScope(metricScope)) {
-        return reply.status(400).send({
-          code: "INVALID_METRIC_SCOPE",
-          success: false
+      try {
+        replaceTopicMappingsCollection(database, topics, {
+          expectedCollectionRevision: expectedRev
+        });
+      } catch (error: unknown) {
+        const domainError = toSourceEditDomainError(error);
+        if (!domainError) throw error;
+        return reply.status(domainError.statusCode).send({
+          code: domainError.code,
+          error: domainError.code,
+          success: false,
+          timestamp: new Date().toISOString(),
+          ...(domainError.currentCollectionRevision === undefined
+            ? {}
+            : { currentCollectionRevision: domainError.currentCollectionRevision })
         });
       }
-      const identity = `${metricScope}:${topic.metricKey}`;
-      if (derivedMetricIdentities.has(identity)) {
-        return reply.status(409).send({
-          code: "DERIVED_METRIC_IDENTITY_CONFLICT",
-          error: `Metric identity is already provided by an enabled derived metric: ${identity}`,
-          success: false
-        });
-      }
-      if (
-        topic.enabled !== false
-        && isSolarAdapterManagedMetricIdentity(metricScope, topic.metricKey)
-      ) {
-        return reply.status(409).send({
-          code: "MANAGED_SOURCE_METRIC_CONFLICT",
-          error: `Metric identity is managed by the Solar source adapter: ${metricScope}:${topic.metricKey}`,
-          success: false
-        });
-      }
-      if (seen.has(identity)) {
-        return reply.status(400).send({
-          code: "DUPLICATE_METRIC_IDENTITY",
-          error: `Duplicate topic mapping identity: ${identity}`,
-          success: false
-        });
-      }
-      seen.add(identity);
-      resolvedTopics.push({ ...topic, metricScope });
+
+      await app.mqttClientService.subscribe(getEnabledTopics());
+      app.socketService.emitDisplaySync({
+        generatedAt: new Date().toISOString(),
+        reason: "mqtt-topics-updated",
+        scope: "mqtt"
+      });
+
+      return {
+        capabilities: {
+          legacyReplaceSupported: true,
+          versionedSourceEditing: true
+        },
+        collectionRevision: readCollectionRevision(database),
+        readiness: readDisplayReadinessReport(),
+        status: app.mqttClientService.getStatus(),
+        topics: serializeTopicMappings()
+      };
     }
-
-    if (checkLegacyMappingMeterSourceConflict(database, existingMappings, resolvedTopics, canonicalizeMetricUnit, resolveMultiplier)) {
-      return reply.status(409).send({ success: false, code: "E1_SOURCE_REVISION_REQUIRED", error: "E1_SOURCE_REVISION_REQUIRED", timestamp: new Date().toISOString() });
-    }
-
-    database.transaction(() => {
-      database.prepare("DELETE FROM topic_mappings").run();
-
-      const insertMapping = database.prepare(`
-        INSERT INTO topic_mappings (
-          metric_scope,
-          metric_key,
-          topic,
-          name_zh,
-          name_en,
-          unit,
-          value_path,
-          selector_json,
-          multiplier,
-          offset,
-          decimal_places,
-          enabled,
-          created_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `);
-
-      for (const topic of resolvedTopics) {
-        const existingMapping = existingMappings.get(`${topic.metricScope}:${topic.metricKey}`);
-        const unit = canonicalizeMetricUnit(topic.unit);
-        insertMapping.run(
-          topic.metricScope,
-          topic.metricKey,
-          topic.topic,
-          resolveCustomName(topic.nameZh, existingMapping?.name_zh ?? null),
-          resolveCustomName(topic.nameEn, existingMapping?.name_en ?? null),
-          unit,
-          topic.valuePath?.trim() || null,
-          existingMapping?.selector_json ?? null,
-          resolveMultiplier(topic.multiplier, existingMapping?.multiplier ?? 1),
-          existingMapping?.offset ?? 0,
-          existingMapping?.decimal_places ?? (unit === "%" ? 1 : 2),
-          topic.enabled === false ? 0 : 1,
-          existingMapping?.created_at ?? new Date().toISOString()
-        );
-        database
-          .prepare(
-            `
-              UPDATE live_metric_values
-              SET unit = ?
-              WHERE metric_scope = ? AND metric_key = ?
-            `
-          )
-          .run(unit, topic.metricScope, topic.metricKey);
-      }
-    })();
-
-    await app.mqttClientService.subscribe(getEnabledTopics());
-    app.socketService.emitDisplaySync({
-      generatedAt: new Date().toISOString(),
-      reason: "mqtt-topics-updated",
-      scope: "mqtt"
-    });
-
-    return {
-      status: app.mqttClientService.getStatus(),
-      topics: serializeTopicMappings(),
-      readiness: readDisplayReadinessReport()
-    };
-  });
+  );
 
   app.post("/api/settings/mqtt/reload", async () => {
     await app.mqttClientService.subscribe(getEnabledTopics());
@@ -801,6 +659,7 @@ const settingsMqttRoute: FastifyPluginAsync = async (app) => {
     });
 
     return {
+      collectionRevision: readCollectionRevision(getDatabase()),
       status: app.mqttClientService.getStatus(),
       topics: serializeTopicMappings(),
       readiness: readDisplayReadinessReport()

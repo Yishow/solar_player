@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import {
+  classifyObservationCandidate,
   MQTT_CATALOG_LIMITS,
   catalogMustNotMutateAcceptedHistory,
   isAllowedDiscoveryFilter,
@@ -19,8 +20,12 @@ import { matchesMqttTopicFilter } from "../mqtt/topicFilter.js";
 const featureEnabled = () => process.env.MQTT_OBSERVATION_CATALOG === "1";
 
 const profiles: ReceptionProfile[] = [
-  { allowedFilters: ["factory/cl/"], id: "cl-power", name: "中壢電力資料", siteScope: "cl" },
-  { allowedFilters: ["factory/kn/"], id: "kn-power", name: "觀音電力資料", siteScope: "kn" }
+  { allowedFilters: ["factory/cl/"], description: "中壢標準電力 topic 接收範圍", id: "cl-power", kind: "generic", name: "中壢電力資料", siteScope: "cl" },
+  { allowedFilters: ["opc/v1/cl/raw/", "opc/raw/"], description: "中壢 OPC/DDE 實體電錶讀值", id: "cl-opc", kind: "physical", name: "中壢實體電錶資料", siteScope: "cl" },
+  { allowedFilters: ["solar/cl/"], description: "中壢 Solar 系統託管資料範圍", id: "cl-solar", kind: "solar", name: "中壢 Solar 託管資料", siteScope: "cl" },
+  { allowedFilters: ["factory/guanyin/"], description: "觀音八工程成果 MQTT topic", id: "kn-engineering", kind: "engineering", name: "觀音八工程成果", siteScope: "kn" },
+  { allowedFilters: ["factory/kn/"], description: "觀音標準電力 topic 接收範圍", id: "kn-power", kind: "generic", name: "觀音電力資料", siteScope: "kn" },
+  { allowedFilters: ["solar/kn/"], description: "觀音 Solar 系統託管資料範圍", id: "kn-solar", kind: "solar", name: "觀音 Solar 託管資料", siteScope: "kn" }
 ];
 
 type StoredSample = {
@@ -95,7 +100,14 @@ function toSession(session: StoredCapture): CaptureSession {
 }
 
 export function listReceptionProfiles() {
-  return profiles.map(({ allowedFilters, id, name, siteScope }) => ({ allowedFilters, id, name, siteScope }));
+  return profiles.map(({ allowedFilters, description, id, kind, name, siteScope }) => ({
+    allowedFilters,
+    description,
+    id,
+    kind,
+    name,
+    siteScope
+  }));
 }
 
 export function startCapture(input: {
@@ -230,7 +242,26 @@ export function tapCatalogObservation(
     session.coverage = "partial";
     return { dropped: true };
   }
-  const candidateId = evidence.exactTopic;
+  let declaredTag: string | null = null;
+  let sourceTimestampEvidence = evidence.sourceTimestampEvidence;
+  try {
+    const parsed = JSON.parse(payload);
+    if (parsed && typeof parsed === "object") {
+      const tagCandidate = parsed as { channelId?: unknown; declaredTag?: unknown; tag?: unknown; tagId?: unknown };
+      const rawTag = tagCandidate.tagId ?? tagCandidate.declaredTag ?? tagCandidate.tag ?? tagCandidate.channelId;
+      if (typeof rawTag === "string" && rawTag.trim().length > 0) {
+        declaredTag = rawTag.trim();
+      }
+      const timeCandidate = parsed as { readAt?: unknown; sourceTimestamp?: unknown; timestamp?: unknown };
+      const rawTime = timeCandidate.sourceTimestamp ?? timeCandidate.readAt ?? timeCandidate.timestamp;
+      if (typeof rawTime === "string" && rawTime.trim().length > 0) {
+        sourceTimestampEvidence = rawTime.trim();
+      }
+    }
+  } catch {
+    // Non-JSON payload
+  }
+  const candidateId = declaredTag ? `${evidence.exactTopic}#${declaredTag}` : evidence.exactTopic;
   let candidate = session.candidates.find((item) => item.candidateId === candidateId);
   if (!candidate) {
     if (session.candidates.length >= MQTT_CATALOG_LIMITS.candidates) {
@@ -239,7 +270,8 @@ export function tapCatalogObservation(
     }
     candidate = {
       candidateId,
-      declaredTag: null,
+      candidateKind: classifyObservationCandidate(evidence.exactTopic),
+      declaredTag,
       exactTopic: evidence.exactTopic,
       lastSeenAt: evidence.receivedAt,
       sampleRefs: [],
@@ -255,7 +287,11 @@ export function tapCatalogObservation(
   candidate.sampleRefs.push(sampleId);
   candidate.lastSeenAt = evidence.receivedAt;
   const redacted = redactObservationPayload(payload);
-  session.samples.set(sampleId, { evidence, redactedPayload: redacted, truncated: false });
+  session.samples.set(sampleId, {
+    evidence: { ...evidence, sourceTimestampEvidence },
+    redactedPayload: redacted,
+    truncated: false
+  });
   session.coverage = "partial";
   return { dropped: false, redacted, sampleId };
 }

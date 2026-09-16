@@ -180,6 +180,21 @@ export const router = createBrowserRouter([
             }
           },
           {
+            path: "engineering-sources",
+            loader: createLazyManagementRouteLoader(
+              "settings/data-hub/engineering-sources",
+              async () => {
+                const { loadKnEngineeringSourcesRoute } = await import("../pages/DataHub/KnEngineeringSourcesRoute");
+                return loadKnEngineeringSourcesRoute;
+              }
+            ),
+            hydrateFallbackElement: <></>,
+            lazy: async () => {
+              const { KnEngineeringSourcesRoute } = await import("../pages/DataHub/KnEngineeringSourcesRoute");
+              return { Component: KnEngineeringSourcesRoute };
+            }
+          },
+          {
             path: "sources/operations",
             loader: createLazyManagementRouteLoader(
               "settings/data-hub/sources/operations",

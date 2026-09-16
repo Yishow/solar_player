@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import { requestJson } from "../../services/api";
 import { refreshDeferredSettingsDiagnostics } from "../shared/editableSettingsLoader";
 import {
@@ -13,7 +13,19 @@ import type {
   MqttStatus
 } from "./viewModel";
 
+const CONNECTION_AFFECTING_FIELDS = new Set<keyof MqttSettingsForm>([
+  "dataMode",
+  "host",
+  "port",
+  "username",
+  "password",
+  "clientId",
+  "reconnectInterval",
+  "messageTimeout"
+]);
+
 export type MqttSettingsBrokerController = {
+  candidateRevision: number;
   handleSettingChange: <Key extends keyof MqttSettingsForm>(
     key: Key,
     value: MqttSettingsForm[Key]
@@ -43,13 +55,31 @@ export function useMqttSettingsBroker({
     setStatus
   } = data;
 
+  const [candidateRevision, setCandidateRevision] = useState(1);
+  const revisionRef = useRef(1);
+
   const handleSettingChange = useCallback(<Key extends keyof MqttSettingsForm>(
     key: Key,
     value: MqttSettingsForm[Key]
   ) => {
     markDirty("Broker 設定已變更，尚未儲存。");
     setSettings((current) => ({ ...current, [key]: value }));
-  }, [markDirty, setSettings]);
+
+    if (CONNECTION_AFFECTING_FIELDS.has(key)) {
+      const nextRev = revisionRef.current + 1;
+      revisionRef.current = nextRev;
+      setCandidateRevision(nextRev);
+
+      setLastConnectionTest((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          isSuperseded: true,
+          message: "設定已變更，先前測試已失效，需重新測試。"
+        };
+      });
+    }
+  }, [markDirty, setLastConnectionTest, setSettings]);
 
   const saveSettings = useCallback(async () => {
     setActionState((current) => ({ ...current, isSavingSettings: true }));
@@ -77,6 +107,7 @@ export function useMqttSettingsBroker({
   }, [connectionsOnly, reloadReadiness, setActionState, setErrorMessage, setLastConnectionTest, setLastSyncedSettings, setMessage, setSettings, setStatus, settings]);
 
   const testConnection = useCallback(async () => {
+    const testingRev = revisionRef.current;
     setActionState((current) => ({ ...current, isTestingConnection: true }));
     try {
       const response = await requestJson<{
@@ -88,20 +119,39 @@ export function useMqttSettingsBroker({
         method: "POST"
       });
       setStatus(response.status);
+
+      const isCurrent = testingRev === revisionRef.current;
       const feedback: ConnectionTestFeedback = {
+        candidateRevision: testingRev,
         connected: response.connected,
-        message: response.message
+        isSuperseded: !isCurrent,
+        message: isCurrent
+          ? (response.connected
+              ? "這份設定可建立連線；尚未套用至正式環境。"
+              : response.message)
+          : "此測試結果屬於先前設定版本，目前草稿已變更，需重新測試。",
+        testedAt: new Date().toISOString()
       };
+
       setLastConnectionTest(feedback);
-      setMessage(response.message);
+      setMessage(feedback.message);
       setErrorMessage("");
     } catch (error) {
-      setLastConnectionTest(null);
+      const isCurrent = testingRev === revisionRef.current;
+      if (isCurrent) {
+        setLastConnectionTest({
+          candidateRevision: testingRev,
+          connected: false,
+          isSuperseded: false,
+          message: error instanceof Error ? error.message : "測試連線失敗。",
+          testedAt: new Date().toISOString()
+        });
+      }
       setErrorMessage(error instanceof Error ? error.message : "測試連線失敗。");
     } finally {
       setActionState((current) => ({ ...current, isTestingConnection: false }));
     }
   }, [setActionState, setErrorMessage, setLastConnectionTest, setMessage, setStatus, settings]);
 
-  return { handleSettingChange, saveSettings, testConnection };
+  return { candidateRevision, handleSettingChange, saveSettings, testConnection };
 }

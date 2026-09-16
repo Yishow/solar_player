@@ -58,6 +58,8 @@ import freshnessPolicyRoute from "./routes/freshness-policy.js";
 import settingsMqttRoute from "./routes/settings-mqtt.js";
 import mqttCapturesRoute from "./routes/mqtt-captures.js";
 import meterSourcesRoute from "./routes/meter-sources.js";
+import dataHubSourceMappingsRoute from "./routes/data-hub-source-mappings.js";
+import engineeringSourcesRoute from "./routes/engineering-sources.js";
 import siteEnergyProfilesRoute from "./routes/site-energy-profiles.js";
 import shellDecorationsRoute from "./routes/shell-decorations.js";
 import sustainabilityStoryRoute from "./routes/sustainability-story.js";
@@ -267,6 +269,8 @@ export async function buildApp() {
   await app.register(mqttCapturesRoute);
   await app.register(siteEnergyProfilesRoute);
   await app.register(meterSourcesRoute);
+  await app.register(dataHubSourceMappingsRoute);
+  await app.register(engineeringSourcesRoute);
   await app.register(shellDecorationsRoute);
   await app.register(sustainabilityStoryRoute);
   await app.register(weatherRoute);

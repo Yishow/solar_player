@@ -1,20 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBlocker } from "react-router-dom";
 import type { MetricScope } from "@solar-display/shared";
 import { requestJson } from "../../services/api";
 import { DataHubSectionState } from "./sectionState";
 import { applySourcesLiveSnapshot, useDataHubLiveMetrics } from "./liveActivity";
 import { useDataHubDraftGuard } from "./draftGuard";
-import { SourceDetailsDrawer } from "./SourceDetailsDrawer";
 import {
   countSourceSummary,
-  createGenericMappingDraft,
   filterSourceRows,
-  mergeScopedTopicEdits,
   mergeLiveObservationSnapshot,
   overlayLiveObservations,
-  sourceDisplayName,
-  validateGenericMappingForSave,
   type LiveObservationOverlay,
   type SourceListQuery
 } from "./sourceWorkspace";
@@ -24,26 +19,22 @@ import {
   defaultMqttStatus,
   emptySolarSources,
   fetchDataHubSourcesModel,
-  loadDataHubSourcesRoute,
   normalizeTopicMapping,
   readCachedDataHubSourcesErrorMessage,
   readCachedDataHubSourcesModel,
   rememberDataHubSourcesModel,
   resolveSourcesSaveErrorMessage,
-  updateGenericMapping,
   type DataHubSourcesModel,
-  type GenericMappingPatch,
   type GenericMqttMapping,
   type MqttSourceStatus
 } from "./SourcesModel";
+import { useDataHubWorkspace } from "./workspaceContext";
+import { ConfiguredSourcesView } from "./ConfiguredSourcesView";
+import { ReceivedDataWorkspace } from "./ReceivedDataWorkspace";
 import {
-  GenericSourceCard,
-  ManagedSourceCard,
-  SourceHealthChip,
-  SourceSummaryRow
-} from "./SourceCards";
-import { useDataHubWorkspace, type DataHubListFilter } from "./workspaceContext";
-import { GuidedOnboardingPanel } from "./GuidedOnboardingPanel";
+  canRefreshSources,
+  useSourceEditorController
+} from "./useSourceEditorController";
 
 export {
   buildSourceRows,
@@ -62,7 +53,7 @@ export {
   SourceRowMeta,
   SourceSummaryRow
 } from "./SourceCards";
-export { applySourcesLiveSnapshot };
+export { applySourcesLiveSnapshot, canRefreshSources };
 export type {
   DataHubSourcesModel,
   GenericMappingPatch,
@@ -71,11 +62,12 @@ export type {
   SourceRow
 } from "./SourcesModel";
 
-export function canRefreshSources(isDirty: boolean, confirmDiscard: () => boolean): boolean {
-  return !isDirty || confirmDiscard();
-}
-
 type TopicMappingsResponse = {
+  capabilities?: {
+    legacyReplaceSupported: boolean;
+    versionedSourceEditing: boolean;
+  };
+  collectionRevision?: number;
   status: MqttSourceStatus;
   topics: Array<GenericMqttMapping & { rawPayload?: string | null }>;
 };
@@ -102,38 +94,42 @@ export function DataHubSourcesContent({
     scope: workspace.managementScope,
     search: workspace.search
   };
-  const [draftTopics, setDraftTopics] = useState(model.topics);
   const [liveSolar, setLiveSolar] = useState(model.solar);
   const [liveOverlay, setLiveOverlay] = useState<LiveObservationOverlay>({});
-  const [pendingSiteChoiceIds, setPendingSiteChoiceIds] = useState<number[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState(initialErrorMessage);
-  const [openRowId, setOpenRowId] = useState<string | null>(workspace.selection);
-  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
 
   useEffect(() => {
     setLiveSolar(model.solar);
-    setDraftTopics((current) => {
-      const dirty = JSON.stringify(buildTopicMappingsSavePayload(current))
-        !== JSON.stringify(buildTopicMappingsSavePayload(model.topics));
-      return dirty ? current : model.topics;
-    });
-  }, [model.solar, model.topics]);
+  }, [model.solar]);
+
+  const onUpdateWorkspace = useCallback((patch: { selection?: string | null; view?: "configured" | "received" }) => {
+    workspace.updateWorkspace(patch);
+  }, [workspace]);
+
+  const editor = useSourceEditorController({
+    initialErrorMessage,
+    initialSelection: workspace.selection,
+    listQueryScope: query.scope,
+    liveSolar,
+    model,
+    onDirtyChange,
+    onRefresh,
+    onSave,
+    onUpdateWorkspace
+  });
 
   useEffect(() => {
-    setErrorMessage(initialErrorMessage);
-  }, [initialErrorMessage]);
+    draftGuard.setDirty(editor.isDirty);
+  }, [draftGuard, editor.isDirty]);
 
   const handleLiveSnapshot = useCallback((snapshot: Parameters<typeof applySourcesLiveSnapshot>[1]) => {
     setLiveOverlay((current) => mergeLiveObservationSnapshot(current, snapshot));
-    setLiveSolar((current) => applySourcesLiveSnapshot({ ...model, solar: current, topics: draftTopics }, snapshot).solar);
-  }, [draftTopics, model]);
+    setLiveSolar((current) => applySourcesLiveSnapshot({ ...model, solar: current, topics: editor.draftTopics }, snapshot).solar);
+  }, [editor.draftTopics, model]);
   useDataHubLiveMetrics(handleLiveSnapshot);
 
   const displayTopics = useMemo(
-    () => overlayLiveObservations(draftTopics, liveOverlay),
-    [draftTopics, liveOverlay]
+    () => overlayLiveObservations(editor.draftTopics, liveOverlay),
+    [editor.draftTopics, liveOverlay]
   );
   const rows = useMemo(
     () => buildSourceRows({ ...model, solar: liveSolar, topics: displayTopics }),
@@ -141,255 +137,141 @@ export function DataHubSourcesContent({
   );
   const visibleRows = useMemo(() => filterSourceRows(rows, query), [query, rows]);
   const summary = countSourceSummary(visibleRows);
-  const openRow = rows.find((row) => row.id === openRowId) ?? null;
-  const isDirty = useMemo(
-    () => JSON.stringify(buildTopicMappingsSavePayload(draftTopics)) !== JSON.stringify(buildTopicMappingsSavePayload(model.topics)),
-    [draftTopics, model.topics]
-  );
-
-  useEffect(() => {
-    onDirtyChange?.(isDirty);
-    draftGuard.setDirty(isDirty);
-  }, [draftGuard, isDirty, onDirtyChange]);
-
-  const handleGenericChange = useCallback((id: number, patch: GenericMappingPatch) => {
-    if (patch.metricScope) {
-      setPendingSiteChoiceIds((current) => current.filter((pendingId) => pendingId !== id));
-    }
-    setDraftTopics((current) => updateGenericMapping(current, id, patch));
-    setMessage("");
-    setErrorMessage("");
-  }, []);
-
-  const handleAddGenericMapping = useCallback(() => {
-    const created = createGenericMappingDraft({
-      existing: draftTopics,
-      managementScope: query.scope
-    });
-    setDraftTopics((current) => [...current, created.mapping]);
-    if (created.siteChoicePending) {
-      setPendingSiteChoiceIds((current) => [...current, created.mapping.id]);
-    }
-    const nextRows = buildSourceRows({
-      ...model,
-      solar: liveSolar,
-      topics: [...draftTopics, created.mapping]
-    });
-    const createdRow = nextRows.find((row) => row.kind === "generic" && row.mapping.id === created.mapping.id);
-    setOpenRowId(createdRow?.id ?? null);
-    setMessage(created.siteChoicePending
-      ? "已新增一筆資料。請先選擇 CL 或 KN 廠區後再儲存。"
-      : "已新增一筆資料，請填寫後儲存。");
-    setErrorMessage("");
-  }, [draftTopics, liveSolar, model, query.scope]);
-
-  const handleDeleteGenericMapping = useCallback((id: number) => {
-    const topic = draftTopics.find((row) => row.id === id);
-    if (!topic) {
-      return;
-    }
-    void requestJson<{ canMutate: boolean; unknown: boolean; consumers: Array<{ kind: string; pageId?: string; metricKey: string }> }>(
-      `/api/data-hub/source-impact?metricKey=${encodeURIComponent(topic.metricKey)}&metricScope=${encodeURIComponent(topic.metricScope)}`
-    ).then((impact) => {
-      if (!impact.canMutate) {
-        const detail = impact.unknown
-          ? "引用查詢失敗，未知影響不能當成沒有引用。"
-          : impact.consumers.map((row) => `${row.kind}:${row.pageId ?? row.metricKey}`).join("、");
-        setErrorMessage(`這個來源仍被引用，已阻擋刪除。${detail}`);
-        return;
-      }
-      setDraftTopics((current) => current.filter((item) => item.id !== id));
-      setPendingSiteChoiceIds((current) => current.filter((pendingId) => pendingId !== id));
-      setOpenRowId(null);
-      setMessage("");
-      setErrorMessage("");
-    }).catch(() => {
-      setErrorMessage("無法確認引用影響，未知影響不能當成沒有引用。");
-    });
-  }, [draftTopics]);
 
   const handlePublishTest = useCallback(async (metricScope: MetricScope, metricKey: string, value: number) => {
-    setErrorMessage("");
+    editor.setErrorMessage("");
     try {
       await requestJson<{ status: MqttSourceStatus }>(
         `/api/settings/mqtt/topics/${encodeURIComponent(metricKey)}/publish`,
-        {
-          body: JSON.stringify({ metricScope, value }),
-          method: "POST"
-        }
+        { body: JSON.stringify({ metricScope, value }), method: "POST" }
       );
-      setMessage(`MQTT 測試值已發佈：${metricKey} (${metricScope.toUpperCase()}) = ${value}`);
+      editor.setMessage(`MQTT 測試值已發佈：${metricKey} (${metricScope.toUpperCase()}) = ${value}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "發佈 MQTT 測試值失敗。");
+      editor.setErrorMessage(error instanceof Error ? error.message : "發佈 MQTT 測試值失敗。");
     }
-  }, []);
-
-  const handleSave = useCallback(async () => {
-    if (!onSave || !isDirty) {
-      return;
-    }
-    const pending = draftTopics.find((topic) => pendingSiteChoiceIds.includes(topic.id));
-    if (pending) {
-      const validation = validateGenericMappingForSave(pending, true);
-      setErrorMessage(validation.message ?? "請先選擇 CL 或 KN 廠區，才能儲存實體電錶。");
-      return;
-    }
-    setIsSaving(true);
-    setErrorMessage("");
-    try {
-      const merged = mergeScopedTopicEdits({
-        draft: draftTopics,
-        original: model.topics,
-        visibleScope: query.scope
-      });
-      await onSave(buildTopicMappingsSavePayload(merged));
-      setMessage("資料來源設定已儲存。");
-    } catch (error) {
-      setErrorMessage(resolveSourcesSaveErrorMessage(error));
-    } finally {
-      setIsSaving(false);
-    }
-  }, [draftTopics, isDirty, model.topics, onSave, pendingSiteChoiceIds, query.scope]);
+  }, [editor]);
 
   const handleRefresh = useCallback(async () => {
-    if (!canRefreshSources(isDirty, () => window.confirm("尚有未儲存的修改，重新整理會捨棄目前輸入，確定要繼續嗎？"))) {
+    if (!canRefreshSources(editor.isDirty, () => window.confirm("尚有未儲存的 generic MQTT mappings，重新整理會捨棄目前修改，確定要繼續嗎？"))) {
       return;
     }
     try {
       await onRefresh?.();
       setLiveOverlay({});
-      setPendingSiteChoiceIds([]);
-      setMessage("來源列表已重新整理。");
-      setErrorMessage("");
+      editor.setPendingSiteChoiceIds([]);
+      editor.setMessage("來源列表已重新整理。");
+      editor.setErrorMessage("");
     } catch (error) {
-      setErrorMessage(resolveSourcesSaveErrorMessage(error));
+      editor.setErrorMessage(resolveSourcesSaveErrorMessage(error));
     }
-  }, [isDirty, onRefresh]);
+  }, [editor, onRefresh]);
 
-  const updateQuery = (patch: Partial<SourceListQuery>) => {
+  const updateQuery = (patch: Partial<SourceListQuery & { panel?: "drawer" | "full"; section?: typeof workspace.section }>) => {
+    if (patch.scope && patch.scope !== query.scope) {
+      draftGuard.requestNavigation(() => {
+        workspace.updateWorkspace({
+          filter: patch.filter ?? query.filter,
+          managementScope: patch.scope ?? query.scope,
+          panel: patch.panel ?? workspace.panel,
+          search: patch.search ?? query.search,
+          section: patch.section ?? workspace.section
+        });
+      });
+      return;
+    }
     workspace.updateWorkspace({
-      filter: (patch.filter ?? query.filter) as DataHubListFilter,
+      filter: patch.filter ?? query.filter,
       managementScope: patch.scope ?? query.scope,
-      search: patch.search ?? query.search
+      panel: patch.panel ?? workspace.panel,
+      search: patch.search ?? query.search,
+      section: patch.section ?? workspace.section
     });
   };
 
-  const closeDrawer = () => setOpenRowId(null);
+  const concreteSite = query.scope === "cl" || query.scope === "kn" ? query.scope : null;
+  const configuredQuery = {
+    ...query,
+    hasExplicitSection: workspace.searchParams.has("section"),
+    panel: workspace.panel,
+    section: workspace.section
+  };
 
   return (
     <div className="space-y-5" data-data-hub-section="sources" data-workspace-safe-viewport="1366">
-      {workspace.task === "connect" ? (
-        <GuidedOnboardingPanel scope={workspace.managementScope} />
-      ) : null}
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="text-[13px] text-[#687169]">
-          先從摘要列表找到來源，再打開單筆詳情。進階傳輸欄位只在抽屜中展開。
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="mgmt-action min-h-[40px]" disabled={!onRefresh} onClick={() => void handleRefresh()} type="button">重新整理</button>
-          <button className="mgmt-action primary min-h-[40px]" disabled={!onSave || !isDirty || isSaving} onClick={() => void handleSave()} type="button">{isSaving ? "儲存中..." : "儲存 mappings"}</button>
-        </div>
-      </header>
-
-      {errorMessage ? <div className="mgmt-status is-error" data-source-error role="alert">{errorMessage}</div> : null}
-      {message ? <div className="mgmt-status is-success" role="status">{message}</div> : null}
-
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="grid min-w-[16rem] flex-1 gap-1 text-[13px] text-[#4d554f]">
-          搜尋名稱、代碼或主題
-          <input
-            aria-label="搜尋來源"
-            className="mgmt-input min-h-[40px] text-[14px]"
-            onChange={(event) => updateQuery({ search: event.target.value })}
-            value={query.search}
-          />
-        </label>
-        <label className="grid gap-1 text-[13px] text-[#4d554f]">
-          篩選
-          <select
-            aria-label="來源篩選"
-            className="mgmt-input min-h-[40px] text-[14px]"
-            onChange={(event) => updateQuery({ filter: event.target.value as DataHubListFilter })}
-            value={query.filter}
-          >
-            <option value="all">全部</option>
-            <option value="issue">異常</option>
-            <option value="managed">託管</option>
-            <option value="custom">自訂</option>
-          </select>
-        </label>
-        <button className="mgmt-action primary min-h-[40px]" onClick={handleAddGenericMapping} type="button">
-          + 新增通用 MQTT 主題
+      <div className="flex border-b border-[#d0d7d1]">
+        <button
+          aria-selected={workspace.view === "configured"}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors min-h-[40px] ${
+            workspace.view === "configured"
+              ? "border-[#1b4332] text-[#1b4332]"
+              : "border-transparent text-[#687169] hover:text-[#2d3730]"
+          }`}
+          data-tab-configured
+          onClick={() => workspace.updateWorkspace({ view: "configured" })}
+          type="button"
+        >
+          已接入來源
+        </button>
+        <button
+          aria-selected={workspace.view === "received"}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors min-h-[40px] ${
+            workspace.view === "received"
+              ? "border-[#1b4332] text-[#1b4332]"
+              : "border-transparent text-[#687169] hover:text-[#2d3730]"
+          }`}
+          data-tab-received
+          onClick={() => workspace.updateWorkspace({ view: "received" })}
+          type="button"
+        >
+          已接收資料
         </button>
       </div>
 
-      <div className="mgmt-card grid gap-3 p-4 text-sm text-[#4d554f] sm:grid-cols-3" data-source-connection-summary>
-        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">中央 Broker</span><strong>{model.status.broker || "未設定"}</strong></div>
-        <div><span className="block text-xs uppercase tracking-wide text-[#7b857d]">連線狀態</span><SourceHealthChip health={model.status.connected ? { label: "正常連線 (Connected)", tone: "success" } : { label: "未連線 (Offline)", tone: "danger" }} /></div>
-        <div>
-          <span className="block text-xs uppercase tracking-wide text-[#7b857d]">這個範圍的摘要</span>
-          <strong data-source-summary-counts>{summary.total} 筆 · {summary.issues} 筆異常 · {summary.managed} 託管 · {summary.custom} 自訂</strong>
-        </div>
-      </div>
-
-      <section className="space-y-2" data-source-summary-list>
-        {visibleRows.length > 0 ? visibleRows.map((row) => (
-          <SourceSummaryRow
-            key={row.id}
-            onOpen={() => setOpenRowId(row.id)}
-            row={row}
-            rowRef={(node) => {
-              if (node) {
-                rowRefs.current.set(row.id, node);
-              } else {
-                rowRefs.current.delete(row.id);
-              }
-            }}
-          />
-        )) : (
-          <div className="mgmt-card p-5 text-sm text-[#687169]">這個範圍目前沒有符合條件的來源。</div>
-        )}
-      </section>
-
-      {openRow ? (
-        <SourceDetailsDrawer
-          onClose={closeDrawer}
-          returnFocusRef={{ current: rowRefs.current.get(openRow.id) ?? null }}
-          title={sourceDisplayName(openRow)}
-        >
-          {openRow.kind === "managed" ? (
-            <div className="space-y-3">
-              <p className="rounded-lg border border-[#ead7aa] bg-[#fff8e8] p-3 text-[13px] text-[#6b5524]" role="note">
-                這是系統託管的 Solar 轉接器來源，對應欄位由轉接器同步，因此無法在這裡修改。
-              </p>
-              <ManagedSourceCard row={openRow} />
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingSiteChoiceIds.includes(openRow.mapping.id) ? (
-                <p className="rounded-lg border border-[#ead7aa] bg-[#fff8e8] p-3 text-[13px] text-[#6b5524]" role="alert">
-                  請先選擇 CL 或 KN 廠區，不能使用全域範圍儲存實體電錶。
-                </p>
-              ) : null}
-              {!openRow.editable ? (
-                <p className="rounded-lg border border-[#ead7aa] bg-[#fff8e8] p-3 text-[13px] text-[#6b5524]" role="note">
-                  此來源由系統託管，Topic 與指標代碼維持唯讀。
-                </p>
-              ) : null}
-              <section data-source-basic>
-                <h3 className="mb-2 text-[13px] font-semibold text-[#637166]">基本資料</h3>
-                <GenericSourceCard
-                  onChange={handleGenericChange}
-                  onDelete={handleDeleteGenericMapping}
-                  onPublishTest={handlePublishTest}
-                  row={openRow}
-                  siteChoicePending={pendingSiteChoiceIds.includes(openRow.mapping.id)}
-                />
-              </section>
-            </div>
-          )}
-        </SourceDetailsDrawer>
-      ) : null}
+      {workspace.view === "received" ? (
+        <ReceivedDataWorkspace
+          configuredMappings={editor.draftTopics}
+          initialSearchQuery={workspace.search}
+          onAddFromReceived={(candidate) => editor.handleAddFromReceived(candidate)}
+          siteScope={concreteSite}
+        />
+      ) : (
+        <ConfiguredSourcesView
+          errorMessage={editor.errorMessage}
+          isDirty={editor.isDirty}
+          isSaving={editor.isSaving}
+          message={editor.message}
+          model={model}
+          onAddFromReceived={() => workspace.updateWorkspace({ view: "received" })}
+          onAddGenericMapping={editor.handleAddGenericMapping}
+          onCloseDrawer={() => {
+            draftGuard.requestNavigation(() => {
+              editor.setOpenRowId(null);
+              workspace.updateWorkspace({ selection: null });
+            });
+          }}
+          onDeleteGenericMapping={editor.handleDeleteGenericMapping}
+          onDiscardSingle={editor.handleDiscardSingle}
+          onGenericChange={editor.handleGenericChange}
+          onOpenDrawer={(rowId) => {
+            if (rowId === editor.openRowId) return;
+            draftGuard.requestNavigation(() => {
+              editor.setOpenRowId(rowId);
+              workspace.updateWorkspace({ selection: rowId }, { replace: false });
+            });
+          }}
+          onPublishTest={handlePublishTest}
+          onRefresh={handleRefresh}
+          onSave={editor.handleSave}
+          onSaveSingle={editor.handleSaveSingle}
+          openRowId={editor.openRowId}
+          pendingSiteChoiceIds={editor.pendingSiteChoiceIds}
+          query={configuredQuery}
+          rows={rows}
+          summary={summary}
+          updateQuery={updateQuery}
+          visibleRows={visibleRows}
+        />
+      )}
     </div>
   );
 }
@@ -444,10 +326,15 @@ export function DataHubSources() {
 
   const save = useCallback(async (topics: ReturnType<typeof buildTopicMappingsSavePayload>) => {
     const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics", {
-      body: JSON.stringify({ topics }),
+      body: JSON.stringify({
+        expectedCollectionRevision: model?.collectionRevision,
+        topics
+      }),
       method: "PUT"
     });
     const nextModel: DataHubSourcesModel = {
+      capabilities: response.capabilities ?? model?.capabilities,
+      collectionRevision: response.collectionRevision ?? model?.collectionRevision,
       solar: model?.solar ?? emptySolarSources,
       status: response.status,
       topics: response.topics.map(normalizeTopicMapping)

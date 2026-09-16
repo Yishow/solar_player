@@ -1,13 +1,32 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { getDatabase } from "../db/index.js";
 import { applyProfile, getActiveProfile, previewProfile } from "../services/siteEnergyProfileService.js";
 import { readProfileReadiness } from "../services/profileReadinessService.js";
-import { applyGuidedMapping, previewGuidedMapping } from "../services/guidedMqttMappingService.js";
+import {
+  applyGuidedMapping, applyGuidedMappingBatch, previewGuidedMapping, previewGuidedMappingBatch
+} from "../services/guidedMqttMappingService.js";
 import { activateGuidedMapping, readGuidedMappingReception } from "../services/guidedMappingActivationService.js";
 import { listMeterSources, listReceivedTags } from "../services/meterSourceCatalogService.js";
 import { isMetricDestinationOwnershipConflict } from "../services/metricDestinationOwnershipService.js";
 import { readSourceImpact } from "../services/sourceImpactService.js";
 import { suggestMappings, type MappingPreviewDraft, type ObservedTag, type SiteEnergyScope } from "@solar-display/shared";
+
+const MAPPING_DOMAIN_CODE = /^(?:MAPPING_|PREVIEW_|IDEMPOTENCY_|SOURCE_|E1_|DERIVED_METRIC_|MANAGED_SOURCE_|METRIC_OWNERSHIP_)/u;
+
+function mappingDomainFailure(error: unknown, fallbackCode: string, defaultStatusCode: number) {
+  const candidate = error as { code?: unknown; statusCode?: unknown };
+  if (typeof candidate.code !== "string" || !MAPPING_DOMAIN_CODE.test(candidate.code)) {
+    return { code: fallbackCode, statusCode: defaultStatusCode };
+  }
+  const statusCode = typeof candidate.statusCode === "number"
+    && [400, 409, 422, 503].includes(candidate.statusCode)
+    ? candidate.statusCode
+    : defaultStatusCode;
+  return {
+    code: candidate.code,
+    statusCode: candidate.code === "SOURCE_REVIEW_REQUIRED" ? 422 : statusCode
+  };
+}
 
 const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
   app.get("/api/data-hub/sites/:scope/energy-profile", async (request, reply) => {
@@ -78,13 +97,38 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
     try {
       return previewGuidedMapping(getDatabase(), request.body as MappingPreviewDraft);
     } catch (error) {
-      const code = (error as { code?: string }).code ?? "MAPPING_PREVIEW_FAILED";
+      const failure = mappingDomainFailure(error, "MAPPING_PREVIEW_FAILED", 422);
       // Only a contest with the destination's real owner is a 409; draft-shape rejections stay
       // 422 so a client is told to fix the draft rather than to try another destination.
-      return reply.code(isMetricDestinationOwnershipConflict(code) ? 409 : 422)
-        .send({ success: false, error: code, timestamp: new Date().toISOString() });
+      const statusCode = isMetricDestinationOwnershipConflict(failure.code)
+        ? 409
+        : failure.code === "METRIC_OWNERSHIP_UNVERIFIED" ? 503 : 422;
+      return reply.code(statusCode)
+        .send({ success: false, error: failure.code, timestamp: new Date().toISOString() });
     }
   });
+
+  const previewGuidedMappingBatchRoute = async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!app.managementAccess.isTrustedManagementReadRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+    try {
+      const body = request.body as { items?: unknown };
+      return previewGuidedMappingBatch(getDatabase(), body?.items);
+    } catch (error) {
+      const failure = mappingDomainFailure(error, "MAPPING_BATCH_PREVIEW_FAILED", 422);
+      const statusCode = isMetricDestinationOwnershipConflict(failure.code)
+        ? 409
+        : failure.code === "METRIC_OWNERSHIP_UNVERIFIED" ? 503 : 422;
+      return reply.code(statusCode).send({
+        success: false,
+        error: failure.code,
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
+  app.post("/api/data-hub/mqtt-mappings/batch-preview", previewGuidedMappingBatchRoute);
 
   app.post("/api/data-hub/mqtt-mappings/apply", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
@@ -114,14 +158,63 @@ const siteEnergyProfilesRoute: FastifyPluginAsync = async (app) => {
         saved: true as const
       };
     } catch (error) {
-      const code = (error as { code?: string }).code ?? "MAPPING_APPLY_FAILED";
-      return reply.code((error as { statusCode?: number }).statusCode ?? 422).send({
+      const failure = mappingDomainFailure(error, "MAPPING_APPLY_FAILED", 422);
+      return reply.code(failure.statusCode).send({
         success: false,
-        error: code,
+        error: failure.code,
         timestamp: new Date().toISOString()
       });
     }
   });
+
+  const applyGuidedMappingBatchRoute = async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {
+      return app.managementAccess.deny(reply);
+    }
+    try {
+      const body = request.body as {
+        batchToken: string;
+        idempotencyKey: string;
+        items: unknown;
+      };
+      const database = getDatabase();
+      const result = applyGuidedMappingBatch(
+        database,
+        body as Parameters<typeof applyGuidedMappingBatch>[1]
+      );
+      const items = [];
+      for (const item of result.items) {
+        const requestItem = (Array.isArray(body.items) ? body.items : []).find((candidate) => (
+          candidate && typeof candidate === "object" && "rowId" in candidate && candidate.rowId === item.rowId
+        )) as { canonicalDraft?: { topic?: string } } | undefined;
+        const topic = requestItem?.canonicalDraft?.topic ?? "";
+        const activation = await activateGuidedMapping(app.mqttClientService, database, {
+          enabled: item.source.enabled,
+          topic
+        });
+        items.push({
+          ...item,
+          activation,
+          reception: readGuidedMappingReception(
+            database,
+            item.source,
+            (source) => app.mqttClientService.readPowerReceptionEvidence(source)
+          ),
+          saved: true as const
+        });
+      }
+      return { ...result, items };
+    } catch (error) {
+      const failure = mappingDomainFailure(error, "MAPPING_BATCH_APPLY_FAILED", 422);
+      return reply.code(failure.statusCode).send({
+        success: false,
+        error: failure.code,
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
+  app.post("/api/data-hub/mqtt-mappings/batch-apply", applyGuidedMappingBatchRoute);
 
   app.post("/api/data-hub/sites/:scope/energy-profile/apply", async (request, reply) => {
     if (!app.managementAccess.isTrustedManagementMutationRequest(request)) {

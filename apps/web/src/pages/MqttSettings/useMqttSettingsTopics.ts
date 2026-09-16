@@ -57,10 +57,12 @@ export function useMqttSettingsTopics({
   reloadReadiness: () => Promise<void>;
 }): MqttSettingsTopicsController {
   const {
+    collectionRevision,
     loadTopics,
     lastSyncedTopicsRef,
     markDirty,
     setActionState,
+    setCollectionRevision,
     setErrorMessage,
     setLastConnectionTest,
     setLastSyncedTopics,
@@ -128,10 +130,16 @@ export function useMqttSettingsTopics({
   }, [activeTopicWorkspaceTab, loadCardData, loadTopics, reloadReadiness, setErrorMessage, setMessage, setStatus]);
 
   const saveTopicMappings = useCallback(async () => {
+    if (collectionRevision === null) {
+      setErrorMessage("Topic mappings revision 尚未載入，請重新載入。");
+      return;
+    }
+
     setActionState((current) => ({ ...current, isSavingTopics: true }));
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics", {
         body: JSON.stringify({
+          expectedCollectionRevision: collectionRevision,
           topics: topics.map((topic) => ({
             enabled: topic.enabled,
             metricKey: topic.metricKey,
@@ -146,6 +154,7 @@ export function useMqttSettingsTopics({
         }),
         method: "PUT"
       });
+      setCollectionRevision(response.collectionRevision ?? collectionRevision);
       setStatus(response.status);
       setTopics(response.topics);
       setLastSyncedTopics(response.topics);
@@ -159,7 +168,7 @@ export function useMqttSettingsTopics({
     } finally {
       setActionState((current) => ({ ...current, isSavingTopics: false }));
     }
-  }, [lastSyncedTopicsRef, reloadReadiness, setActionState, setErrorMessage, setLastConnectionTest, setLastSyncedTopics, setMessage, setStatus, setTopics, topics]);
+  }, [collectionRevision, lastSyncedTopicsRef, reloadReadiness, setActionState, setCollectionRevision, setErrorMessage, setLastConnectionTest, setLastSyncedTopics, setMessage, setStatus, setTopics, topics]);
 
   const reloadTopics = useCallback(async () => {
     setActionState((current) => ({ ...current, isReloadingTopics: true }));
@@ -167,6 +176,7 @@ export function useMqttSettingsTopics({
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/reload", {
         method: "POST"
       });
+      setCollectionRevision(response.collectionRevision ?? collectionRevision);
       setStatus(response.status);
       setTopics(response.topics);
       setLastSyncedTopics(response.topics);
@@ -180,7 +190,7 @@ export function useMqttSettingsTopics({
     } finally {
       setActionState((current) => ({ ...current, isReloadingTopics: false }));
     }
-  }, [lastSyncedTopicsRef, reloadReadiness, setActionState, setErrorMessage, setLastConnectionTest, setLastSyncedTopics, setMessage, setStatus, setTopics]);
+  }, [collectionRevision, lastSyncedTopicsRef, reloadReadiness, setActionState, setCollectionRevision, setErrorMessage, setLastConnectionTest, setLastSyncedTopics, setMessage, setStatus, setTopics]);
 
   const addTopicMapping = useCallback(() => {
     const metricScope = activeCardDataSite === "jungli" ? "cl" : "kn";

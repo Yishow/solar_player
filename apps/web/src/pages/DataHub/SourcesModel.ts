@@ -10,6 +10,7 @@ export type MqttSourceStatus = {
 };
 
 export type GenericMqttMapping = {
+  configRevision?: number;
   enabled: boolean;
   id: number;
   lastReceivedAt: string | null;
@@ -20,6 +21,7 @@ export type GenericMqttMapping = {
   nameEn: string | null;
   nameZh: string | null;
   quality: string | null;
+  sourceRef?: string;
   topic: string;
   unit: string;
   updatedAt: string | null;
@@ -58,6 +60,11 @@ export type SolarManagedZone = {
 };
 
 export type DataHubSourcesModel = {
+  capabilities?: {
+    legacyReplaceSupported: boolean;
+    versionedSourceEditing: boolean;
+  };
+  collectionRevision?: number;
   solar: {
     errors: SolarSourceContractError[];
     sources: SolarManagedSource[];
@@ -68,8 +75,22 @@ export type DataHubSourcesModel = {
 };
 
 type TopicMappingsResponse = {
+  capabilities?: {
+    legacyReplaceSupported: boolean;
+    versionedSourceEditing: boolean;
+  };
+  collectionRevision?: number;
   status: MqttSourceStatus;
   topics: Array<GenericMqttMapping & { rawPayload?: string | null }>;
+};
+
+export type SourceMappingMutationResponse = {
+  configuration?: Partial<GenericMqttMapping> | null;
+  persistence?: "committed";
+  revision?: number;
+  runtime?: string;
+  sourceRef?: string;
+  success?: true;
 };
 
 type SolarSourcesResponse = DataHubSourcesModel["solar"];
@@ -320,6 +341,24 @@ export function buildTopicMappingsSavePayload(topics: GenericMqttMapping[]) {
 
 export function resolveSourcesSaveErrorMessage(error: unknown) {
   const code = (error as { body?: { code?: unknown } } | null)?.body?.code;
+  if (code === "SOURCE_REVISION_CONFLICT" || code === "COLLECTION_REVISION_CONFLICT") {
+    return "此資料來源已被其他操作者更新，為避免覆蓋最新設定，已取消儲存。請重新整理或檢視最新版本。";
+  }
+  if (code === "LEGACY_WRITE_REQUIRES_REVISION") {
+    return "伺服器已啟用版本化來源管理，不允許無版本寫入。請升級用戶端或以單筆方式儲存。";
+  }
+  if (code === "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD") {
+    return "請求金鑰已被使用於不同的變更內容，請重新操作。";
+  }
+  if (code === "E1_SOURCE_IMPACT_UNKNOWN") {
+    return "無法確認引用影響，未知影響不能當成沒有引用。";
+  }
+  if (code === "E1_SOURCE_IN_USE") {
+    return "這個來源仍被引用，已阻擋變更或刪除。";
+  }
+  if (code === "E1_SOURCE_REVISION_REQUIRED") {
+    return "此來源屬於受審核的正式電錶，若需修改語意或計量單位，請走審核修訂流程。";
+  }
   if (code === "MANAGED_SOURCE_METRIC_CONFLICT") {
     return "此 metric identity 已由 Solar adapter 管理，無法儲存 generic mapping。";
   }
@@ -335,6 +374,124 @@ export function resolveSourcesSaveErrorMessage(error: unknown) {
 export function normalizeTopicMapping(topic: TopicMappingsResponse["topics"][number]): GenericMqttMapping {
   const { rawPayload: _rawPayload, ...safeTopic } = topic;
   return safeTopic;
+}
+
+function definedEntries(value: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
+}
+
+/**
+ * Mutation responses return the editable configuration separately from the
+ * source identity envelope. Keep the existing row metadata while merging both
+ * parts so a local save cannot lose its id, sourceRef, or revision.
+ */
+export function normalizeSavedTopicMapping(
+  response: SourceMappingMutationResponse,
+  previous: GenericMqttMapping
+): GenericMqttMapping {
+  const configuration = response.configuration && typeof response.configuration === "object"
+    ? definedEntries(response.configuration as Record<string, unknown>)
+    : {};
+  const identity = {
+    ...(typeof response.revision === "number" && Number.isInteger(response.revision) && response.revision > 0
+      ? { configRevision: response.revision }
+      : {}),
+    ...(typeof response.sourceRef === "string" && response.sourceRef.trim()
+      ? { sourceRef: response.sourceRef }
+      : {})
+  };
+  return normalizeTopicMapping({
+    ...previous,
+    ...configuration,
+    ...identity
+  } as TopicMappingsResponse["topics"][number]);
+}
+
+export async function saveSingleSourceMappingApi({
+  sourceRef,
+  expectedRevision,
+  patch,
+  idempotencyKey
+}: {
+  expectedRevision: number;
+  idempotencyKey?: string;
+  patch: GenericMappingPatch;
+  sourceRef: string;
+}) {
+  return requestJson<SourceMappingMutationResponse>(`/api/data-hub/source-mappings/${encodeURIComponent(sourceRef)}`, {
+    body: JSON.stringify({
+      expectedRevision,
+      idempotencyKey: idempotencyKey ?? `save_${sourceRef}_${Date.now()}`,
+      patch
+    }),
+    method: "PATCH"
+  });
+}
+
+export async function deleteSingleSourceMappingApi({
+  sourceRef,
+  expectedRevision,
+  idempotencyKey
+}: {
+  expectedRevision: number;
+  idempotencyKey?: string;
+  sourceRef: string;
+}) {
+  return requestJson<{
+    deleted: true;
+    persistence: "committed";
+    runtime: string;
+    sourceRef: string;
+    success: true;
+  }>(`/api/data-hub/source-mappings/${encodeURIComponent(sourceRef)}`, {
+    body: JSON.stringify({
+      expectedRevision,
+      idempotencyKey: idempotencyKey ?? `del_${sourceRef}_${Date.now()}`
+    }),
+    method: "DELETE"
+  });
+}
+
+export async function createSingleSourceMappingApi({
+  source,
+  idempotencyKey
+}: {
+  idempotencyKey?: string;
+  source: GenericMqttMapping;
+}) {
+  return requestJson<SourceMappingMutationResponse>("/api/data-hub/source-mappings", {
+    body: JSON.stringify({
+      idempotencyKey: idempotencyKey ?? `create_${Date.now()}`,
+      source: {
+        decimalPlaces: source.unit === "%" ? 1 : 2,
+        enabled: source.enabled,
+        metricKey: source.metricKey,
+        metricScope: source.metricScope,
+        multiplier: source.multiplier ?? 1,
+        nameEn: source.nameEn ?? "",
+        nameZh: source.nameZh ?? "",
+        offset: 0,
+        topic: source.topic,
+        unit: source.unit,
+        valuePath: source.valuePath
+      }
+    }),
+    method: "POST"
+  });
+}
+
+export async function fetchDataHubCapabilities(): Promise<{ legacyReplaceSupported: boolean; versionedSourceEditing: boolean }> {
+  try {
+    const res = await requestJson<{ capabilities: { legacyReplaceSupported: boolean; versionedSourceEditing: boolean } }>(
+      "/api/data-hub/capabilities"
+    );
+    return res.capabilities;
+  } catch {
+    return {
+      legacyReplaceSupported: true,
+      versionedSourceEditing: true
+    };
+  }
 }
 
 export async function fetchDataHubSourcesModel() {
@@ -363,6 +520,11 @@ export async function fetchDataHubSourcesModel() {
   return {
     errorMessage: errors.join("；"),
     model: {
+      capabilities: topics?.capabilities ?? {
+        legacyReplaceSupported: true,
+        versionedSourceEditing: true
+      },
+      collectionRevision: topics?.collectionRevision ?? 1,
       solar,
       status: topics?.status ?? defaultMqttStatus,
       topics: topics?.topics.map(normalizeTopicMapping) ?? []

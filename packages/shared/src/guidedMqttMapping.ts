@@ -48,6 +48,37 @@ export type GuidedMappingApplyResult = {
   source: MeterSourceDefinition;
 };
 
+/** A reviewed row in a multi-source mapping preview or apply request. */
+export type GuidedMappingBatchItem = {
+  rowId: string;
+  canonicalDraft: MappingPreviewDraft;
+  previewToken: string;
+};
+
+export type GuidedMappingBatchPreviewItem = GuidedMappingBatchItem & {
+  reused: boolean;
+};
+
+export type GuidedMappingBatchPreviewResult = {
+  batchToken: string;
+  items: GuidedMappingBatchPreviewItem[];
+};
+
+export type GuidedMappingBatchApplyItem = {
+  activation?: GuidedMappingActivation;
+  applied: true;
+  channelId: string;
+  reception?: GuidedMappingReception;
+  rowId: string;
+  saved?: true;
+  source: MeterSourceDefinition;
+};
+
+export type GuidedMappingBatchApplyResult = {
+  applied: true;
+  items: GuidedMappingBatchApplyItem[];
+};
+
 type StoredPreview = {
   draft: MappingPreviewDraft;
   hash: string;

@@ -111,8 +111,11 @@ export type ActionState = {
 };
 
 export type ConnectionTestFeedback = {
+  candidateRevision?: number;
   connected: boolean;
+  isSuperseded?: boolean;
   message: string;
+  testedAt?: string;
 } | null;
 
 type DraftSections = {

@@ -11,8 +11,11 @@ export type MqttTransportEvidence = {
   sourceTimestampEvidence: string | null;
 };
 
+export type ObservationCandidateKind = "solar-managed" | "engineering" | "physical-raw" | "diagnostic" | "generic";
+
 export type ObservationCandidate = {
   candidateId: string;
+  candidateKind?: ObservationCandidateKind;
   declaredTag: string | null;
   exactTopic: string;
   lastSeenAt: string;
@@ -20,9 +23,13 @@ export type ObservationCandidate = {
   schemaVersion: number;
 };
 
+export type ReceptionProfileKind = "solar" | "engineering" | "physical" | "generic";
+
 export type ReceptionProfile = {
   allowedFilters: string[];
+  description?: string;
   id: string;
+  kind?: ReceptionProfileKind;
   name: string;
   siteScope: "cl" | "kn";
 };
@@ -114,12 +121,48 @@ export function catalogMustNotMutateAcceptedHistory(
 }
 
 export function isAllowedDiscoveryFilter(filter: string, profile: ReceptionProfile) {
-  if (filter === "#") {
+  if (filter === "#" || filter === "+") {
     return false;
   }
-  return profile.allowedFilters.some((allowed) => filter === allowed || filter.startsWith(`${allowed}`));
+  return profile.allowedFilters.some((allowed) => {
+    const prefix = allowed.endsWith("/") ? allowed : `${allowed}/`;
+    return filter === allowed || filter.startsWith(prefix);
+  });
+}
+
+export function isManagedSolarTopic(topic: string): boolean {
+  const normalized = topic.toLowerCase();
+  return /^solar\/(cl|kn)\/(summary|zone\/[^/]+)$/.test(normalized);
+}
+
+export function isKnEngineeringTopic(topic: string): boolean {
+  const normalized = topic.toLowerCase();
+  return /^factory\/guanyin\/(stamping|body|painting|assembly|utility|office|heavy_vehicle|ed_coating)(\/.*)?$/.test(normalized);
+}
+
+export function isPhysicalRawTopic(topic: string): boolean {
+  const normalized = topic.toLowerCase();
+  return /^opc(\/v\d+)?\/(cl|kn)\/raw\/[^/]+$/.test(normalized) || /^opc\/raw\/[^/]+$/.test(normalized);
+}
+
+export function isDiagnosticTopic(topic: string): boolean {
+  const normalized = topic.toLowerCase();
+  return /\/(status|heartbeat|alert|snapshot)(\/.*)?$/.test(normalized) || /^solar\/(cl|kn)\/(status|heartbeat|alert)$/.test(normalized);
+}
+
+export function classifyObservationCandidate(topic: string): ObservationCandidateKind {
+  if (isManagedSolarTopic(topic)) return "solar-managed";
+  if (isDiagnosticTopic(topic)) return "diagnostic";
+  if (isKnEngineeringTopic(topic)) return "engineering";
+  if (isPhysicalRawTopic(topic)) return "physical-raw";
+  return "generic";
+}
+
+export function sanitizeObservationMarkup(text: string): string {
+  return text.replace(/[<>]/g, (char) => (char === "<" ? "&lt;" : "&gt;"));
 }
 
 export function redactObservationPayload(raw: string) {
-  return raw.replace(/(password|token|secret)("?\s*[:=]\s*"?)[^"}\s]+/gi, "$1$2****");
+  const redacted = raw.replace(/(password|token|secret)("?\s*[:=]\s*"?)[^"}\s]+/gi, "$1$2****");
+  return sanitizeObservationMarkup(redacted);
 }

@@ -3,6 +3,9 @@ import { randomBytes } from "node:crypto";
 import {
   hasLiveMetricRequirementsData,
   resolveLiveMetricRequirementsForPage,
+  validateEngineeringPacket,
+  type EngineeringCumulativePacket,
+  type EngineeringPowerPacket,
   type DisplayPageTemplateKey,
   type GuidedMappingReception,
   type MeterReadingChangeEvent
@@ -47,6 +50,11 @@ import {
   type SolarMetricMessage
 } from "./SolarSourceAdapter.js";
 import { type MqttSettingsRow, resolveMqttSettings } from "./settings-source.js";
+import { admitDailyEngineeringReport } from "../services/engineeringReportService.js";
+import {
+  getEngineeringSourceByTopic,
+  resolveEnabledEngineeringTopics
+} from "../services/engineeringSourceService.js";
 
 type LoggerLike = {
   debug?: (payload: unknown, message?: string) => void;
@@ -899,6 +907,7 @@ export class MqttClientService {
     return new Set(
       [
         ...genericTopics,
+        ...resolveEnabledEngineeringTopics(this.database),
         ...this.managedSourceAdapters.flatMap(({ subscriptionFilters }) => subscriptionFilters)
       ]
         .map((topic) => topic.trim())
@@ -934,6 +943,10 @@ export class MqttClientService {
           }
         })
     );
+
+    if (await this.handleEngineeringMessage(topic, rawPayload)) {
+      return;
+    }
 
     const mappings = this.database
       .prepare(
@@ -1217,6 +1230,105 @@ export class MqttClientService {
       });
     }
 
+  }
+
+  private async handleEngineeringMessage(topic: string, rawPayload: string): Promise<boolean> {
+    const configuredSource = getEngineeringSourceByTopic(this.database, topic);
+    let parsedSourceKind = false;
+    try {
+      parsedSourceKind = (JSON.parse(rawPayload) as { sourceKind?: unknown })?.sourceKind === "engineering";
+    } catch {
+      // The engineering topic classification below still sends malformed JSON through the gate.
+    }
+
+    const isEngineeringTopic = configuredSource !== null
+      || parsedSourceKind
+      || topic.startsWith("factory/guanyin/power/")
+      || topic.startsWith("factory/guanyin/energy/daily/")
+      || topic.startsWith("factory/guanyin/energy/cumulative/");
+    if (!isEngineeringTopic) {
+      return false;
+    }
+
+    const registration = getEngineeringSourceByTopic(this.database, topic, { effectiveOnly: true });
+    if (!registration) {
+      this.logger.warn(
+        { code: "UNREGISTERED_SOURCE", topic },
+        "Rejected engineering MQTT packet without an approved enabled registration"
+      );
+      return true;
+    }
+
+    const validation = validateEngineeringPacket(rawPayload, {
+      isProduction: true,
+      expectedRegistration: registration,
+      expectedTopic: topic
+    });
+    if (!validation.accepted || !validation.packet) {
+      this.logger.warn(
+        { code: validation.rejectionCode ?? "GATE_REJECTED", topic },
+        "Rejected engineering MQTT packet"
+      );
+      return true;
+    }
+
+    if (validation.packet.measurementKind === "interval-energy") {
+      const outcome = admitDailyEngineeringReport(this.database, validation.packet, { isProduction: true });
+      if (!outcome.accepted) {
+        this.logger.warn(
+          { code: outcome.code ?? "REPORT_REJECTED", topic },
+          "Rejected engineering daily report"
+        );
+      }
+      return true;
+    }
+
+    this.persistEngineeringLivePacket(validation.packet, rawPayload);
+    return true;
+  }
+
+  private persistEngineeringLivePacket(
+    packet: EngineeringPowerPacket | EngineeringCumulativePacket,
+    rawPayload: string
+  ) {
+    const metricKey = packet.measurementKind === "power-gauge"
+      ? `engineering.${packet.engineeringId}.powerKw`
+      : `engineering.${packet.engineeringId}.cumulativeKWh`;
+    const value = Number(packet.value);
+    const current = this.database
+      .prepare("SELECT value, unit, timestamp FROM live_metric_values WHERE metric_scope = ? AND metric_key = ?")
+      .get("kn", metricKey) as { value?: number; unit?: string; timestamp?: string } | undefined;
+    const candidateMs = Date.parse(packet.observedAt);
+    const currentMs = current?.timestamp ? Date.parse(current.timestamp) : Number.NEGATIVE_INFINITY;
+    if (Number.isFinite(currentMs) && candidateMs < currentMs) {
+      this.logger.warn({ code: "LATE_ENGINEERING_OBSERVATION", metricKey }, "Ignored late engineering observation");
+      return;
+    }
+    if (Number.isFinite(currentMs) && candidateMs === currentMs) {
+      if (current?.value === value && current.unit === packet.unit) {
+        return;
+      }
+      this.logger.warn({ code: "ENGINEERING_OBSERVATION_CONFLICT", metricKey }, "Ignored conflicting engineering observation");
+      return;
+    }
+
+    this.database
+      .prepare(`
+        INSERT INTO live_metric_values (
+          metric_scope, metric_key, value, unit, timestamp, quality, raw_payload
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(metric_scope, metric_key) DO UPDATE SET
+          value = excluded.value,
+          unit = excluded.unit,
+          timestamp = excluded.timestamp,
+          quality = excluded.quality,
+          raw_payload = excluded.raw_payload
+      `)
+      .run("kn", metricKey, value, packet.unit, packet.observedAt, packet.quality, rawPayload);
+    this.socketService?.emitLiveMetrics(
+      "kn",
+      readAuthoritativeScopedLiveMetricsSnapshot("kn", this.database)
+    );
   }
 
   private handleManagedSourceMetricsPersisted(message: SolarMetricMessage) {

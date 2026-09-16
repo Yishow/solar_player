@@ -46,6 +46,18 @@ test("mqtt settings includes custom display names in the topics save payload", (
   assert.match(saveTopicsSource, /metricScope:\s*topic\.metricScope/);
 });
 
+test("mqtt settings carries the topic collection revision through load and save", () => {
+  assert.match(mqttSettingsLoadModelSource, /collectionRevision:\s*topicsResponse\.collectionRevision/);
+  assert.match(mqttSettingsDataSource, /setCollectionRevision\(model\.collectionRevision\)/);
+  assert.match(mqttSettingsDataSource, /setCollectionRevision\(response\.collectionRevision\)/);
+  assert.match(mqttSettingsTopicsSource, /if \(collectionRevision === null\)/);
+  assert.match(mqttSettingsTopicsSource, /expectedCollectionRevision:\s*collectionRevision/);
+  assert.match(
+    mqttSettingsTopicsSource,
+    /setCollectionRevision\(response\.collectionRevision \?\? collectionRevision\)/
+  );
+});
+
 test("mqtt settings saves broker settings without weather dependency", () => {
   const saveSettingsStart = mqttSettingsBrokerSource.indexOf("const saveSettings = useCallback(async () => {");
   const saveSettingsSource = mqttSettingsBrokerSource.slice(
@@ -275,7 +287,7 @@ test("mqtt settings keeps route, request, and payload contracts discoverable acr
   assert.match(mqttSettingsDataSource, /requestJson(?:<[^>]+>)?\("\/api\/settings\/mqtt\/topics"\)/);
   assert.match(
     mqttSettingsTopicsSource,
-    /requestJson(?:<[^>]+>)?\("\/api\/settings\/mqtt\/topics",\s*\{\s*body:\s*JSON\.stringify\(\{\s*topics:\s*topics\.map/
+    /requestJson(?:<[^>]+>)?\("\/api\/settings\/mqtt\/topics",\s*\{\s*body:\s*JSON\.stringify\(\{\s*expectedCollectionRevision:\s*collectionRevision,\s*topics:\s*topics\.map/
   );
   assert.match(mqttSettingsTopicsSource, /requestJson(?:<[^>]+>)?\("\/api\/settings\/mqtt\/reload",\s*\{\s*method:\s*"POST"/);
   assert.match(mqttSettingsWeatherSource, /requestJson(?:<[^>]+>)?\("\/api\/weather\/refresh",\s*\{\s*method:\s*"POST"/);

@@ -51,6 +51,7 @@ export type WeatherSettingsLoadOutcome = DisplaySyncReloadResult;
 
 export type MqttSettingsDataController = {
   actionState: ActionState;
+  collectionRevision: number | null;
   errorMessage: string;
   hasLoadedMqttEditableModel: boolean;
   hasLoadedMqttSettings: boolean;
@@ -75,6 +76,7 @@ export type MqttSettingsDataController = {
   message: string;
   playbackPages: PlaybackPage[];
   setActionState: Dispatch<SetStateAction<ActionState>>;
+  setCollectionRevision: Dispatch<SetStateAction<number | null>>;
   setErrorMessage: Dispatch<SetStateAction<string>>;
   setLastConnectionTest: Dispatch<SetStateAction<ConnectionTestFeedback>>;
   setLastSyncedSettings: Dispatch<SetStateAction<MqttSettingsForm>>;
@@ -112,6 +114,7 @@ export function useMqttSettingsData({
   const [topics, setTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const [lastSyncedTopics, setLastSyncedTopics] = useState<TopicMapping[]>(initialEditableModel?.topics ?? []);
   const lastSyncedTopicsRef = useRef(lastSyncedTopics);
+  const [collectionRevision, setCollectionRevision] = useState<number | null>(initialEditableModel?.collectionRevision ?? null);
   const [weatherSettings, setWeatherSettingsState] = useState<WeatherSettings>(initialWeatherSettings);
   const [lastSyncedWeatherSettings, setLastSyncedWeatherSettings] = useState<WeatherSettings>(initialWeatherSettings);
   const weatherSettingsRef = useRef(initialWeatherSettings);
@@ -223,6 +226,7 @@ export function useMqttSettingsData({
     weatherRequest: ReturnType<typeof beginWeatherRequest>
   ) => {
     setSettings(model.settings);
+    setCollectionRevision(model.collectionRevision);
     setLastSyncedSettings(model.settings);
     setStatus(model.status);
     setTopics(model.topics);
@@ -289,6 +293,7 @@ export function useMqttSettingsData({
     try {
       const response = await requestJson<TopicMappingsResponse>("/api/settings/mqtt/topics");
       setStatus(response.status);
+      setCollectionRevision(response.collectionRevision);
       if (isPolling) {
         setTopics((current) => mergePolledTopicMappings(current, lastSyncedTopicsRef.current, response.topics));
       } else {
@@ -493,6 +498,7 @@ export function useMqttSettingsData({
 
   return {
     actionState,
+    collectionRevision,
     errorMessage,
     hasLoadedMqttEditableModel,
     hasLoadedMqttSettings,
@@ -513,6 +519,7 @@ export function useMqttSettingsData({
     message,
     playbackPages,
     setActionState,
+    setCollectionRevision,
     setErrorMessage,
     setLastConnectionTest,
     setLastSyncedSettings,

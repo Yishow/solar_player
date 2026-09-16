@@ -58,12 +58,16 @@ test("U1-R2 workspace context does not carry display binding or preview device f
   assert.deepEqual(keys, [
     "filter",
     "managementScope",
+    "panel",
     "requestedScope",
+    "returnTo",
     "scopeCorrected",
     "scopeCorrectionMessage",
     "search",
+    "section",
     "selection",
-    "task"
+    "task",
+    "view"
   ]);
   assert.equal(keys.includes("binding"), false);
   assert.equal(keys.includes("previewDevice"), false);
@@ -119,4 +123,46 @@ test("workspace search round-trips filter, selection and task without inventing 
   assert.equal(parsed.selection, "mqtt:kn:factoryCircuit.stampingPower:11");
   assert.equal(parsed.task, "edit");
   assert.equal(parsed.scopeCorrected, false);
+});
+
+test("U1-R8 / DHR-R1 view resolver normalizes task=connect to received, and roundtrips panel/section/returnTo", () => {
+  // 1. Default without view is configured
+  assert.equal(parseDataHubWorkspaceSearch("scope=kn").view, "configured");
+
+  // 2. task=connect normalizes view to received
+  const connectState = parseDataHubWorkspaceSearch("scope=kn&task=connect");
+  assert.equal(connectState.view, "received");
+
+  // 3. Explicit view overrides task
+  const explicitState = parseDataHubWorkspaceSearch("scope=kn&task=connect&view=configured");
+  assert.equal(explicitState.view, "configured");
+
+  // 4. Panel and section default and roundtrip
+  assert.equal(parseDataHubWorkspaceSearch("scope=kn").panel, "drawer");
+  assert.equal(parseDataHubWorkspaceSearch("scope=kn").section, "overview");
+  assert.equal(parseDataHubWorkspaceSearch("scope=kn&panel=full&section=mapping").panel, "full");
+  assert.equal(parseDataHubWorkspaceSearch("scope=kn&panel=full&section=mapping").section, "mapping");
+
+  // 5. Roundtrip toDataHubWorkspaceSearch
+  const params = toDataHubWorkspaceSearch({
+    managementScope: "kn",
+    panel: "full",
+    returnTo: "/settings/data-hub/sources?scope=kn",
+    section: "mapping",
+    view: "received"
+  });
+  const reParsed = parseDataHubWorkspaceSearch(params);
+  assert.equal(reParsed.view, "received");
+  assert.equal(reParsed.panel, "full");
+  assert.equal(reParsed.section, "mapping");
+  assert.equal(reParsed.returnTo, "/settings/data-hub/sources?scope=kn");
+});
+
+test("DHR-R1-S03 sanitizeReturnContext rejects external domains and accepts allowlisted paths", async () => {
+  const { sanitizeReturnContext } = await import("./workspaceContext");
+  assert.equal(sanitizeReturnContext("https://malicious.com/steal"), null);
+  assert.equal(sanitizeReturnContext("//evil.com/settings/data-hub/sources"), null);
+  assert.equal(sanitizeReturnContext("/other/path"), null);
+  assert.equal(sanitizeReturnContext("/settings/data-hub/sources?scope=kn"), "/settings/data-hub/sources?scope=kn");
+  assert.equal(sanitizeReturnContext("/settings/data-hub/metrics"), "/settings/data-hub/metrics");
 });

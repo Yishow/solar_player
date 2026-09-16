@@ -166,6 +166,6 @@ test("M2 mapping preview uses the reviewed source semantics and topic", async ()
 test("U2 connection test is separate from real publish", () => {
   const html = renderToStaticMarkup(<GuidedOnboardingPanel scope="kn" />);
   assert.match(html, /data-onboarding-connection-test/);
-  assert.match(html, /測試連線/);
+  assert.match(html, /檢查目前連線/);
   assert.doesNotMatch(html, /data-onboarding-real-publish/);
 });

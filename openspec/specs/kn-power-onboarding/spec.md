@@ -1,0 +1,307 @@
+# kn-power-onboarding Specification
+
+## Purpose
+
+Specify the onboarding evidence gates and staged commissioning requirements for Guanyin engineering sources without requiring physical meter emulation.
+
+## Requirements
+
+### Requirement: KN registry begins with engineering results rather than physical points
+<!-- requirement-id: KNP-R1 -->
+
+KN SHALL use the eight existing engineering identities and the G KNE/EPR source contracts. Logical engineering IDs are known product vocabulary, not proof of active messages. Initial mode, publisher authority and real payload agreement SHALL remain unconfigured until reviewed. Player SHALL NOT require meterId, DDE Item, NodeId or CL device inventories for engineering activation. Upstream acquisition technology SHALL remain outside the receiver commissioning prerequisite.
+
+#### Scenario: Known engineering no payload
+<!-- scenario-id: KNP-R1-S01 -->
+
+- **GIVEN** painting is a known slot but no real result contract is provided
+- **WHEN** the plan is opened
+- **THEN** the row is visible and unconfigured without pretending an actual source exists
+
+#### Scenario: Aggregate without item inventory
+<!-- scenario-id: KNP-R1-S02 -->
+
+- **GIVEN** the publisher provides a reviewed engineering result and definition summary
+- **WHEN** receiver commissioning is reviewed
+- **THEN** absence of bottom-level meter or DDE Item lists does not block this source kind
+
+
+<!-- @trace
+source: plan-power-mqtt-publishing-and-kn-onboarding
+updated: 2026-09-16
+code:
+  - apps/server/src/db/migrations/054_engineering_sources_and_reports.sql
+  - apps/server/src/services/sourceEditValidationService.ts
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - packages/shared/src/index.ts
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/web/src/pages/DataHub/KnEngineeringSourcesView.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/services/engineeringReportService.ts
+  - apps/server/src/routes/engineering-sources.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - packages/shared/src/engineeringGate.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/routes/settings-mqtt.ts
+  - packages/shared/src/engineeringPeriodResults.ts
+  - packages/shared/src/powerMqttPublishingContract.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
+  - apps/server/src/app.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/server/src/services/engineeringSourceService.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - packages/shared/src/siteEnergyProfile.ts
+  - packages/shared/src/engineeringSources.ts
+tests:
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - packages/shared/src/siteEnergyProfileV2.test.ts
+  - apps/server/src/services/engineeringServices.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/engineering-sources.test.ts
+  - packages/shared/src/engineeringGate.test.ts
+  - packages/shared/src/engineeringDisplayBinding.test.ts
+  - apps/server/src/services/engineeringRolloutMigration.test.ts
+  - apps/web/src/pages/DataHub/KnEngineeringSourcesView.test.tsx
+  - packages/shared/src/engineeringPeriodResults.test.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - packages/shared/src/engineeringSources.test.ts
+  - packages/shared/src/powerMqttPublishingContract.test.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+-->
+
+---
+### Requirement: KN begins per engineering and chooses measurement meaning explicitly
+<!-- requirement-id: KNP-R2 -->
+
+Each engineering MAY be commissioned independently using a confirmed power, daily-result or cumulative-result contract. Cadence SHALL NOT determine meaning. A site-main meter, grid purchase source or complete department device topology SHALL not be required to receive an engineering result. The chosen modes, units, total coverage and overlap rules SHALL follow G. Full-site consumption SHALL remain distinct from engineering-only totals, grid purchase and Solar generation.
+
+#### Scenario: One engineering ready
+<!-- scenario-id: KNP-R2-S01 -->
+
+- **GIVEN** painting is reviewed and other engineering modes are unconfigured
+- **WHEN** painting is enabled
+- **THEN** it becomes available independently while missing engineering rows and factory coverage remain explicit
+
+#### Scenario: No actual power
+<!-- scenario-id: KNP-R2-S02 -->
+
+- **GIVEN** engineering daily kWh exists without kW
+- **WHEN** the power slot is rendered
+- **THEN** it remains unavailable and no energy-to-power relabeling occurs
+
+#### Scenario: No total meter
+<!-- scenario-id: KNP-R2-S03 -->
+
+- **GIVEN** all engineering results have approved contracts but no site-main source exists
+- **WHEN** engineering reporting is configured
+- **THEN** report reception and engineering totals can proceed with explicit coverage labels rather than demanding a fake main meter
+
+
+<!-- @trace
+source: plan-power-mqtt-publishing-and-kn-onboarding
+updated: 2026-09-16
+code:
+  - apps/server/src/db/migrations/054_engineering_sources_and_reports.sql
+  - apps/server/src/services/sourceEditValidationService.ts
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - packages/shared/src/index.ts
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/web/src/pages/DataHub/KnEngineeringSourcesView.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/services/engineeringReportService.ts
+  - apps/server/src/routes/engineering-sources.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - packages/shared/src/engineeringGate.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/routes/settings-mqtt.ts
+  - packages/shared/src/engineeringPeriodResults.ts
+  - packages/shared/src/powerMqttPublishingContract.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
+  - apps/server/src/app.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/server/src/services/engineeringSourceService.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - packages/shared/src/siteEnergyProfile.ts
+  - packages/shared/src/engineeringSources.ts
+tests:
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - packages/shared/src/siteEnergyProfileV2.test.ts
+  - apps/server/src/services/engineeringServices.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/engineering-sources.test.ts
+  - packages/shared/src/engineeringGate.test.ts
+  - packages/shared/src/engineeringDisplayBinding.test.ts
+  - apps/server/src/services/engineeringRolloutMigration.test.ts
+  - apps/web/src/pages/DataHub/KnEngineeringSourcesView.test.tsx
+  - packages/shared/src/engineeringPeriodResults.test.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - packages/shared/src/engineeringSources.test.ts
+  - packages/shared/src/powerMqttPublishingContract.test.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+-->
+
+---
+### Requirement: KN commissioning follows report and mode-specific evidence gates
+<!-- requirement-id: KNP-R3 -->
+
+KN SHALL separately verify contract preview, isolated message/revision handling, source subscription, usable results, typed accounting profile and display binding. Daily results SHALL be tested for original period, corrections, partial/missing dates and bounded replay; counter and power modes SHALL use their own continuity/freshness tests. A valid complete daily result SHALL not wait for counter baselines. Field observation targets SHALL be approved for the selected mode and SHALL not be represented as completed acceptance. Missing actual payload or schedule SHALL block only the affected capability.
+
+#### Scenario: One complete daily result
+<!-- scenario-id: KNP-R3-S01 -->
+
+- **GIVEN** a daily result has valid full-period evidence
+- **WHEN** the period is read
+- **THEN** it can be complete without two physical observations
+
+#### Scenario: Result not due
+<!-- scenario-id: KNP-R3-S02 -->
+
+- **GIVEN** a daily report has not reached its reviewed deadline
+- **WHEN** readiness refreshes
+- **THEN** the receiver distinguishes not-due from missed delivery rather than applying a 90-second raw timeout
+
+#### Scenario: Only documents verified
+<!-- scenario-id: KNP-R3-S03 -->
+
+- **GIVEN** new artifacts pass static checks
+- **WHEN** deployment status is reported
+- **THEN** runtime, publisher handoff and field acceptance remain unverified
+
+
+<!-- @trace
+source: plan-power-mqtt-publishing-and-kn-onboarding
+updated: 2026-09-16
+code:
+  - apps/server/src/db/migrations/054_engineering_sources_and_reports.sql
+  - apps/server/src/services/sourceEditValidationService.ts
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - packages/shared/src/index.ts
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/web/src/pages/DataHub/KnEngineeringSourcesView.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/services/engineeringReportService.ts
+  - apps/server/src/routes/engineering-sources.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - packages/shared/src/engineeringGate.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/routes/settings-mqtt.ts
+  - packages/shared/src/engineeringPeriodResults.ts
+  - packages/shared/src/powerMqttPublishingContract.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
+  - apps/server/src/app.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/server/src/services/engineeringSourceService.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - packages/shared/src/siteEnergyProfile.ts
+  - packages/shared/src/engineeringSources.ts
+tests:
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - packages/shared/src/siteEnergyProfileV2.test.ts
+  - apps/server/src/services/engineeringServices.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/engineering-sources.test.ts
+  - packages/shared/src/engineeringGate.test.ts
+  - packages/shared/src/engineeringDisplayBinding.test.ts
+  - apps/server/src/services/engineeringRolloutMigration.test.ts
+  - apps/web/src/pages/DataHub/KnEngineeringSourcesView.test.tsx
+  - packages/shared/src/engineeringPeriodResults.test.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - packages/shared/src/engineeringSources.test.ts
+  - packages/shared/src/powerMqttPublishingContract.test.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+-->
+
+---
+### Requirement: KN rollout is independently reversible and preserves records
+<!-- requirement-id: KNP-R4 -->
+
+KN rollout SHALL require engineering contract owners, approved effective authorities, configuration backups and stop criteria, not upstream control writes. Unapproved modes or definitions SHALL not activate. Failure SHALL disable only the affected new engineering admission and retain report revisions, CL physical data and Solar subscriptions. G owns detailed replay/correction/projection behavior; this onboarding capability SHALL not create another writer or silently restore legacy physical fallback.
+
+#### Scenario: One source fails
+<!-- scenario-id: KNP-R4-S01 -->
+
+- **GIVEN** painting fails a contract check
+- **WHEN** rollout stops it
+- **THEN** other engineering/CL/Solar owners continue and painting records are preserved
+
+#### Scenario: Mode changes
+<!-- scenario-id: KNP-R4-S02 -->
+
+- **GIVEN** a source moves from engineering cumulative to daily at an approved day boundary
+- **WHEN** cutover is applied
+- **THEN** only one energy authority contributes for each period and missing continuity remains explicit
+
+<!-- @trace
+source: plan-power-mqtt-publishing-and-kn-onboarding
+updated: 2026-09-16
+code:
+  - apps/server/src/db/migrations/054_engineering_sources_and_reports.sql
+  - apps/server/src/services/sourceEditValidationService.ts
+  - apps/server/src/services/sourceEditReceiptService.ts
+  - apps/web/src/pages/DataHub/Sources.tsx
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.tsx
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.tsx
+  - packages/shared/src/index.ts
+  - apps/server/src/routes/data-hub-source-mappings.ts
+  - apps/web/src/pages/DataHub/KnEngineeringSourcesView.tsx
+  - apps/web/src/pages/DataHub/SourcesModel.ts
+  - apps/web/src/pages/MqttSettings/viewModel.ts
+  - apps/server/src/services/engineeringReportService.ts
+  - apps/server/src/routes/engineering-sources.ts
+  - apps/server/src/services/sourceEditCollectionService.ts
+  - packages/shared/src/dataHubSourceTransactions.ts
+  - packages/shared/src/engineeringGate.ts
+  - apps/web/src/pages/DataHub/SourceDetailsDrawer.tsx
+  - apps/server/src/routes/settings-mqtt.ts
+  - packages/shared/src/engineeringPeriodResults.ts
+  - packages/shared/src/powerMqttPublishingContract.ts
+  - apps/server/src/services/sourceEditTransactionService.ts
+  - apps/server/src/app.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.ts
+  - apps/server/src/db/migrations/053_data_hub_source_edit_transactions.sql
+  - apps/server/src/services/engineeringSourceService.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionStatusCard.tsx
+  - packages/shared/src/siteEnergyProfile.ts
+  - packages/shared/src/engineeringSources.ts
+tests:
+  - apps/web/src/pages/DataHub/GuidedOnboardingPanel.test.tsx
+  - packages/shared/src/siteEnergyProfileV2.test.ts
+  - apps/server/src/services/engineeringServices.test.ts
+  - apps/server/src/routes/data-hub-source-edit-transactions.test.ts
+  - apps/web/src/pages/MqttSettings/useMqttSettingsBroker.test.ts
+  - apps/server/src/routes/engineering-sources.test.ts
+  - packages/shared/src/engineeringGate.test.ts
+  - packages/shared/src/engineeringDisplayBinding.test.ts
+  - apps/server/src/services/engineeringRolloutMigration.test.ts
+  - apps/web/src/pages/DataHub/KnEngineeringSourcesView.test.tsx
+  - packages/shared/src/engineeringPeriodResults.test.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionDiagnostics.test.tsx
+  - apps/web/src/pages/DataHub/SourcesModelTransactions.test.ts
+  - packages/shared/src/engineeringSources.test.ts
+  - packages/shared/src/powerMqttPublishingContract.test.ts
+  - apps/web/src/pages/DataHub/Connections/ConnectionsView.test.tsx
+-->

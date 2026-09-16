@@ -171,3 +171,95 @@ export function profileMemberChannelIds(profile: SiteEnergyProfileV1): string[] 
   }
   return Array.from(ids);
 }
+
+import type { KnEngineeringId, KnEngineeringMode } from "./engineeringSources.js";
+
+export type AccountingMemberRef =
+  | { kind: "physical-meter"; channelId: string }
+  | { kind: "engineering"; sourceRef: string; engineeringId: KnEngineeringId; mode: KnEngineeringMode };
+
+export type SiteEnergyProfileV2 = {
+  departments: Array<{
+    accountingIncluded: boolean;
+    coverageReview: "reviewed" | "needs-review";
+    departmentId: string;
+    members: AccountingMemberRef[];
+    nameZh: string;
+  }>;
+  effectiveFrom: string;
+  metricScope: SiteEnergyScope;
+  profileId: string;
+  providerKind: "physical" | "engineering";
+  revision: number;
+  schemaVersion: 2;
+  shareBasis: {
+    kind: "site-main" | "department-sum" | "member-set";
+    departmentIds?: string[];
+    label?: string;
+    members?: AccountingMemberRef[];
+  };
+  siteTimeZone: string;
+  siteTotal: {
+    coverageReview: "reviewed" | "needs-review";
+    kind: "unconfigured" | "member-set";
+    label: string;
+    members: AccountingMemberRef[];
+  };
+  status: "incomplete" | "configured-awaiting-data" | "ready" | "conflict";
+};
+
+export function validateSiteEnergyProfileV2(profile: SiteEnergyProfileV2) {
+  const errors: Array<{ field: string; message: string }> = [];
+
+  if (profile.metricScope !== "cl" && profile.metricScope !== "kn") {
+    errors.push({ field: "metricScope", message: "廠區必須是 CL 或 KN。" });
+  }
+
+  if (profile.providerKind !== "physical" && profile.providerKind !== "engineering") {
+    errors.push({ field: "providerKind", message: "providerKind 必須是 physical 或 engineering。" });
+  }
+
+  // Check all member refs to ensure no mixing of physical and engineering
+  const allMembers: AccountingMemberRef[] = [
+    ...profile.siteTotal.members,
+    ...profile.departments.flatMap((d) => d.members),
+    ...(profile.shareBasis.members || [])
+  ];
+
+  let hasPhysical = false;
+  let hasEngineering = false;
+
+  for (const m of allMembers) {
+    if (m.kind === "physical-meter") {
+      hasPhysical = true;
+      if (profile.providerKind === "engineering") {
+        errors.push({ field: "members", message: "Engineering profile cannot contain physical-meter members." });
+      }
+    } else if (m.kind === "engineering") {
+      hasEngineering = true;
+      if (profile.providerKind === "physical") {
+        errors.push({ field: "members", message: "Physical profile cannot contain engineering members." });
+      }
+    }
+  }
+
+  if (hasPhysical && hasEngineering) {
+    errors.push({
+      field: "members",
+      message: "Overlapping accounting inputs forbidden: cannot mix physical-meter and engineering in the same profile."
+    });
+  }
+
+  return { errors, ok: errors.length === 0 };
+}
+
+export function assertSupportedProfileVersion(
+  profile: { schemaVersion: number },
+  consumerSupportedVersion: 1 | 2
+): void {
+  if (profile.schemaVersion > consumerSupportedVersion) {
+    throw new Error(
+      `Unsupported profile schemaVersion ${profile.schemaVersion}. This consumer only supports schemaVersion ${consumerSupportedVersion}.`
+    );
+  }
+}
