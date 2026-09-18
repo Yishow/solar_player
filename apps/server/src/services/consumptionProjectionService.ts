@@ -1,11 +1,21 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
-import type { PeriodConsumptionResult } from "@solar-display/shared";
+import {
+  isKnEngineeringId,
+  type AccountingPeriodResult,
+  type KnEngineeringId,
+  type PeriodConsumptionResult
+} from "@solar-display/shared";
 import { selectProjectionFingerprintEvidence } from "./accountingEvidenceSelection.js";
 import { canonicalJson } from "./authoringCanonicalJson.js";
+import { computeEngineeringPeriodFingerprint } from "./engineeringReportService.js";
 import type { AcceptedMeterReadingRow } from "./meterReadingService.js";
+import { getActiveProfile } from "./siteEnergyProfileRepository.js";
 
-export type ConsumptionProjection = PeriodConsumptionResult & {
+export type EngineeringAccountingPeriodResult = AccountingPeriodResult & { providerKind: "engineering" };
+export type ProjectableConsumptionResult = PeriodConsumptionResult | EngineeringAccountingPeriodResult;
+
+type ProjectionMetadata = {
   active: boolean;
   algorithmVersion: string;
   contextKey: string;
@@ -17,9 +27,13 @@ export type ConsumptionProjection = PeriodConsumptionResult & {
   watermark: string | null;
 };
 
+export type ConsumptionProjection =
+  | (PeriodConsumptionResult & ProjectionMetadata)
+  | (EngineeringAccountingPeriodResult & ProjectionMetadata);
+
 function rowToProjection(row: Record<string, unknown>): ConsumptionProjection {
   return {
-    ...(row.result_json ? JSON.parse(String(row.result_json)) as PeriodConsumptionResult : {}),
+    ...(row.result_json ? JSON.parse(String(row.result_json)) as ProjectableConsumptionResult : {}),
     contextKey: String(row.context_key ?? ""),
     active: Number(row.active) === 1,
     algorithmVersion: String(row.algorithm_version),
@@ -33,7 +47,47 @@ function rowToProjection(row: Record<string, unknown>): ConsumptionProjection {
     siteTimeZone: String(row.site_time_zone),
     valueKwh: row.value_kwh === null ? null : String(row.value_kwh),
     watermark: row.watermark === null ? null : String(row.watermark)
-  };
+  } as ConsumptionProjection;
+}
+
+export function isEngineeringResult(
+  result: ProjectableConsumptionResult
+): result is EngineeringAccountingPeriodResult {
+  return "providerKind" in result && result.providerKind === "engineering";
+}
+
+function engineeringProfileIds(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  result: AccountingPeriodResult
+): KnEngineeringId[] {
+  const profile = getActiveProfile(database, scope);
+  if (!profile || profile.schemaVersion !== 2 || profile.providerKind !== "engineering"
+    || profile.metricScope !== scope || profile.revision !== result.profileRevision
+    || profile.siteTotal.kind !== "member-set") {
+    projectionError("PROJECTION_INPUT_CHANGED");
+  }
+  const ids: KnEngineeringId[] = [];
+  for (const member of profile.siteTotal.members) {
+    if (member.kind !== "engineering" || !isKnEngineeringId(member.engineeringId)) {
+      projectionError("PROJECTION_INPUT_CHANGED");
+    }
+    ids.push(member.engineeringId);
+  }
+  return [...new Set(ids)];
+}
+
+function freshEngineeringFingerprint(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  result: AccountingPeriodResult
+) {
+  return computeEngineeringPeriodFingerprint(database, {
+    expectedEngineeringIds: engineeringProfileIds(database, scope, result),
+    periodEnd: result.periodEnd,
+    periodStart: result.periodStart,
+    profileRevision: result.profileRevision
+  });
 }
 
 // The fingerprint rows of a projection, freshly selected on every call.
@@ -58,7 +112,17 @@ export function acceptedWatermark(database: Database.Database, scope: "cl" | "kn
   return fingerprintWatermark(projectionSamples(database, scope, result));
 }
 
-export function projectionContextKey(result: PeriodConsumptionResult) {
+export function projectionContextKey(result: ProjectableConsumptionResult) {
+  if (isEngineeringResult(result)) {
+    return JSON.stringify([
+      result.providerKind,
+      result.periodStart,
+      result.periodEnd,
+      result.siteTimeZone,
+      result.profileRevision,
+      result.revisionFingerprint
+    ]);
+  }
   return result.periodStart && result.periodEnd
     ? JSON.stringify([result.periodStart, result.periodEnd, result.siteTimeZone, result.profileRevision, result.calculationVersion, result.meterIds, result.profileRevisionBoundaries])
     : "";
@@ -66,29 +130,34 @@ export function projectionContextKey(result: PeriodConsumptionResult) {
 
 export function shadowProject(
   database: Database.Database,
-  result: PeriodConsumptionResult,
+  result: ProjectableConsumptionResult,
   scope: "cl" | "kn",
   range: ConsumptionProjection["range"],
   checksum?: string,
   watermark?: string | null
 ) {
   const contextKey = projectionContextKey(result);
-  // One fresh selection at candidate creation serves the input check and any
-  // checksum or watermark the caller did not supply.
-  const evidence = projectionSamples(database, scope, result);
-  const inputChecksum = fingerprintChecksum(evidence);
-  const evidenceWatermark = fingerprintWatermark(evidence);
+  const engineering = isEngineeringResult(result);
+  // Physical candidates keep the existing bounded meter selection. Engineering
+  // candidates bind directly to the provider fingerprint and never query meter rows.
+  const evidence = engineering ? [] : projectionSamples(database, scope, result);
+  const inputChecksum = engineering
+    ? freshEngineeringFingerprint(database, scope, result)
+    : fingerprintChecksum(evidence);
+  const evidenceWatermark = engineering ? null : fingerprintWatermark(evidence);
+  if (engineering && inputChecksum !== result.revisionFingerprint) projectionError("PROJECTION_INPUT_CHANGED");
   const sampleChecksum = checksum === undefined ? inputChecksum : checksum;
   const resolvedWatermark = watermark === undefined ? evidenceWatermark : watermark;
   if (sampleChecksum !== inputChecksum) projectionError("PROJECTION_INPUT_CHANGED");
-  if (result.periodStart && result.calculatedThrough && result.meterIds && watermark !== undefined && watermark !== evidenceWatermark) {
+  if (!engineering && result.periodStart && result.calculatedThrough && result.meterIds
+    && watermark !== undefined && watermark !== evidenceWatermark) {
     projectionError("PROJECTION_INPUT_CHANGED");
   }
   const projectionId = createHash("sha256")
     .update(canonicalJson({ result, scope, range, checksum: sampleChecksum, watermark: resolvedWatermark, inputChecksum }))
     .digest("hex");
   const current = readActiveProjection(database, scope, range, contextKey);
-  const algorithmVersion = result.calculationVersion ?? "e2-v1";
+  const algorithmVersion = engineering ? "engineering-v1" : result.calculationVersion ?? "e2-v1";
   const createdAt = new Date().toISOString();
   database.prepare(`
     INSERT OR IGNORE INTO consumption_projections (
@@ -127,11 +196,14 @@ export function activateProjection(database: Database.Database, candidate: Consu
     if (!row) projectionError("PROJECTION_NOT_FOUND");
     const stored = rowToProjection(row);
     const current = readActiveProjection(database, stored.scope, stored.range, stored.contextKey);
-    const currentEvidence = projectionSamples(database, stored.scope, stored);
-    const currentInputChecksum = fingerprintChecksum(currentEvidence);
+    const engineering = isEngineeringResult(stored);
+    const currentEvidence = engineering ? [] : projectionSamples(database, stored.scope, stored);
+    const currentInputChecksum = engineering
+      ? freshEngineeringFingerprint(database, stored.scope, stored)
+      : fingerprintChecksum(currentEvidence);
     if (row.input_checksum !== currentInputChecksum) projectionError("PROJECTION_INPUT_CHANGED");
     if (
-      stored.periodStart && stored.calculatedThrough && stored.meterIds
+      !engineering && stored.periodStart && stored.calculatedThrough && stored.meterIds
       && stored.watermark !== fingerprintWatermark(currentEvidence)
     ) {
       projectionError("PROJECTION_INPUT_CHANGED");

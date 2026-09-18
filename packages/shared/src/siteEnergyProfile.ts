@@ -1,4 +1,10 @@
 import type { PeriodConsumptionResult, PeriodSelection } from "./periodConsumption.js";
+import type { AccountingPeriodResult } from "./engineeringPeriodResults.js";
+import {
+  isSiteEnergyProfileV2,
+  validateSiteEnergyProfileV2,
+  type SiteEnergyProfileV2
+} from "./siteEnergyProfileV2.js";
 
 export type SiteEnergyScope = "cl" | "kn";
 
@@ -37,8 +43,27 @@ export type SiteEnergyProfileV1 = {
   status: "incomplete" | "configured-awaiting-data" | "ready" | "conflict";
 };
 
+export type SiteEnergyProfile = SiteEnergyProfileV1 | SiteEnergyProfileV2;
+
+export type SiteEnergyProfileValidationErrorCode =
+  | "PROFILE_INVALID"
+  | "PROFILE_OVERLAP_CONFLICT"
+  | "PROFILE_PROVIDER_INVALID"
+  | "PROFILE_VERSION_UNSUPPORTED";
+
+export type SiteEnergyProfileValidationError = {
+  code: SiteEnergyProfileValidationErrorCode;
+  field: string;
+  message: string;
+};
+
+export type SiteEnergyProfileValidationResult = {
+  errors: SiteEnergyProfileValidationError[];
+  ok: boolean;
+};
+
 export type ProfilePreviewRequest = {
-  draft: SiteEnergyProfileV1;
+  draft: SiteEnergyProfile;
   expectedRevision: number;
   periodSelection: { kind: "month"; year: number; month: number };
 };
@@ -47,7 +72,7 @@ export type ProfileReadiness = {
   asOf: string;
   periodSelection: PeriodSelection;
   reasons: string[];
-  status: SiteEnergyProfileV1["status"];
+  status: SiteEnergyProfile["status"];
 };
 
 export type ProfilePreviewSource = {
@@ -57,31 +82,33 @@ export type ProfilePreviewSource = {
   sourceRevision: number;
 };
 
+export type ProfilePreviewPeriodResult = PeriodConsumptionResult | AccountingPeriodResult;
+
 export type ProfilePreviewDepartment = {
   departmentId: string;
   nameZh: string;
   ratio: number | null;
-  result: PeriodConsumptionResult;
+  result: ProfilePreviewPeriodResult;
 };
 
 export type ProfilePreviewResponse = {
   asOf: string;
   calculator: {
-    basis: { memberChannelIds: string[]; result: PeriodConsumptionResult };
+    basis: { memberChannelIds: string[]; result: ProfilePreviewPeriodResult };
     departments: ProfilePreviewDepartment[];
-    period: PeriodConsumptionResult;
+    period: ProfilePreviewPeriodResult;
   };
   expectedRevision: number;
   periodSelection: PeriodSelection;
   previewToken: string;
-  profile: SiteEnergyProfileV1;
+  profile: SiteEnergyProfile;
   readiness: ProfileReadiness;
   reviewContext: "profile-draft";
   siteTimeZone: string;
   sources: ProfilePreviewSource[];
 };
 
-export type ProfileApplyResponse = SiteEnergyProfileV1 & {
+export type ProfileApplyResponse = SiteEnergyProfile & {
   activationAsOf: string;
   readiness: ProfileReadiness;
   reviewAsOf: string;
@@ -96,29 +123,83 @@ export function isValidIanaTimeZone(value: string) {
   }
 }
 
-export function validateSiteEnergyProfile(profile: SiteEnergyProfileV1) {
-  const errors: Array<{ field: string; message: string }> = [];
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function addValidationError(
+  errors: SiteEnergyProfileValidationError[],
+  code: SiteEnergyProfileValidationErrorCode,
+  field: string,
+  message: string
+) {
+  errors.push({ code, field, message });
+}
+
+function addUnsupportedVersionError(errors: SiteEnergyProfileValidationError[], version: unknown) {
+  addValidationError(
+    errors,
+    "PROFILE_VERSION_UNSUPPORTED",
+    "schemaVersion",
+    `Unsupported profile schemaVersion ${String(version)}. Supported schemaVersion values are 1 and 2.`
+  );
+}
+
+export function validateCommonProfileFields(
+  profile: Record<string, unknown>,
+  errors: SiteEnergyProfileValidationError[]
+) {
   if (profile.metricScope !== "cl" && profile.metricScope !== "kn") {
-    errors.push({ field: "metricScope", message: "廠區必須是 CL 或 KN。" });
+    addValidationError(errors, "PROFILE_PROVIDER_INVALID", "metricScope", "廠區必須是 CL 或 KN。");
   }
-  if (!isValidIanaTimeZone(profile.siteTimeZone)) {
-    errors.push({ field: "siteTimeZone", message: "siteTimeZone 必須是有效 IANA 時區。" });
+
+  if (typeof profile.siteTimeZone !== "string" || !isValidIanaTimeZone(profile.siteTimeZone)) {
+    addValidationError(errors, "PROFILE_INVALID", "siteTimeZone", "siteTimeZone 必須是有效 IANA 時區。");
   }
+}
+
+export function validateSiteEnergyProfileV1(profile: SiteEnergyProfileV1): SiteEnergyProfileValidationResult {
+  const errors: SiteEnergyProfileValidationError[] = [];
+  validateCommonProfileFields(profile as unknown as Record<string, unknown>, errors);
   const shareBasisKind = (profile.shareBasis as { kind?: unknown } | undefined)?.kind;
   if (shareBasisKind !== "site-main" && shareBasisKind !== "department-sum" && shareBasisKind !== "meter-set") {
-    errors.push({ field: "shareBasis.kind", message: "分母來源類型不受支援。" });
+    addValidationError(errors, "PROFILE_INVALID", "shareBasis.kind", "分母來源類型不受支援。");
   }
   if (profile.siteTotal.kind === "meter-set" && profile.siteTotal.memberChannelIds.length === 0) {
-    errors.push({ field: "siteTotal.memberChannelIds", message: "總錶來源尚未設定。" });
+    addValidationError(errors, "PROFILE_INVALID", "siteTotal.memberChannelIds", "總錶來源尚未設定。");
   }
   const seen = new Set<string>();
   for (const channelId of profile.siteTotal.memberChannelIds) {
     if (seen.has(channelId)) {
-      errors.push({ field: "siteTotal.memberChannelIds", message: `總錶集合重複 channel ${channelId}` });
+      addValidationError(
+        errors,
+        "PROFILE_OVERLAP_CONFLICT",
+        "siteTotal.memberChannelIds",
+        `總錶集合重複 channel ${channelId}`
+      );
     }
     seen.add(channelId);
   }
   return { errors, ok: errors.length === 0 };
+}
+
+export function isSiteEnergyProfileV1(profile: unknown): profile is SiteEnergyProfileV1 {
+  return isRecord(profile) && profile.schemaVersion === 1;
+}
+
+export { isSiteEnergyProfileV2 };
+
+export function validateSiteEnergyProfile(profile: unknown): SiteEnergyProfileValidationResult {
+  const errors: SiteEnergyProfileValidationError[] = [];
+  const version = isRecord(profile) ? profile.schemaVersion : undefined;
+  if (version === 1) {
+    return validateSiteEnergyProfileV1(profile as SiteEnergyProfileV1);
+  }
+  if (version === 2) {
+    return validateSiteEnergyProfileV2(profile as SiteEnergyProfileV2);
+  }
+  addUnsupportedVersionError(errors, version);
+  return { errors, ok: false };
 }
 
 export function rejectCalendarOverride(input: { timeZone?: string; start?: string; end?: string }) {
@@ -172,94 +253,18 @@ export function profileMemberChannelIds(profile: SiteEnergyProfileV1): string[] 
   return Array.from(ids);
 }
 
-import type { KnEngineeringId, KnEngineeringMode } from "./engineeringSources.js";
-
-export type AccountingMemberRef =
-  | { kind: "physical-meter"; channelId: string }
-  | { kind: "engineering"; sourceRef: string; engineeringId: KnEngineeringId; mode: KnEngineeringMode };
-
-export type SiteEnergyProfileV2 = {
-  departments: Array<{
-    accountingIncluded: boolean;
-    coverageReview: "reviewed" | "needs-review";
-    departmentId: string;
-    members: AccountingMemberRef[];
-    nameZh: string;
-  }>;
-  effectiveFrom: string;
-  metricScope: SiteEnergyScope;
-  profileId: string;
-  providerKind: "physical" | "engineering";
-  revision: number;
-  schemaVersion: 2;
-  shareBasis: {
-    kind: "site-main" | "department-sum" | "member-set";
-    departmentIds?: string[];
-    label?: string;
-    members?: AccountingMemberRef[];
-  };
-  siteTimeZone: string;
-  siteTotal: {
-    coverageReview: "reviewed" | "needs-review";
-    kind: "unconfigured" | "member-set";
-    label: string;
-    members: AccountingMemberRef[];
-  };
-  status: "incomplete" | "configured-awaiting-data" | "ready" | "conflict";
-};
-
-export function validateSiteEnergyProfileV2(profile: SiteEnergyProfileV2) {
-  const errors: Array<{ field: string; message: string }> = [];
-
-  if (profile.metricScope !== "cl" && profile.metricScope !== "kn") {
-    errors.push({ field: "metricScope", message: "廠區必須是 CL 或 KN。" });
-  }
-
-  if (profile.providerKind !== "physical" && profile.providerKind !== "engineering") {
-    errors.push({ field: "providerKind", message: "providerKind 必須是 physical 或 engineering。" });
-  }
-
-  // Check all member refs to ensure no mixing of physical and engineering
-  const allMembers: AccountingMemberRef[] = [
-    ...profile.siteTotal.members,
-    ...profile.departments.flatMap((d) => d.members),
-    ...(profile.shareBasis.members || [])
-  ];
-
-  let hasPhysical = false;
-  let hasEngineering = false;
-
-  for (const m of allMembers) {
-    if (m.kind === "physical-meter") {
-      hasPhysical = true;
-      if (profile.providerKind === "engineering") {
-        errors.push({ field: "members", message: "Engineering profile cannot contain physical-meter members." });
-      }
-    } else if (m.kind === "engineering") {
-      hasEngineering = true;
-      if (profile.providerKind === "physical") {
-        errors.push({ field: "members", message: "Physical profile cannot contain engineering members." });
-      }
-    }
-  }
-
-  if (hasPhysical && hasEngineering) {
-    errors.push({
-      field: "members",
-      message: "Overlapping accounting inputs forbidden: cannot mix physical-meter and engineering in the same profile."
-    });
-  }
-
-  return { errors, ok: errors.length === 0 };
-}
+export * from "./siteEnergyProfileV2.js";
 
 export function assertSupportedProfileVersion(
   profile: { schemaVersion: number },
   consumerSupportedVersion: 1 | 2
 ): void {
-  if (profile.schemaVersion > consumerSupportedVersion) {
-    throw new Error(
+  if ((profile.schemaVersion !== 1 && profile.schemaVersion !== 2)
+    || profile.schemaVersion > consumerSupportedVersion) {
+    const error = new Error(
       `Unsupported profile schemaVersion ${profile.schemaVersion}. This consumer only supports schemaVersion ${consumerSupportedVersion}.`
     );
+    Object.assign(error, { code: "PROFILE_VERSION_UNSUPPORTED", field: "schemaVersion" });
+    throw error;
   }
 }

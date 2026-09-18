@@ -1,16 +1,27 @@
 import type Database from "better-sqlite3";
 import {
   resolvePeriodConsumption,
+  type AccountingPeriodResult,
   type DefinitionRevisionItem,
   type PeriodConsumptionResult,
   type PeriodSelection,
   type ProfileReadiness,
+  type SiteEnergyProfile,
+  type SiteEnergyProfileV2,
   type SiteEnergyProfileV1
 } from "@solar-display/shared";
-import { captureProfileSourceSnapshot, type ProfileSourceSnapshot } from "./profileSourceSnapshot.js";
-import { loadEffectivePeriodContext, periodSelectionFromRange } from "./periodConsumptionService.js";
+import {
+  captureProfileProviderSnapshot,
+  captureProfileSourceSnapshot,
+  type ProfileSourceSnapshot
+} from "./profileSourceSnapshot.js";
+import {
+  loadEffectivePeriodContext,
+  periodSelectionFromRange,
+  resolveAccountingPeriodResult
+} from "./periodConsumptionService.js";
 import { getActiveProfile } from "./siteEnergyProfileRepository.js";
-import { deriveProfileReadiness } from "./profileReadiness.js";
+import { deriveEngineeringProfileReadiness, deriveProfileReadiness } from "./profileReadiness.js";
 import { resolveProfileEvidence } from "./profileEvidence.js";
 
 function invalidResult(profile: SiteEnergyProfileV1, issue: string): PeriodConsumptionResult {
@@ -84,13 +95,105 @@ function missingProfileReadiness(asOf: string): ProfileReadiness {
   };
 }
 
+function profileReadinessUnavailable(asOf: string, code: string): ProfileReadiness {
+  return {
+    asOf,
+    periodSelection: {
+      kind: "month",
+      month: Number(new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "2-digit" })
+        .formatToParts(new Date(asOf)).find((part) => part.type === "month")?.value ?? 1),
+      year: Number(new Intl.DateTimeFormat("en-US", { timeZone: "UTC", year: "numeric" })
+        .formatToParts(new Date(asOf)).find((part) => part.type === "year")?.value ?? 1970)
+    },
+    reasons: [code],
+    status: "incomplete"
+  };
+}
+
+function readEngineeringProfileReadiness(
+  database: Database.Database,
+  scope: "cl" | "kn",
+  profile: SiteEnergyProfileV2,
+  asOf: string
+): ProfileReadiness {
+  const branchReasons: string[] = [];
+  if (scope !== "kn" || profile.metricScope !== "kn" || profile.metricScope !== scope) {
+    branchReasons.push("PROFILE_SCOPE_MISMATCH");
+  }
+  if (profile.providerKind !== "engineering") {
+    branchReasons.push("PROFILE_PROVIDER_INVALID");
+  }
+  if (branchReasons.length > 0) {
+    return profileReadinessUnavailable(asOf, branchReasons[0]!);
+  }
+
+  let period: PeriodSelection | null;
+  try {
+    period = periodSelectionFromRange("month", asOf, profile.siteTimeZone);
+  } catch {
+    return profileReadinessUnavailable(asOf, "PROFILE_TIMEZONE_INVALID");
+  }
+  if (!period) {
+    return profileReadinessUnavailable(asOf, "PROFILE_PERIOD_UNAVAILABLE");
+  }
+
+  const sourceReasons: string[] = [];
+  try {
+    const snapshot = captureProfileProviderSnapshot(database, profile);
+    if (snapshot.providerKind !== "engineering") {
+      sourceReasons.push("PROFILE_PROVIDER_INVALID");
+    }
+  } catch (error) {
+    sourceReasons.push((error as { code?: string }).code ?? "PROFILE_ENGINEERING_SOURCE_UNAVAILABLE");
+  }
+
+  let periodResult: AccountingPeriodResult;
+  try {
+    periodResult = resolveAccountingPeriodResult({
+      asOf,
+      database,
+      profile,
+      period,
+      scope: "kn"
+    });
+  } catch (error) {
+    return {
+      asOf,
+      periodSelection: period,
+      reasons: [...new Set([
+        ...sourceReasons,
+        (error as { code?: string }).code ?? "PROFILE_READINESS_UNAVAILABLE"
+      ])],
+      status: "incomplete"
+    };
+  }
+
+  return deriveEngineeringProfileReadiness({
+    asOf,
+    period: periodResult,
+    periodSelection: period,
+    profile,
+    sourceReasons
+  });
+}
+
 export function readProfileReadiness(
   database: Database.Database,
   scope: "cl" | "kn",
   asOf = new Date().toISOString()
 ): ProfileReadiness {
-  const active = getActiveProfile(database, scope);
+  let active: SiteEnergyProfile | null;
+  try {
+    active = getActiveProfile(database, scope);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code?.startsWith("PROFILE_")) return profileReadinessUnavailable(asOf, code);
+    throw error;
+  }
   if (!active) return missingProfileReadiness(asOf);
+  if (active.schemaVersion === 2) {
+    return readEngineeringProfileReadiness(database, scope, active, asOf);
+  }
 
   let period: PeriodSelection | null;
   try {

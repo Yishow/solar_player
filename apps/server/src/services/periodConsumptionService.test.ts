@@ -3,13 +3,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 import Database from "better-sqlite3";
-import type { MeterSourceDefinition } from "@solar-display/shared";
+import type { MeterSourceDefinition, SiteEnergyProfileV2 } from "@solar-display/shared";
 import { shadowProject, activateProjection } from "./consumptionProjectionService.js";
 import { saveMeterSource } from "./meterSourceCatalogService.js";
 import { seedAcceptedReading, ingestMeterReading } from "./meterReadingService.js";
 import { readFreshnessPolicy } from "./freshnessPolicyService.js";
 import {
   loadAcceptedSamples,
+  adaptPhysicalPeriodResult,
   loadEffectivePeriodContext,
   monthDateKeys,
   periodSelectionFromRange,
@@ -19,6 +20,7 @@ import {
   resolveDailyConsumptionPoints,
   resolveDailyPointsFromEvidence,
   resolvePeriodFromEvidence,
+  resolveAccountingPeriodResult,
   resolvePersistedPeriodConsumption,
   resolveSpanFromEvidence,
   tryResolvePersistedPeriodConsumption
@@ -53,6 +55,7 @@ function createDatabase(effectiveFrom = "2026-01-01T00:00:00+08:00") {
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/047_projection_activation_context.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/048_meter_source_lifecycle.sql"), "utf8"));
   database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/049_meter_source_boundary_age.sql"), "utf8"));
+  database.exec(readFileSync(resolve(process.cwd(), "src/db/migrations/054_engineering_sources_and_reports.sql"), "utf8"));
   return database;
 }
 
@@ -106,6 +109,76 @@ test("accepted loader keeps source identity and does not bridge replacement epoc
   );
   assert.equal(result.quality, "partial");
   assert.equal(result.valueKwh, null);
+  database.close();
+});
+
+test("EPR-R6: physical adapter retains the existing result while adding typed provider evidence", () => {
+  const database = createDatabase();
+  seedAcceptedReading(database, source(1, "epoch-1"), "100", "2026-08-31T16:00:00Z", "2026-08-31T16:00:00Z");
+  seedAcceptedReading(database, source(1, "epoch-1"), "150", "2026-09-01T04:00:00Z", "2026-09-01T04:00:01Z");
+  const existing = resolvePersistedPeriodConsumption(
+    database,
+    "kn",
+    { day: 1, kind: "day", month: 9, year: 2026 },
+    "2026-09-01T16:00:00Z"
+  );
+  const adapted = adaptPhysicalPeriodResult(existing);
+  assert.equal(adapted.providerKind, "physical");
+  assert.equal(adapted.valueKwh, existing.valueKwh);
+  assert.equal(adapted.profileRevision, existing.profileRevision);
+  assert.equal(adapted.siteTimeZone, existing.siteTimeZone);
+  assert.equal(adapted.quality, "partial");
+  assert.equal(adapted.coverage, "partial");
+  assert.deepEqual(adapted.missingIdentities, []);
+  assert.match(adapted.revisionFingerprint, /^[a-f0-9]{64}$/u);
+  assert.equal(existing.calculationVersion, "e2-v4");
+  database.close();
+});
+
+test("EPR-R6: provider dispatch chooses V2 engineering explicitly and never reads meter evidence", () => {
+  const database = createDatabase();
+  const profile: SiteEnergyProfileV2 = {
+    schemaVersion: 2,
+    profileId: "kn-engineering",
+    revision: 3,
+    metricScope: "kn",
+    providerKind: "engineering",
+    effectiveFrom: "2026-01-01T00:00:00+08:00",
+    siteTimeZone: "Asia/Taipei",
+    status: "ready",
+    siteTotal: {
+      kind: "member-set",
+      label: "KN 工程總和",
+      coverageReview: "reviewed",
+      members: [{ kind: "engineering", sourceRef: "kn-eng-stamping-energy", engineeringId: "stamping", mode: "daily-report" }]
+    },
+    departments: [],
+    shareBasis: { kind: "site-main" }
+  };
+  const result = resolveAccountingPeriodResult({
+    database,
+    scope: "kn",
+    profile,
+    period: { day: 1, kind: "day", month: 9, year: 2026 },
+    asOf: "2026-09-01T16:00:00Z"
+  });
+  assert.equal(result.providerKind, "engineering");
+  assert.equal(result.valueKwh, null);
+  assert.equal(result.quality, "unavailable");
+  assert.deepEqual(result.missingIdentities, ["stamping"]);
+  assert.equal((database.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count, 0);
+  database.close();
+});
+
+test("EPR-R6: provider dispatch rejects an unsupported profile schema visibly", () => {
+  const database = createDatabase();
+  assert.throws(() => resolveAccountingPeriodResult({
+    database,
+    scope: "kn",
+    profile: { schemaVersion: 99 } as never,
+    period: { day: 1, kind: "day", month: 9, year: 2026 },
+    asOf: "2026-09-01T16:00:00Z"
+  }), /PROFILE_VERSION_UNSUPPORTED/);
   database.close();
 });
 

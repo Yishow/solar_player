@@ -2,9 +2,11 @@ import {
   findOverlappingDepartmentChannels,
   parseDecimalString,
   validateSiteEnergyProfile,
+  type AccountingPeriodResult,
   type PeriodConsumptionResult,
   type PeriodSelection,
   type ProfileReadiness,
+  type SiteEnergyProfileV2,
   type SiteEnergyProfileV1
 } from "@solar-display/shared";
 
@@ -22,6 +24,14 @@ export type ProfileReadinessEvidence = {
   revisionBoundary?: boolean;
   sourceReasons?: string[];
   structuralReasons?: string[];
+};
+
+export type EngineeringProfileReadinessEvidence = {
+  asOf: string;
+  period: AccountingPeriodResult;
+  periodSelection: PeriodSelection;
+  profile: SiteEnergyProfileV2;
+  sourceReasons?: string[];
 };
 
 function isUsable(result: PeriodConsumptionResult | null) {
@@ -119,6 +129,71 @@ export function deriveProfileReadiness(input: ProfileReadinessEvidence): Profile
     }
     if (department.ratio === null) {
       waitingReasons.push(`DEPARTMENT_RATIO_UNAVAILABLE:${department.departmentId}`);
+    }
+  }
+
+  const uniqueReasons = [...new Set([...reasons, ...waitingReasons])];
+  return {
+    asOf: input.asOf,
+    periodSelection: input.periodSelection,
+    reasons: uniqueReasons,
+    status: reasons.length > 0
+      ? "incomplete"
+      : waitingReasons.length > 0
+        ? "configured-awaiting-data"
+        : "ready"
+  };
+}
+
+function engineeringStructureReasons(profile: SiteEnergyProfileV2): string[] {
+  const reasons = validateSiteEnergyProfile(profile).errors.map(({ code, field }) => `${code}:${field}`);
+  const siteTotal = profile.siteTotal;
+  if (siteTotal.kind !== "member-set" || !Array.isArray(siteTotal.members) || siteTotal.members.length === 0) {
+    reasons.push("SITE_TOTAL_MEMBERS_REQUIRED");
+  }
+  if (siteTotal.coverageReview !== "reviewed") {
+    reasons.push("SITE_TOTAL_COVERAGE_REVIEW_REQUIRED");
+  }
+  for (const department of profile.departments) {
+    if (department.accountingIncluded === false) continue;
+    if (department.coverageReview !== "reviewed") {
+      reasons.push(`DEPARTMENT_COVERAGE_REVIEW_REQUIRED:${department.departmentId}`);
+    }
+    if (!Array.isArray(department.members) || department.members.length === 0) {
+      reasons.push(`DEPARTMENT_MEMBERS_REQUIRED:${department.departmentId}`);
+    }
+  }
+  return reasons;
+}
+
+function engineeringResultIssues(result: AccountingPeriodResult): string[] {
+  if (result.issues && result.issues.length > 0) {
+    return [...result.issues];
+  }
+  return [`SITE_TOTAL_${result.quality.toUpperCase()}`];
+}
+
+export function deriveEngineeringProfileReadiness(
+  input: EngineeringProfileReadinessEvidence
+): ProfileReadiness {
+  const reasons = [
+    ...engineeringStructureReasons(input.profile),
+    ...(input.sourceReasons ?? [])
+  ];
+  const waitingReasons: string[] = [];
+  const period = input.period;
+
+  if (period.providerKind !== "engineering") {
+    reasons.push("PROFILE_PROVIDER_INVALID");
+  } else if (period.quality === "invalid") {
+    reasons.push(...engineeringResultIssues(period));
+  } else {
+    const complete = period.quality === "valid"
+      && period.coverage === "complete"
+      && period.valueKwh !== null
+      && period.missingIdentities.length === 0;
+    if (!complete) {
+      waitingReasons.push(...engineeringResultIssues(period));
     }
   }
 

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { MeterSourceDefinition } from "@solar-display/shared";
+import type { MeterSourceDefinition, SiteEnergyProfileV2 } from "@solar-display/shared";
 import { normalizeMetricSnapshotCapturedAt } from "../db/normalizeMetricSnapshotCapturedAt.js";
 import { seedAcceptedReading } from "../services/meterReadingService.js";
+import { serializeSiteEnergyProfile } from "../services/siteEnergyProfileRepository.js";
 import { createPairedDeviceTestContext } from "../testing/deviceContextTestSupport.js";
 import {
   buildApp,
@@ -1233,6 +1234,144 @@ test("R5 department shares report the same span the consumption card reports", a
     assert.equal(totalShares.periodStart, fixture.spanStart.toISOString());
     assert.notEqual(totalShares.periodStart, fixture.yearStart.toISOString(), "total shares must not fall back to the calendar year");
   } finally {
+    await app.close();
+  }
+});
+
+test("V2 engineering history stays typed while V1-only display consumers fail visibly", async () => {
+  const database = getDatabase();
+  for (const table of [
+    "consumption_projections",
+    "site_energy_profiles",
+    "metric_snapshots",
+    "daily_energy_summaries",
+    "cumulative_counters"
+  ]) {
+    database.prepare(`DELETE FROM ${table}`).run();
+  }
+  const profile: SiteEnergyProfileV2 = {
+    departments: [],
+    effectiveFrom: "2026-01-01T00:00:00+08:00",
+    metricScope: "kn",
+    profileId: "kn-engineering",
+    providerKind: "engineering",
+    revision: 1,
+    schemaVersion: 2,
+    shareBasis: { kind: "site-main" },
+    siteTimeZone: "Asia/Taipei",
+    siteTotal: {
+      coverageReview: "reviewed",
+      kind: "member-set",
+      label: "觀音工程總量",
+      members: [{
+        engineeringId: "stamping",
+        kind: "engineering",
+        mode: "daily-report",
+        sourceRef: "kn-eng-stamping-energy"
+      }]
+    },
+    status: "configured-awaiting-data"
+  };
+  const serialized = serializeSiteEnergyProfile(profile);
+  database.prepare(`
+    INSERT INTO site_energy_profiles (
+      profile_id, metric_scope, revision, schema_version, site_time_zone, status,
+      effective_from, site_total_json, departments_json, share_basis_json, active, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+  `).run(
+    profile.profileId,
+    profile.metricScope,
+    profile.revision,
+    serialized.schemaVersion,
+    profile.siteTimeZone,
+    profile.status,
+    profile.effectiveFrom,
+    serialized.siteTotalJson,
+    serialized.departmentsJson,
+    serialized.shareBasisJson,
+    "2026-01-01T00:00:00.000Z"
+  );
+  database.prepare(`
+    INSERT INTO metric_snapshots (metric_scope, generation, consumption, captured_at)
+    VALUES ('kn', 900, 800, '2026-09-15T00:00:00.000Z')
+  `).run();
+  database.prepare(`
+    INSERT INTO daily_energy_summaries (metric_scope, date, generation_total, consumption_total)
+    VALUES ('kn', '2026-09-15', 900, 800)
+  `).run();
+  database.prepare(`
+    INSERT INTO cumulative_counters (metric_scope, metric_key, total_value)
+    VALUES ('kn', 'consumption', 800)
+  `).run();
+
+  const paired = createPairedDeviceTestContext("kn");
+  const clPaired = createPairedDeviceTestContext("cl");
+  const app = await buildApp();
+  try {
+    const management = await app.inject({
+      method: "GET",
+      url: "/api/data-hub/energy-history?metricScope=kn&range=day"
+    });
+    assert.equal(management.statusCode, 200);
+    const managementBody = management.json() as {
+      counters: unknown[];
+      periodSummary: Record<string, unknown>;
+      snapshots: unknown[];
+      summaries: unknown[];
+    };
+    assert.equal(managementBody.periodSummary.providerKind, "engineering");
+    assert.equal(managementBody.periodSummary.profileRevision, 1);
+    assert.equal(typeof managementBody.periodSummary.revisionFingerprint, "string");
+    assert.deepEqual(managementBody.counters, []);
+    assert.deepEqual(managementBody.snapshots, []);
+    assert.deepEqual(managementBody.summaries, []);
+
+    const profileResponse = await app.inject({ method: "GET", url: "/api/data-hub/sites/kn/energy-profile" });
+    assert.equal(profileResponse.statusCode, 200);
+    assert.equal(profileResponse.json().profile.schemaVersion, 2);
+    assert.equal(profileResponse.json().profile.providerKind, "engineering");
+    assert.equal(typeof profileResponse.json().readiness.status, "string");
+
+    for (const url of [
+      "/api/metrics/history?range=day",
+      "/api/metrics/daily-summary?range=day",
+      "/api/metrics/cumulative",
+      "/api/metrics/department-shares?range=day"
+    ]) {
+      const response = await app.inject({
+        cookies: { solar_device_credential: paired.credential },
+        method: "GET",
+        url
+      });
+      assert.equal(response.statusCode, 422, url);
+      assert.equal(response.json().error, "PROFILE_VERSION_UNSUPPORTED", url);
+    }
+
+    const unsupportedRange = await app.inject({
+      method: "GET",
+      url: "/api/data-hub/energy-history?metricScope=kn&range=week"
+    });
+    assert.equal(unsupportedRange.statusCode, 422);
+    assert.equal(unsupportedRange.json().error, "PROFILE_VERSION_UNSUPPORTED");
+
+    const denied = await app.inject({
+      method: "GET",
+      remoteAddress: "198.51.100.24",
+      url: "/api/data-hub/energy-history?metricScope=kn&range=day"
+    });
+    assert.equal(denied.statusCode, 403);
+
+    const isolated = await app.inject({
+      cookies: { solar_device_credential: clPaired.credential },
+      method: "GET",
+      url: "/api/metrics/history?range=day"
+    });
+    assert.equal(isolated.statusCode, 200);
+  } finally {
+    database.prepare("DELETE FROM site_energy_profiles WHERE profile_id = 'kn-engineering'").run();
+    database.prepare("DELETE FROM metric_snapshots WHERE metric_scope = 'kn'").run();
+    database.prepare("DELETE FROM daily_energy_summaries WHERE metric_scope = 'kn'").run();
+    database.prepare("DELETE FROM cumulative_counters WHERE metric_scope = 'kn'").run();
     await app.close();
   }
 });

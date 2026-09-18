@@ -5,6 +5,7 @@ import {
   previousSiteEnergySetupStep,
   type ProfileApplyResponse,
   type ProfilePreviewResponse,
+  type SiteEnergyProfile,
   type SiteEnergyProfileV1,
   type SiteEnergySetupStep
 } from "@solar-display/shared";
@@ -20,7 +21,7 @@ const STEP_LABELS: Record<SiteEnergySetupStep, string> = {
 
 type SiteEnergyProfileReadResponse = {
   meters?: Array<{ channelId: string; displayNameZh?: string | null; meterId: string }>;
-  profile: SiteEnergyProfileV1 | null;
+  profile: SiteEnergyProfile | null;
   receivedTags?: Array<{ tag: string | null; topic: string }>;
 };
 
@@ -85,6 +86,9 @@ function MeterPicker({
 }
 
 function stripApplyMetadata(response: ProfileApplyResponse): SiteEnergyProfileV1 {
+  if (response.schemaVersion !== 1) {
+    throw new Error("PROFILE_VERSION_UNSUPPORTED");
+  }
   const {
     activationAsOf: _activationAsOf,
     readiness: _readiness,
@@ -144,6 +148,7 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
   const [isRefreshingRevision, setIsRefreshingRevision] = useState(false);
   const [revisionRefreshBlocked, setRevisionRefreshBlocked] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [unsupportedProfileVersion, setUnsupportedProfileVersion] = useState(false);
   const inputRevision = useRef(0);
 
   const clearPreview = () => {
@@ -173,6 +178,15 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
       if (!Object.prototype.hasOwnProperty.call(current, "profile")) {
         throw new Error("PROFILE_REVISION_READ_INVALID");
       }
+      if (current.profile?.schemaVersion === 2) {
+        setExpectedRevision(current.profile.revision);
+        setProfileLoaded(true);
+        setRevisionRefreshBlocked(false);
+        setUnsupportedProfileVersion(true);
+        setMessage("目前套用的是 V2 engineering 設定；此編輯器僅支援 V1 physical 設定。");
+        return false;
+      }
+      setUnsupportedProfileVersion(false);
       setExpectedRevision(current.profile?.revision ?? 0);
       setProfileLoaded(true);
       setRevisionRefreshBlocked(false);
@@ -209,13 +223,17 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
     setIsRefreshingRevision(false);
     setRevisionRefreshBlocked(false);
     setIsApplying(false);
+    setUnsupportedProfileVersion(false);
     void readSiteEnergyProfile(scope)
       .then((payload) => {
         if (cancelled) {
           return;
         }
-        if (payload.profile) {
+        if (payload.profile?.schemaVersion === 1) {
           setDraft(payload.profile);
+        } else if (payload.profile?.schemaVersion === 2) {
+          setUnsupportedProfileVersion(true);
+          setMessage("目前套用的是 V2 engineering 設定；此編輯器僅支援 V1 physical 設定。");
         }
         setExpectedRevision(payload.profile?.revision ?? 0);
         setRevisionRefreshBlocked(false);
@@ -223,7 +241,7 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
           channelId: meter.channelId,
           label: meter.displayNameZh || meter.channelId
         })));
-        if ((payload.receivedTags ?? []).length > 0) {
+        if (payload.profile?.schemaVersion !== 2 && (payload.receivedTags ?? []).length > 0) {
           setMessage(`已接收 ${payload.receivedTags?.length} 個穩定 tag 來源，可直接選 channel，不必手填 mapping。`);
         }
         setProfileLoaded(true);
@@ -245,9 +263,9 @@ export function SiteEnergySetupPanel({ scope }: { scope: "cl" | "kn" }) {
     && draft.departments
       .filter((department) => department.memberChannelIds.length > 0)
       .every((department) => department.coverageReview === "reviewed");
-  const controlsDisabled = isApplying || isPreviewing || isRefreshingRevision;
+  const controlsDisabled = unsupportedProfileVersion || isApplying || isPreviewing || isRefreshingRevision;
   const canPreview = profileLoaded && expectedRevision !== null && hasReviewedCoverage && basisConfirmed
-    && !isPreviewing && !isApplying && !isRefreshingRevision;
+    && !unsupportedProfileVersion && !isPreviewing && !isApplying && !isRefreshingRevision;
   const previewReadiness = previewResult?.readiness?.status;
   const canApply = Boolean(previewToken && previewResult?.readiness)
     && basisConfirmed

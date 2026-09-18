@@ -3,26 +3,35 @@ import {
   monthBoundaryInProfileZone,
   profileMemberChannelIds,
   resolveAccountingSpanConsumption,
-  resolvePeriodConsumption,
   periodWindow,
+  resolvePeriodConsumption,
   type AccountingSpan,
+  type AccountingPeriodResult,
   type FreshnessPolicy,
   type PeriodConsumptionResult,
-  type PeriodConsumptionQuality,
   type PeriodSelection,
   type PeriodSample,
   type SiteEnergyProfileV1
 } from "@solar-display/shared";
 import { readFreshnessPolicy } from "./freshnessPolicyService.js";
-import { getActiveProfile, listPersistedProfiles } from "./siteEnergyProfileRepository.js";
-import { readActiveProjection, acceptedSampleChecksum, projectionContextKey } from "./consumptionProjectionService.js";
+import { getActiveProfile } from "./siteEnergyProfileRepository.js";
+import {
+  readActiveProjection,
+  acceptedSampleChecksum,
+  isEngineeringResult,
+  projectionContextKey
+} from "./consumptionProjectionService.js";
 import { selectCalculationEvidence, toPeriodSamples } from "./accountingEvidenceSelection.js";
-import { loadAcceptedMeterReadings } from "./meterReadingService.js";
+import {
+  listPersistedV1Profiles,
+  profileProviderError,
+  requireV1Profile,
+  resolveAccountingPeriodResult
+} from "./accountingPeriodService.js";
 
-/** Every accepted reading of a scope as resolver samples, for callers that need the whole scope. */
-export function loadAcceptedSamples(database: Database.Database, scope: "cl" | "kn"): PeriodSample[] {
-  return toPeriodSamples(loadAcceptedMeterReadings(database, scope));
-}
+export * from "./accountingPeriodService.js";
+export * from "./dailyConsumptionPointsService.js";
+
 
 export function calendarPartsInProfileZone(instantUtc: string, siteTimeZone: string) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -232,7 +241,7 @@ function selectEffectiveForWindow(
  * so the read spans the earliest window's opening to the latest through-instant;
  * the resolver's month coverage days fall inside their month and need nothing more.
  */
-function selectEvidenceSamples(
+export function selectEvidenceSamples(
   database: Database.Database,
   scope: "cl" | "kn",
   channelIds: readonly string[],
@@ -256,7 +265,7 @@ export function loadEffectivePeriodContext(
   asOf: string,
   options: { profileRevision?: number } = {}
 ): EffectivePeriodContext {
-  const selection = selectEffectiveRangeWindow(listPersistedProfiles(database, scope), rangeWindow, asOf, options);
+  const selection = selectEffectiveRangeWindow(listPersistedV1Profiles(database, scope), rangeWindow, asOf, options);
   const freshnessPolicy = readFreshnessPolicy(database).policy;
   return {
     ...selection,
@@ -275,7 +284,7 @@ export function resolvePersistedPeriodConsumption(
   asOf: string,
   options: { profileRevision?: number; meterIds?: string[]; timeZone?: string; start?: string; end?: string } = {}
 ) {
-  const profiles = listPersistedProfiles(database, scope);
+  const profiles = listPersistedV1Profiles(database, scope);
   const selection = selectEffectivePeriod(profiles, period, asOf, options);
   const samples = selectEvidenceSamples(database, scope, options.meterIds ?? selection.profile.siteTotal.memberChannelIds, [selection]);
   return resolvePeriodFromEvidence(profiles, samples, period, asOf, readFreshnessPolicy(database).policy, options);
@@ -340,28 +349,45 @@ export function tryResolvePersistedPeriodConsumption(
   if (!profile) {
     return null;
   }
+  if (profile.schemaVersion === 2) {
+    if (range === "week" || range === "total") {
+      profileProviderError("PROFILE_VERSION_UNSUPPORTED");
+    }
+    const period = periodSelectionFromRange(range, asOf, profile.siteTimeZone);
+    if (!period) profileProviderError("PROFILE_VERSION_UNSUPPORTED");
+    const result = resolveAccountingPeriodResult({ asOf, database, period, profile, scope });
+    if (result.providerKind !== "engineering") profileProviderError("PROFILE_PROVIDER_INVALID");
+    const engineeringResult = result as AccountingPeriodResult & { providerKind: "engineering" };
+    const active = readActiveProjection(database, scope, period.kind, projectionContextKey(engineeringResult));
+    return active && isEngineeringResult(active)
+      && active.revisionFingerprint === engineeringResult.revisionFingerprint
+      ? active
+      : engineeringResult;
+  }
+  const physicalProfile = requireV1Profile(profile);
   if (range === "week" || range === "total") {
     // A configured profile always answers with a canonical result, so the consumers can tell
     // "no supported measurement" apart from "no accounting profile" and never fall back to a
     // legacy counter. Spans are not cached as projections: that store only knows calendar ranges.
-    return tryResolveSpanConsumption(database, scope, range, asOf, profile);
+    return tryResolveSpanConsumption(database, scope, range, asOf, physicalProfile);
   }
   try {
-    const period = periodSelectionFromRange(range, asOf, profile.siteTimeZone);
+    const period = periodSelectionFromRange(range, asOf, physicalProfile.siteTimeZone);
     if (!period) {
-      return unavailablePeriodResult(profile, range, asOf);
+      return unavailablePeriodResult(physicalProfile, range, asOf);
     }
     const result = resolvePersistedPeriodConsumption(database, scope, period, asOf);
     const projectedRange = period.kind;
     const contextKey = projectionContextKey(result);
     const active = readActiveProjection(database, scope, projectedRange, contextKey);
-    if (active && active.calculatedThrough === result.calculatedThrough && active.quality === result.quality
+    if (active && !isEngineeringResult(active)
+      && active.calculatedThrough === result.calculatedThrough && active.quality === result.quality
       && active.sampleChecksum === acceptedSampleChecksum(database, scope, result)) {
       return { ...active, freshness: result.freshness, freshnessState: result.freshnessState };
     }
     return result;
   } catch (error) {
-    return unavailablePeriodResult(profile, range, asOf, error);
+    return unavailablePeriodResult(physicalProfile, range, asOf, error);
   }
 }
 
@@ -400,7 +426,7 @@ function tryResolveSpanConsumption(
   asOf: string,
   activeProfile: SiteEnergyProfileV1
 ) {
-  const profiles = listPersistedProfiles(database, scope);
+  const profiles = listPersistedV1Profiles(database, scope);
   if (profiles.length === 0) {
     return null;
   }
@@ -435,118 +461,4 @@ function unavailableSpanResult(
     siteTimeZone: profile.siteTimeZone,
     valueKwh: null
   };
-}
-
-export type DailyConsumptionPoint = {
-  date: string;
-  profileRevision: number;
-  quality: PeriodConsumptionQuality;
-  siteTimeZone: string;
-  valueKwh: string | null;
-};
-
-/** Every calendar date key of `YYYY-MM`, ascending. Returns [] for a malformed month key. */
-export function monthDateKeys(month: string): string[] {
-  const match = /^(\d{4})-(\d{2})$/.exec(month);
-  if (!match) {
-    return [];
-  }
-  const year = Number(match[1]);
-  const monthNumber = Number(match[2]);
-  if (monthNumber < 1 || monthNumber > 12) {
-    return [];
-  }
-  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-  return Array.from({ length: daysInMonth }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
-}
-
-/** The day period a `YYYY-MM-DD` key names, or null for a key the daily series skips. */
-function dailyPeriodOf(date: string): PeriodSelection | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!match) {
-    return null;
-  }
-  const period: PeriodSelection = { day: Number(match[3]), kind: "day", month: Number(match[2]), year: Number(match[1]) };
-  if (period.month! < 1 || period.month! > 12 || period.day! < 1 || period.day! > 31) {
-    return null;
-  }
-  return period;
-}
-
-function dailyConsumptionPoint(
-  profiles: SiteEnergyProfileV1[],
-  samples: PeriodSample[],
-  freshnessPolicy: FreshnessPolicy,
-  date: string,
-  asOf: string
-): DailyConsumptionPoint | null {
-  const period = dailyPeriodOf(date);
-  if (!period) {
-    return null;
-  }
-  try {
-    const result = resolvePeriodFromEvidence(profiles, samples, period, asOf, freshnessPolicy);
-    return {
-      date,
-      profileRevision: result.profileRevision,
-      quality: result.quality,
-      siteTimeZone: result.siteTimeZone,
-      valueKwh: result.quality === "exact" || result.quality === "estimated-boundary" ? result.valueKwh : null
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Canonical consumption for an explicit set of dates. The caller owns the date set so a range
- * contract (day/week/month/year/total) is never rewritten into the current month; profiles,
- * samples and the freshness policy are loaded once for the whole set.
- */
-export function resolveDailyConsumptionPoints(
-  database: Database.Database,
-  scope: "cl" | "kn",
-  dates: string[],
-  asOf: string
-): DailyConsumptionPoint[] | null {
-  const profiles = listPersistedProfiles(database, scope);
-  if (profiles.length === 0) {
-    return null;
-  }
-  if (dates.length === 0) {
-    return [];
-  }
-  // Each date resolves against its own effective profile; one bounded read covers them all.
-  const selections = dates.flatMap((date) => {
-    const period = dailyPeriodOf(date);
-    if (!period) {
-      return [];
-    }
-    try {
-      return [selectEffectivePeriod(profiles, period, asOf)];
-    } catch {
-      return [];
-    }
-  });
-  const channelIds = selections.flatMap((selection) => selection.profile.siteTotal.memberChannelIds);
-  const samples = selectEvidenceSamples(database, scope, channelIds, selections);
-  const freshnessPolicy = readFreshnessPolicy(database).policy;
-  return resolveDailyPointsFromEvidence(profiles, samples, freshnessPolicy, dates, asOf);
-}
-
-/** The one daily-point resolution, over whichever evidence the caller selected. */
-export function resolveDailyPointsFromEvidence(
-  profiles: SiteEnergyProfileV1[],
-  samples: PeriodSample[],
-  freshnessPolicy: FreshnessPolicy,
-  dates: string[],
-  asOf: string
-): DailyConsumptionPoint[] {
-  return dates
-    .map((date) => dailyConsumptionPoint(profiles, samples, freshnessPolicy, date, asOf))
-    .filter((point): point is DailyConsumptionPoint => point !== null);
-}
-
-export function monthKeyFromProfile(asOf: string, profile: Pick<SiteEnergyProfileV1, "siteTimeZone">) {
-  return monthBoundaryInProfileZone(asOf, profile.siteTimeZone);
 }

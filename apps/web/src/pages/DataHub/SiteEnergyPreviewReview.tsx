@@ -1,4 +1,8 @@
-import type { PeriodConsumptionResult, ProfilePreviewResponse, SiteEnergyProfileV1 } from "@solar-display/shared";
+import type {
+  ProfilePreviewPeriodResult,
+  ProfilePreviewResponse,
+  SiteEnergyProfile
+} from "@solar-display/shared";
 
 function formatRatio(ratio: number | null) {
   if (ratio === null) {
@@ -18,8 +22,9 @@ export function formatPreviewPeriod(period: ProfilePreviewResponse["periodSelect
   return `${period.year}-${String(period.month ?? 1).padStart(2, "0")}`;
 }
 
-function qualityLabel(quality: PeriodConsumptionResult["quality"]) {
+function qualityLabel(quality: ProfilePreviewPeriodResult["quality"]) {
   switch (quality) {
+    case "valid":
     case "exact":
       return "完整";
     case "estimated-boundary":
@@ -33,11 +38,16 @@ function qualityLabel(quality: PeriodConsumptionResult["quality"]) {
   }
 }
 
-function resultValue(result: PeriodConsumptionResult | undefined) {
+function resultValue(result: ProfilePreviewPeriodResult | undefined) {
   return result?.valueKwh ?? "—";
 }
 
-function coverageLabel(result: PeriodConsumptionResult | undefined) {
+function coverageLabel(result: ProfilePreviewPeriodResult | undefined) {
+  if (result && "providerKind" in result) {
+    if (result.coverage === "complete") return "完整";
+    if (result.coverage === "partial") return "部分覆蓋";
+    return "未知";
+  }
   const coverage = result?.dailyCoverage;
   if (!coverage) {
     return "未提供覆蓋證據";
@@ -45,11 +55,11 @@ function coverageLabel(result: PeriodConsumptionResult | undefined) {
   return `${coverage.coveredDays}/${coverage.totalDays} 日${coverage.isComplete ? "完整" : "不足"}`;
 }
 
-function isMissingBaseline(result: PeriodConsumptionResult | undefined) {
+function isMissingBaseline(result: ProfilePreviewPeriodResult | undefined) {
   return result?.issues?.some((issue) => issue.includes("MISSING_BASELINE")) ?? false;
 }
 
-function readinessLabel(status: SiteEnergyProfileV1["status"] | undefined) {
+function readinessLabel(status: SiteEnergyProfile["status"] | undefined) {
   switch (status) {
     case "ready":
       return "已就緒";

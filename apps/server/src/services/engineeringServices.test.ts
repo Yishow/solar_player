@@ -14,6 +14,7 @@ const [{ migrateDatabase }, { getDatabase }] = await Promise.all([
 ]);
 
 const {
+  getEngineeringSourceByRef,
   listEngineeringSources,
   previewEngineeringSource,
   applyEngineeringSource,
@@ -23,7 +24,9 @@ const {
 const {
   admitDailyEngineeringReport,
   batchImportDailyReports,
+  computeEngineeringPeriodFingerprint,
   getEngineeringReportHistory,
+  readEngineeringAccountingPeriodResult,
   readEngineeringPeriodResult
 } = await import("./engineeringReportService.js");
 
@@ -49,6 +52,32 @@ function registerDailyEngineeringSource(
   return applyEngineeringSource(db, {
     previewToken: preview.previewToken,
     expectedRevision: 0,
+    draft: preview.canonicalDraft
+  }).source;
+}
+
+function registerAccountingEngineeringSource(
+  db: ReturnType<typeof getDatabase>,
+  engineeringId: "stamping" | "body" | "painting" | "assembly" | "utility" | "office" | "heavy_vehicle" | "ed_coating",
+  publisherId: string
+) {
+  const listed = listEngineeringSources(db).find((source) => source.engineeringId === engineeringId && source.purpose === "energy");
+  const existing = listed ? getEngineeringSourceByRef(db, listed.sourceRef) : null;
+  if (!existing) {
+    return registerDailyEngineeringSource(db, engineeringId, publisherId);
+  }
+  const preview = previewEngineeringSource({
+    ...existing,
+    approvedPublisherId: publisherId,
+    enabled: true,
+    mode: "daily-report",
+    purpose: "energy",
+    reviewStatus: "approved",
+    unit: "kWh"
+  });
+  return applyEngineeringSource(db, {
+    previewToken: preview.previewToken,
+    expectedRevision: existing.configurationRevision,
     draft: preview.canonicalDraft
   }).source;
 }
@@ -396,4 +425,364 @@ test("EPR-R4/R6: period provider includes every complete local day in the reques
   assert.equal(period.summary.periodDays, 2);
   assert.equal(period.summary.totalKWh, 220);
   assert.equal(period.summary.itemsByEngineering.stamping, 220);
+});
+
+test("EPR-R6: engineering period fingerprint is ordered and tracks registration and report heads", () => {
+  const db = getDatabase();
+  const heavyVehicle = registerDailyEngineeringSource(db, "heavy_vehicle", "pub-fingerprint");
+  registerDailyEngineeringSource(db, "ed_coating", "pub-fingerprint");
+
+  const base = {
+    schemaVersion: 1,
+    sourceKind: "engineering" as const,
+    site: "kn" as const,
+    publisherId: "pub-fingerprint",
+    definitionRevision: 1,
+    calendarRevision: 1,
+    measurementKind: "interval-energy" as const,
+    unit: "kWh" as const,
+    periodStart: "2026-09-11T16:00:00Z",
+    periodEnd: "2026-09-12T16:00:00Z",
+    periodStatus: "final" as const,
+    coverage: "complete" as const,
+    quality: "valid" as const,
+    dataRevision: 1,
+    publishedAt: "2026-09-16T01:00:00Z"
+  };
+
+  assert.equal(admitDailyEngineeringReport(db, {
+    ...base,
+    engineeringId: "heavy_vehicle" as const,
+    value: "10"
+  }).accepted, true);
+  assert.equal(admitDailyEngineeringReport(db, {
+    ...base,
+    engineeringId: "ed_coating" as const,
+    value: "20"
+  }).accepted, true);
+
+  const periodParams = {
+    periodStart: base.periodStart,
+    periodEnd: base.periodEnd,
+    profileRevision: 11
+  };
+  const expectedEngineeringIds = ["ed_coating", "heavy_vehicle", "body"] as const;
+  const ordered = readEngineeringPeriodResult(db, {
+    ...periodParams,
+    expectedEngineeringIds
+  });
+  const reversed = readEngineeringPeriodResult(db, {
+    ...periodParams,
+    expectedEngineeringIds: ["body", "heavy_vehicle", "ed_coating"]
+  });
+  assert.equal(ordered.revisionFingerprint, reversed.revisionFingerprint);
+  assert.equal(ordered.results.length, 2);
+  assert.equal(ordered.summary.totalKWh, 30);
+  assert.equal(
+    ordered.revisionFingerprint,
+    computeEngineeringPeriodFingerprint(db, {
+      ...periodParams,
+      expectedEngineeringIds: ["heavy_vehicle", "body", "ed_coating"]
+    })
+  );
+  assert.match(ordered.revisionFingerprint, /^[a-f0-9]{64}$/u);
+
+  // An unrelated non-effective registration must not duplicate current heads
+  // or change the evidence for the requested expected set.
+  const ignoredRegistration = previewEngineeringSource({
+    sourceRef: "kn-eng-body-energy-ignored",
+    sourceKind: "engineering",
+    site: "kn",
+    engineeringId: "body",
+    purpose: "energy",
+    mode: "daily-report",
+    exactTopic: "factory/guanyin/energy/daily/body-ignored",
+    approvedPublisherId: "pub-ignored",
+    reviewStatus: "draft",
+    unit: "kWh",
+    enabled: false
+  });
+  applyEngineeringSource(db, {
+    previewToken: ignoredRegistration.previewToken,
+    expectedRevision: 0,
+    draft: ignoredRegistration.canonicalDraft
+  });
+  const afterIgnoredRegistration = readEngineeringPeriodResult(db, {
+    ...periodParams,
+    expectedEngineeringIds
+  });
+  assert.equal(afterIgnoredRegistration.results.length, 2);
+  assert.equal(afterIgnoredRegistration.summary.totalKWh, 30);
+  assert.equal(afterIgnoredRegistration.revisionFingerprint, ordered.revisionFingerprint);
+
+  const registrationBefore = ordered.revisionFingerprint;
+  const registrationUpdate = previewEngineeringSource({
+    ...heavyVehicle,
+    definitionRevision: 2
+  });
+  applyEngineeringSource(db, {
+    previewToken: registrationUpdate.previewToken,
+    expectedRevision: heavyVehicle.configurationRevision,
+    draft: registrationUpdate.canonicalDraft
+  });
+  const registrationChanged = readEngineeringPeriodResult(db, {
+    ...periodParams,
+    expectedEngineeringIds
+  }).revisionFingerprint;
+  assert.notEqual(registrationChanged, registrationBefore);
+
+  const corrected = admitDailyEngineeringReport(db, {
+    ...base,
+    engineeringId: "heavy_vehicle" as const,
+    publisherId: "pub-fingerprint",
+    definitionRevision: 2,
+    value: "11",
+    dataRevision: 2,
+    reason: "Correction"
+  });
+  assert.equal(corrected.accepted, true);
+  const correctionChanged = readEngineeringPeriodResult(db, {
+    ...periodParams,
+    expectedEngineeringIds
+  }).revisionFingerprint;
+  assert.notEqual(correctionChanged, registrationChanged);
+
+  const withdrawn = admitDailyEngineeringReport(db, {
+    ...base,
+    engineeringId: "heavy_vehicle" as const,
+    publisherId: "pub-fingerprint",
+    definitionRevision: 2,
+    value: null,
+    periodStatus: "withdrawn" as const,
+    coverage: "partial" as const,
+    dataRevision: 3,
+    reason: "Withdrawal"
+  });
+  assert.equal(withdrawn.accepted, true);
+  const withdrawalChanged = readEngineeringPeriodResult(db, {
+    ...periodParams,
+    expectedEngineeringIds
+  }).revisionFingerprint;
+  assert.notEqual(withdrawalChanged, correctionChanged);
+});
+
+test("EPR-R6: engineering adapter exposes a typed two-day accounting result", () => {
+  const db = getDatabase();
+  registerAccountingEngineeringSource(db, "stamping", "pub-accounting");
+  registerAccountingEngineeringSource(db, "body", "pub-accounting");
+  const base = {
+    schemaVersion: 1,
+    sourceKind: "engineering" as const,
+    site: "kn" as const,
+    publisherId: "pub-accounting",
+    definitionRevision: 1,
+    calendarRevision: 1,
+    measurementKind: "interval-energy" as const,
+    unit: "kWh" as const,
+    periodStatus: "final" as const,
+    coverage: "complete" as const,
+    quality: "valid" as const,
+    dataRevision: 1,
+    publishedAt: "2026-09-16T01:00:00Z"
+  };
+  for (const [engineeringId, values] of [
+    ["stamping", [100, 120]] as const,
+    ["body", [40, 60]] as const
+  ]) {
+    for (const [index, value] of values.entries()) {
+      const periodStart = `2026-08-${String(5 + index).padStart(2, "0")}T16:00:00Z`;
+      const periodEnd = `2026-08-${String(6 + index).padStart(2, "0")}T16:00:00Z`;
+      assert.equal(admitDailyEngineeringReport(db, {
+        ...base,
+        engineeringId,
+        periodStart,
+        periodEnd,
+        value: String(value)
+      }).accepted, true);
+    }
+  }
+
+  const result = readEngineeringAccountingPeriodResult(db, {
+    periodStart: "2026-08-05T16:00:00Z",
+    periodEnd: "2026-08-07T16:00:00Z",
+    siteTimeZone: "Asia/Taipei",
+    profileRevision: 9,
+    expectedEngineeringIds: ["body", "stamping"]
+  });
+  assert.equal(result.providerKind, "engineering");
+  assert.equal(result.valueKwh, "320");
+  assert.equal(result.quality, "valid");
+  assert.equal(result.coverage, "complete");
+  assert.deepEqual(result.missingIdentities, []);
+  assert.equal(result.profileRevision, 9);
+  assert.equal(result.siteTimeZone, "Asia/Taipei");
+  assert.match(result.revisionFingerprint, /^[a-f0-9]{64}$/u);
+});
+
+test("EPR-R6: engineering accounting preserves exact decimal totals from persisted reports", () => {
+  const db = getDatabase();
+  registerAccountingEngineeringSource(db, "painting", "pub-accounting-decimal");
+  const base = {
+    schemaVersion: 1,
+    sourceKind: "engineering" as const,
+    site: "kn" as const,
+    engineeringId: "painting" as const,
+    publisherId: "pub-accounting-decimal",
+    definitionRevision: 1,
+    calendarRevision: 1,
+    measurementKind: "interval-energy" as const,
+    unit: "kWh" as const,
+    periodStatus: "final" as const,
+    coverage: "complete" as const,
+    quality: "valid" as const,
+    dataRevision: 1,
+    publishedAt: "2026-09-16T01:00:00Z"
+  };
+  assert.equal(admitDailyEngineeringReport(db, {
+    ...base,
+    periodStart: "2026-08-10T16:00:00Z",
+    periodEnd: "2026-08-11T16:00:00Z",
+    value: "0.1"
+  }).accepted, true);
+  assert.equal(admitDailyEngineeringReport(db, {
+    ...base,
+    periodStart: "2026-08-11T16:00:00Z",
+    periodEnd: "2026-08-12T16:00:00Z",
+    value: "0.2"
+  }).accepted, true);
+
+  const result = readEngineeringAccountingPeriodResult(db, {
+    periodStart: "2026-08-10T16:00:00Z",
+    periodEnd: "2026-08-12T16:00:00Z",
+    siteTimeZone: "Asia/Taipei",
+    profileRevision: 1,
+    expectedEngineeringIds: ["painting"]
+  });
+
+  assert.equal(result.valueKwh, "0.3");
+  assert.deepEqual(result.engineeringValuesKwh, { painting: "0.3" });
+});
+
+test("EPR-R6: engineering adapter preserves zero and degrades after correction or withdrawal", () => {
+  const db = getDatabase();
+  registerAccountingEngineeringSource(db, "utility", "pub-accounting-state");
+  registerAccountingEngineeringSource(db, "office", "pub-accounting-state");
+  const base = {
+    schemaVersion: 1,
+    sourceKind: "engineering" as const,
+    site: "kn" as const,
+    publisherId: "pub-accounting-state",
+    definitionRevision: 1,
+    calendarRevision: 1,
+    measurementKind: "interval-energy" as const,
+    unit: "kWh" as const,
+    periodStart: "2026-08-07T16:00:00Z",
+    periodEnd: "2026-08-08T16:00:00Z",
+    periodStatus: "final" as const,
+    coverage: "complete" as const,
+    quality: "valid" as const,
+    dataRevision: 1,
+    publishedAt: "2026-09-16T01:00:00Z"
+  };
+  assert.equal(admitDailyEngineeringReport(db, { ...base, engineeringId: "utility", value: "0" }).accepted, true);
+  assert.equal(admitDailyEngineeringReport(db, { ...base, engineeringId: "office", value: "10" }).accepted, true);
+  const initial = readEngineeringAccountingPeriodResult(db, {
+    periodStart: base.periodStart,
+    periodEnd: base.periodEnd,
+    siteTimeZone: "Asia/Taipei",
+    profileRevision: 1,
+    expectedEngineeringIds: ["utility", "office"]
+  });
+  assert.equal(initial.valueKwh, "10");
+
+  assert.equal(admitDailyEngineeringReport(db, {
+    ...base,
+    engineeringId: "office",
+    value: "12",
+    dataRevision: 2,
+    reason: "Correction"
+  }).accepted, true);
+  const corrected = readEngineeringAccountingPeriodResult(db, {
+    periodStart: base.periodStart,
+    periodEnd: base.periodEnd,
+    siteTimeZone: "Asia/Taipei",
+    profileRevision: 1,
+    expectedEngineeringIds: ["office", "utility"]
+  });
+  assert.equal(corrected.valueKwh, "12");
+  assert.equal(corrected.quality, "valid");
+
+  assert.equal(admitDailyEngineeringReport(db, {
+    ...base,
+    engineeringId: "office",
+    value: null,
+    periodStatus: "withdrawn",
+    coverage: "partial",
+    dataRevision: 3,
+    reason: "Withdrawal"
+  }).accepted, true);
+  const withdrawn = readEngineeringAccountingPeriodResult(db, {
+    periodStart: base.periodStart,
+    periodEnd: base.periodEnd,
+    siteTimeZone: "Asia/Taipei",
+    profileRevision: 1,
+    expectedEngineeringIds: ["utility", "office"]
+  });
+  assert.equal(withdrawn.valueKwh, "0");
+  assert.equal(withdrawn.quality, "partial");
+  assert.equal(withdrawn.coverage, "partial");
+  assert.deepEqual(withdrawn.missingIdentities, ["office"]);
+});
+
+test("EPR-R6: engineering adapter reports missing identities without creating meter rows", () => {
+  const db = getDatabase();
+  const before = Number((db.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count);
+  const result = readEngineeringAccountingPeriodResult(db, {
+    periodStart: "2026-08-01T16:00:00Z",
+    periodEnd: "2026-08-02T16:00:00Z",
+    siteTimeZone: "Asia/Taipei",
+    profileRevision: 1,
+    expectedEngineeringIds: ["stamping", "body"]
+  });
+  assert.equal(result.valueKwh, null);
+  assert.equal(result.quality, "unavailable");
+  assert.equal(result.coverage, "unknown");
+  assert.deepEqual(result.missingIdentities, ["stamping", "body"]);
+  const after = Number((db.prepare("SELECT COUNT(*) AS count FROM meter_readings_accepted").get() as { count: number }).count);
+  assert.equal(after, before);
+});
+
+test("EPR-R6: engineering adapter detects a missing day for a present identity", () => {
+  const db = getDatabase();
+  registerAccountingEngineeringSource(db, "assembly", "pub-missing-day");
+  assert.equal(admitDailyEngineeringReport(db, {
+    schemaVersion: 1,
+    sourceKind: "engineering",
+    site: "kn",
+    engineeringId: "assembly",
+    publisherId: "pub-missing-day",
+    definitionRevision: 1,
+    calendarRevision: 1,
+    measurementKind: "interval-energy",
+    unit: "kWh",
+    value: "25",
+    periodStart: "2026-08-02T16:00:00Z",
+    periodEnd: "2026-08-03T16:00:00Z",
+    periodStatus: "final",
+    coverage: "complete",
+    quality: "valid",
+    dataRevision: 1,
+    publishedAt: "2026-09-16T01:00:00Z"
+  }).accepted, true);
+  const result = readEngineeringAccountingPeriodResult(db, {
+    periodStart: "2026-08-02T16:00:00Z",
+    periodEnd: "2026-08-04T16:00:00Z",
+    siteTimeZone: "Asia/Taipei",
+    profileRevision: 1,
+    expectedEngineeringIds: ["assembly"]
+  });
+  assert.equal(result.valueKwh, "25");
+  assert.equal(result.quality, "partial");
+  assert.equal(result.coverage, "partial");
+  assert.deepEqual(result.missingIdentities, ["assembly"]);
 });

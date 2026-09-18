@@ -34,6 +34,7 @@ export * from "./metricScope.js";
 export * from "./meterReading.js";
 export * from "./mqttObservation.js";
 export * from "./siteEnergyProfile.js";
+export * from "./siteEnergyProfileV2.js";
 export * from "./periodConsumption.js";
 export * from "./guidedMqttMapping.js";
 export * from "./departmentEnergyShares.js";

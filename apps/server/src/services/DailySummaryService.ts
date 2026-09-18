@@ -3,8 +3,20 @@ import type Database from "better-sqlite3";
 import type { DisplaySyncEvent, MetricScope } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { getActiveProfile } from "./siteEnergyProfileService.js";
-import { periodSelectionFromRange, resolvePersistedPeriodConsumption } from "./periodConsumptionService.js";
-import { acceptedSampleChecksum, activateProjection, projectionContextKey, readActiveProjection, shadowProject } from "./consumptionProjectionService.js";
+import {
+  periodSelectionFromRange,
+  resolveAccountingPeriodResult,
+  resolvePersistedPeriodConsumption
+} from "./periodConsumptionService.js";
+import {
+  acceptedSampleChecksum,
+  activateProjection,
+  isEngineeringResult,
+  projectionContextKey,
+  readActiveProjection,
+  shadowProject,
+  type EngineeringAccountingPeriodResult
+} from "./consumptionProjectionService.js";
 import type { CumulativeCounters, MetricsAccumulatorService } from "./MetricsAccumulatorService.js";
 
 type DailySummaryServiceOptions = {
@@ -199,10 +211,37 @@ export class DailySummaryService {
     if (!profile) return;
     const period = periodSelectionFromRange("day", now.toISOString(), profile.siteTimeZone)!;
     this.database.transaction(() => {
+      if (profile.schemaVersion === 2) {
+        const result = resolveAccountingPeriodResult({
+          asOf: now.toISOString(),
+          database: this.database,
+          period,
+          profile,
+          scope
+        });
+        if (result.providerKind !== "engineering") return;
+        const engineeringResult = result as EngineeringAccountingPeriodResult;
+        const current = readActiveProjection(this.database, scope, "day", projectionContextKey(engineeringResult));
+        if (current && isEngineeringResult(current)
+          && current.sampleChecksum === engineeringResult.revisionFingerprint
+          && current.quality === engineeringResult.quality) return;
+        activateProjection(this.database, shadowProject(
+          this.database,
+          engineeringResult,
+          scope,
+          "day",
+          engineeringResult.revisionFingerprint
+        ));
+        return;
+      }
       const result = resolvePersistedPeriodConsumption(this.database, scope, period, now.toISOString());
       const checksum = acceptedSampleChecksum(this.database, scope, result);
       const current = readActiveProjection(this.database, scope, "day", projectionContextKey(result));
-      if (current?.sampleChecksum === checksum && current.quality === result.quality && current.freshness === result.freshness && current.freshnessState === result.freshnessState) return;
+      if (current && !isEngineeringResult(current)
+        && current.sampleChecksum === checksum
+        && current.quality === result.quality
+        && current.freshness === result.freshness
+        && current.freshnessState === result.freshnessState) return;
       activateProjection(this.database, shadowProject(this.database, result, scope, "day", checksum));
     }).immediate();
   }

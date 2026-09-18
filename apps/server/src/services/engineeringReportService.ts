@@ -1,16 +1,14 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
 import {
-  KN_ENGINEERING_IDS,
-  aggregateEngineeringPeriodResults,
   isKnEngineeringId,
   validateEngineeringPacket,
-  type EngineeringDailyResultItem,
   type EngineeringDailyPacket,
-  type EngineeringPeriodSummary,
   type KnEngineeringId
 } from "@solar-display/shared";
 import { getEffectiveEngineeringEnergySource } from "./engineeringSourceService.js";
+
+export * from "./engineeringAccountingPeriodService.js";
 
 export interface ReportAdmissionOutcome {
   accepted: boolean;
@@ -22,71 +20,6 @@ export interface ReportAdmissionOutcome {
 
 export interface BatchImportOptions {
   explicitApprovalForOldReplay?: boolean;
-}
-
-export interface EngineeringPeriodResult {
-  periodStart: string;
-  periodEnd: string;
-  results: EngineeringDailyResultItem[];
-  summary: EngineeringPeriodSummary;
-}
-
-function taipeiDateKey(timestamp: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date(timestamp));
-  const read = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return `${read("year")}-${read("month")}-${read("day")}`;
-}
-
-export function readEngineeringPeriodResult(
-  db: Database.Database,
-  params: {
-    periodStart: string;
-    periodEnd: string;
-    expectedEngineeringIds?: KnEngineeringId[];
-  }
-): EngineeringPeriodResult {
-  const expectedEngineeringIds = params.expectedEngineeringIds ?? [...KN_ENGINEERING_IDS];
-  const expectedSet = new Set(expectedEngineeringIds);
-  const rows = db
-    .prepare(
-      `SELECT engineering_id, period_start, period_end, current_data_revision,
-              period_status, coverage, quality, value
-       FROM engineering_report_heads
-       WHERE site = 'kn' AND measurement_kind = 'interval-energy'
-         AND period_start >= ? AND period_end <= ?`
-    )
-    .all(params.periodStart, params.periodEnd) as Array<Record<string, unknown>>;
-
-  const results = rows.flatMap((row): EngineeringDailyResultItem[] => {
-    const engineeringId = row.engineering_id;
-    if (!isKnEngineeringId(engineeringId) || !expectedSet.has(engineeringId)) {
-      return [];
-    }
-    const value = row.value === null || row.value === undefined ? null : Number(row.value);
-    return [{
-      engineeringId,
-      dateStr: taipeiDateKey(String(row.period_start)),
-      periodStart: String(row.period_start),
-      periodEnd: String(row.period_end),
-      value: value === null || Number.isFinite(value) ? value : null,
-      periodStatus: row.period_status as EngineeringDailyResultItem["periodStatus"],
-      coverage: row.coverage as EngineeringDailyResultItem["coverage"],
-      quality: row.quality as EngineeringDailyResultItem["quality"],
-      dataRevision: Number(row.current_data_revision)
-    }];
-  });
-
-  return {
-    periodStart: params.periodStart,
-    periodEnd: params.periodEnd,
-    results,
-    summary: aggregateEngineeringPeriodResults(results, { expectedEngineeringIds })
-  };
 }
 
 export function computeReportDigest(packet: EngineeringDailyPacket): string {

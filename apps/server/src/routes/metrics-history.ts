@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { isMetricScope, type MetricScope, type SiteEnergyProfileV1 } from "@solar-display/shared";
 import { getDatabase } from "../db/index.js";
 import { requireResolvedDisplayClientContext } from "../plugins/deviceContext.js";
@@ -23,6 +23,25 @@ function isHistoryRange(value: unknown): value is MetricHistoryRange {
 }
 
 const historyRangeError = "Invalid range. Expected day, week, month, year, or total.";
+const profileVersionUnsupported = "PROFILE_VERSION_UNSUPPORTED";
+
+function sendUnsupportedProfile(reply: FastifyReply) {
+  return reply.code(422).send({
+    success: false,
+    error: profileVersionUnsupported,
+    timestamp: new Date().toISOString()
+  });
+}
+
+function isUnsupportedProfileError(error: unknown) {
+  return typeof error === "object" && error !== null
+    && "code" in error && error.code === profileVersionUnsupported;
+}
+
+function usesV2Profile(database: ReturnType<typeof getDatabase>, metricScope: MetricScope) {
+  if (metricScope !== "cl" && metricScope !== "kn") return false;
+  return getActiveProfile(database, metricScope)?.schemaVersion === 2;
+}
 
 /**
  * The requested range owns the response's date set. Only a month request may additionally expose
@@ -72,6 +91,9 @@ function overlayCanonicalDailyConsumption(
   if (!profile) {
     return summaries;
   }
+  if (profile.schemaVersion !== 1) {
+    throw Object.assign(new Error(profileVersionUnsupported), { code: profileVersionUnsupported });
+  }
   const dates = selectDates(summaries, profile);
   const points = new Map(
     (resolveDailyConsumptionPoints(database, metricScope, dates, asOf) ?? []).map((point) => [point.date, point])
@@ -110,6 +132,16 @@ function readEnergyHistory(
 ) {
   const database = getDatabase();
   const asOf = new Date().toISOString();
+  if (usesV2Profile(database, metricScope)) {
+    return {
+      counters: [],
+      metricScope,
+      periodSummary: tryResolvePersistedPeriodConsumption(database, metricScope, range, asOf),
+      range,
+      snapshots: [],
+      summaries: []
+    };
+  }
   return {
     counters: resolveCumulativeCounterHistory(database, { metricScope }),
     metricScope,
@@ -152,10 +184,23 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
-    return readEnergyHistory(request.query.metricScope, request.query.range);
+    try {
+      return readEnergyHistory(request.query.metricScope, request.query.range);
+    } catch (error) {
+      if (isUnsupportedProfileError(error)) return sendUnsupportedProfile(reply);
+      throw error;
+    }
   });
 
-  app.get("/api/metrics/history", { preHandler: app.requireDisplayClientContext }, async (request, reply) => {
+  const blockV2DisplayClients = async (request: FastifyRequest, reply: FastifyReply) => {
+    const metricScope = requireResolvedDisplayClientContext(request).siteScope;
+    if (usesV2Profile(getDatabase(), metricScope)) {
+      return sendUnsupportedProfile(reply);
+    }
+  };
+  const v2DisplayGuard = { preHandler: [app.requireDisplayClientContext, blockV2DisplayClients] };
+
+  app.get("/api/metrics/history", v2DisplayGuard, async (request, reply) => {
     const rangeParam = (request.query as { range?: string }).range ?? "day";
 
     if (!isHistoryRange(rangeParam)) {
@@ -167,7 +212,6 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
       return;
     }
     const metricScope = requireResolvedDisplayClientContext(request).siteScope;
-
     const database = getDatabase();
     const asOf = new Date().toISOString();
     return {
@@ -177,7 +221,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.get("/api/metrics/daily-summary", { preHandler: app.requireDisplayClientContext }, async (request, reply) => {
+  app.get("/api/metrics/daily-summary", v2DisplayGuard, async (request, reply) => {
     const rangeParam = (request.query as { range?: string }).range ?? "total";
     if (!isHistoryRange(rangeParam)) {
       reply.status(400).send({
@@ -188,7 +232,6 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
       return;
     }
     const metricScope = requireResolvedDisplayClientContext(request).siteScope;
-
     const database = getDatabase();
     const asOf = new Date().toISOString();
     return {
@@ -203,7 +246,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.get("/api/metrics/cumulative", { preHandler: app.requireDisplayClientContext }, async (request) => {
+  app.get("/api/metrics/cumulative", v2DisplayGuard, async (request) => {
     const metricScope = requireResolvedDisplayClientContext(request).siteScope;
     const database = getDatabase();
     return {
@@ -211,7 +254,7 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.get("/api/metrics/department-shares", { preHandler: app.requireDisplayClientContext }, async (request, reply) => {
+  app.get("/api/metrics/department-shares", v2DisplayGuard, async (request, reply) => {
     const rangeParam = (request.query as { range?: string }).range ?? "month";
     if (!isHistoryRange(rangeParam)) {
       reply.status(400).send({
@@ -228,9 +271,12 @@ const metricsHistoryRoute: FastifyPluginAsync = async (app) => {
     const database = getDatabase();
     const asOf = new Date().toISOString();
     const profile = getActiveProfile(database, metricScope);
+    if (!profile || profile.schemaVersion !== 1) {
+      return { quality: "unavailable", shares: [] };
+    }
     // Shares resolve the requested range through the same authority the consumption card uses, so
     // week and total describe the same span rather than silently emptying or borrowing the year.
-    const rangeWindow = profile ? rangeWindowFor(rangeParam, asOf, profile) : null;
+    const rangeWindow = rangeWindowFor(rangeParam, asOf, profile);
     if (!rangeWindow) {
       return { quality: "unavailable", shares: [] };
     }

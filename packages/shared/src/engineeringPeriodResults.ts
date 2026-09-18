@@ -2,13 +2,14 @@ import {
   KN_ENGINEERING_IDS,
   type KnEngineeringId
 } from "./engineeringSources.js";
+import { formatDecimalString, parseDecimalString } from "./meterReading.js";
 
 export interface EngineeringDailyResultItem {
   engineeringId: KnEngineeringId;
   dateStr: string; // YYYY-MM-DD
   periodStart: string;
   periodEnd: string;
-  value: number | null;
+  value: string | number | null;
   periodStatus: "preliminary" | "final" | "withdrawn";
   coverage: "complete" | "partial" | "unknown";
   quality: "valid" | "partial" | "invalid" | "unknown";
@@ -17,18 +18,47 @@ export interface EngineeringDailyResultItem {
 
 export interface PeriodAggregationOptions {
   expectedEngineeringIds?: KnEngineeringId[];
+  expectedDateStrs?: string[];
 }
 
 export interface EngineeringPeriodSummary {
   periodDays: number;
   totalKWh: number | null;
+  totalKWhDecimal: string | null;
   coverage: "complete" | "partial" | "unknown";
   isComplete: boolean;
   missingEngineeringIds: KnEngineeringId[];
   itemsByEngineering: Record<KnEngineeringId, number | null>;
+  itemsByEngineeringDecimal: Record<KnEngineeringId, string | null>;
   sharesByEngineering: Record<KnEngineeringId, number | null>;
   zeroBasis: boolean;
 }
+
+export type AccountingPeriodResult = {
+  providerKind: "physical" | "engineering";
+  periodStart: string;
+  periodEnd: string;
+  siteTimeZone: string;
+  profileRevision: number;
+  valueKwh: string | null;
+  quality: "valid" | "partial" | "invalid" | "unavailable";
+  coverage: "complete" | "partial" | "unknown";
+  missingIdentities: string[];
+  revisionFingerprint: string;
+  engineeringValuesKwh?: Partial<Record<KnEngineeringId, string | null>>;
+  engineeringShares?: Partial<Record<KnEngineeringId, number | null>>;
+  issues?: string[];
+};
+
+export type EngineeringAccountingPeriodResultInput = {
+  periodStart: string;
+  periodEnd: string;
+  siteTimeZone: string;
+  profileRevision: number;
+  revisionFingerprint: string;
+  summary: EngineeringPeriodSummary;
+  issues?: string[];
+};
 
 type TaipeiDateParts = {
   year: number;
@@ -96,16 +126,33 @@ export function isTaipeiLocalDayInterval(periodStart: string, periodEnd: string)
     && Date.parse(periodEnd) - Date.parse(periodStart) === 24 * 60 * 60 * 1000;
 }
 
+function parseEngineeringValue(value: EngineeringDailyResultItem["value"]): bigint | null {
+  if (value === null || (typeof value === "number" && !Number.isFinite(value))) {
+    return null;
+  }
+  try {
+    return parseDecimalString(String(value));
+  } catch {
+    return null;
+  }
+}
+
 export function aggregateEngineeringPeriodResults(
   results: EngineeringDailyResultItem[],
   options: PeriodAggregationOptions = {}
 ): EngineeringPeriodSummary {
-  const expectedIds = options.expectedEngineeringIds || [...KN_ENGINEERING_IDS];
+  const requestedIds = new Set(options.expectedEngineeringIds || [...KN_ENGINEERING_IDS]);
+  const expectedIds = KN_ENGINEERING_IDS.filter((id) => requestedIds.has(id));
+  const expectedDateStrs = options.expectedDateStrs === undefined
+    ? undefined
+    : [...new Set(options.expectedDateStrs)].sort();
   const itemsByEngineering: Record<string, number | null> = {};
+  const itemsByEngineeringDecimal: Record<string, string | null> = {};
   const hasValidComplete: Record<string, boolean> = {};
 
   for (const id of expectedIds) {
     itemsByEngineering[id] = null;
+    itemsByEngineeringDecimal[id] = null;
     hasValidComplete[id] = true;
   }
 
@@ -120,7 +167,7 @@ export function aggregateEngineeringPeriodResults(
     byId.get(r.engineeringId)!.push(r);
   }
 
-  let totalKWh = 0;
+  let totalKWhDecimal = 0n;
   let hasObservedValue = false;
 
   for (const id of expectedIds) {
@@ -140,14 +187,28 @@ export function aggregateEngineeringPeriodResults(
       }
     }
 
-    let engSum = 0;
+    let engSumDecimal = 0n;
     let engineeringHasObservedValue = false;
-    for (const item of effectiveByDate.values()) {
+    const effectiveItems = expectedDateStrs !== undefined && expectedDateStrs.length > 0
+      ? expectedDateStrs.map((dateStr) => effectiveByDate.get(dateStr)).filter(
+        (item): item is EngineeringDailyResultItem => item !== undefined
+      )
+      : [...effectiveByDate.values()];
+    if (expectedDateStrs !== undefined && expectedDateStrs.length > 0) {
+      for (const dateStr of expectedDateStrs) {
+        if (!effectiveByDate.has(dateStr)) {
+          missingSet.add(id);
+          hasValidComplete[id] = false;
+        }
+      }
+    }
+    for (const item of effectiveItems) {
+      const decimalValue = parseEngineeringValue(item.value);
       const isUsable =
         item.periodStatus === "final" &&
         item.coverage === "complete" &&
         item.quality === "valid" &&
-        item.value !== null;
+        decimalValue !== null;
 
       if (!isUsable) {
         missingSet.add(id);
@@ -155,18 +216,21 @@ export function aggregateEngineeringPeriodResults(
       }
 
       if (
-        item.value !== null
+        decimalValue !== null
         && item.periodStatus !== "withdrawn"
         && item.quality !== "invalid"
-        && Number.isFinite(item.value)
       ) {
-        engSum += item.value;
+        engSumDecimal += decimalValue;
         engineeringHasObservedValue = true;
         hasObservedValue = true;
       }
     }
-    itemsByEngineering[id] = engineeringHasObservedValue ? engSum : null;
-    totalKWh += engSum;
+    const engineeringValueDecimal = engineeringHasObservedValue
+      ? formatDecimalString(engSumDecimal)
+      : null;
+    itemsByEngineeringDecimal[id] = engineeringValueDecimal;
+    itemsByEngineering[id] = engineeringValueDecimal === null ? null : Number(engineeringValueDecimal);
+    totalKWhDecimal += engSumDecimal;
   }
 
   const isComplete = missingSet.size === 0;
@@ -174,25 +238,60 @@ export function aggregateEngineeringPeriodResults(
   const missingEngineeringIds = Array.from(missingSet);
 
   const sharesByEngineering: Record<string, number | null> = {};
-  const resolvedTotalKWh = hasObservedValue ? totalKWh : null;
-  const zeroBasis = resolvedTotalKWh === 0;
+  const resolvedTotalKWhDecimal = hasObservedValue ? formatDecimalString(totalKWhDecimal) : null;
+  const resolvedTotalKWh = resolvedTotalKWhDecimal === null ? null : Number(resolvedTotalKWhDecimal);
+  const zeroBasis = resolvedTotalKWhDecimal === "0";
 
   for (const id of expectedIds) {
     if (zeroBasis || !isComplete) {
       sharesByEngineering[id] = null;
     } else {
-      sharesByEngineering[id] = (itemsByEngineering[id] ?? 0) / (resolvedTotalKWh ?? 1);
+      const engineeringValueDecimal = itemsByEngineeringDecimal[id];
+      sharesByEngineering[id] = engineeringValueDecimal === null || resolvedTotalKWhDecimal === null
+        ? null
+        : Number(engineeringValueDecimal) / Number(resolvedTotalKWhDecimal);
     }
   }
 
   return {
-    periodDays: new Set(results.map((item) => item.dateStr)).size,
+    periodDays: expectedDateStrs !== undefined && expectedDateStrs.length > 0
+      ? expectedDateStrs.length
+      : new Set(results.map((item) => item.dateStr)).size,
     totalKWh: resolvedTotalKWh,
+    totalKWhDecimal: resolvedTotalKWhDecimal,
     coverage,
     isComplete,
     missingEngineeringIds,
     itemsByEngineering: itemsByEngineering as Record<KnEngineeringId, number | null>,
+    itemsByEngineeringDecimal: itemsByEngineeringDecimal as Record<KnEngineeringId, string | null>,
     sharesByEngineering: sharesByEngineering as Record<KnEngineeringId, number | null>,
     zeroBasis
+  };
+}
+
+export function toEngineeringAccountingPeriodResult(
+  input: EngineeringAccountingPeriodResultInput
+): AccountingPeriodResult {
+  const { summary } = input;
+  const hasUsableValue = summary.totalKWhDecimal !== null;
+  const missingIdentities = [...summary.missingEngineeringIds];
+  const issues = [
+    ...(input.issues ?? []),
+    ...missingIdentities.map((engineeringId) => `MISSING_ENGINEERING_IDENTITY:${engineeringId}`)
+  ];
+  return {
+    providerKind: "engineering",
+    periodStart: input.periodStart,
+    periodEnd: input.periodEnd,
+    siteTimeZone: input.siteTimeZone,
+    profileRevision: input.profileRevision,
+    valueKwh: summary.totalKWhDecimal,
+    quality: hasUsableValue ? (summary.isComplete ? "valid" : "partial") : "unavailable",
+    coverage: hasUsableValue ? (summary.isComplete ? "complete" : "partial") : "unknown",
+    missingIdentities,
+    revisionFingerprint: input.revisionFingerprint,
+    engineeringValuesKwh: { ...summary.itemsByEngineeringDecimal },
+    engineeringShares: { ...summary.sharesByEngineering },
+    ...(issues.length > 0 ? { issues: [...new Set(issues)] } : {})
   };
 }

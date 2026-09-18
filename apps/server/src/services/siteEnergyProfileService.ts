@@ -4,20 +4,35 @@ import {
   rejectCalendarOverride,
   resolveReviewPeriodConsumption,
   validateSiteEnergyProfile,
+  type AccountingPeriodResult,
   type PeriodConsumptionResult,
   type ProfileApplyResponse,
   type ProfilePreviewResponse,
   type ProfilePreviewRequest,
+  type SiteEnergyProfile,
   type SiteEnergyProfileV1,
   type SiteEnergyScope
 } from "@solar-display/shared";
 import { canonicalJson } from "./authoringCanonicalJson.js";
-import { captureProfileSourceSnapshot, type ProfileSourceSnapshot } from "./profileSourceSnapshot.js";
+import {
+  captureProfileProviderSnapshot,
+  captureProfileSourceSnapshot,
+  type ProfileProviderSnapshot,
+  type ProfileSourceSnapshot
+} from "./profileSourceSnapshot.js";
 import { loadAcceptedSamples } from "./periodConsumptionService.js";
 import { readFreshnessPolicy } from "./freshnessPolicyService.js";
 import { buildReviewReadiness, readProfileReadiness } from "./profileReadinessService.js";
-import { getActiveProfile } from "./siteEnergyProfileRepository.js";
+import { getActiveProfile, serializeSiteEnergyProfile } from "./siteEnergyProfileRepository.js";
+import {
+  conflict,
+  freezeDeep,
+  previewSourceConflict,
+  readPreviewPeriodEvidence,
+  type PreviewPeriodEvidence
+} from "./profilePreviewEvidence.js";
 import { resolveProfileEvidence } from "./profileEvidence.js";
+import { calculateEngineeringReview } from "./engineeringProfileReview.js";
 import type { DefinitionRevisionItem, PeriodSelection } from "@solar-display/shared";
 
 export { getActiveProfile, listPersistedProfiles } from "./siteEnergyProfileRepository.js";
@@ -26,24 +41,19 @@ export type ProfileCalculator = (
   profile: SiteEnergyProfileV1,
   period: ProfilePreviewRequest["periodSelection"],
   context: { asOf: string; sourceSnapshot: ProfileSourceSnapshot[] }
-) => ProfilePreviewResponse["calculator"];
+) => {
+  basis: { memberChannelIds: string[]; result: PeriodConsumptionResult };
+  departments: Array<Omit<ProfilePreviewResponse["calculator"]["departments"][number], "result"> & {
+    result: PeriodConsumptionResult;
+  }>;
+  period: PeriodConsumptionResult;
+};
 
 type ReviewCalculation = {
   calculator: ProfilePreviewResponse["calculator"];
   readiness: ProfilePreviewResponse["readiness"];
+  revisionFingerprint?: string;
 };
-
-function conflict(code: string): never {
-  throw Object.assign(new Error(code), { code, statusCode: 409 });
-}
-
-function freezeDeep<T>(value: T): T {
-  if (!value || typeof value !== "object") return value;
-  for (const child of Object.values(value as Record<string, unknown>)) {
-    freezeDeep(child);
-  }
-  return Object.freeze(value);
-}
 
 function reviewDefinitionRevisions(sourceSnapshot: ProfileSourceSnapshot[]): DefinitionRevisionItem[] {
   return sourceSnapshot.map(({ channelId, epochId, meterId, sourceRevision }) => ({
@@ -97,6 +107,7 @@ function calculateReview(
   };
 }
 
+
 export function previewProfile(
   database: Database.Database,
   scope: SiteEnergyScope,
@@ -111,7 +122,13 @@ export function previewProfile(
   }
   const validation = validateSiteEnergyProfile(draftSnapshot);
   if (!validation.ok) {
-    throw Object.assign(new Error("PROFILE_INVALID"), { code: "PROFILE_INVALID", statusCode: 422, fields: validation.errors });
+    const code = validation.errors[0]?.code ?? "PROFILE_INVALID";
+    throw Object.assign(new Error(code), { code, statusCode: 422, fields: validation.errors });
+  }
+  if (draftSnapshot.schemaVersion === 2
+    && (scope !== "kn" || draftSnapshot.providerKind !== "engineering")) {
+    const code = scope !== "kn" ? "PROFILE_SCOPE_MISMATCH" : "PROFILE_PROVIDER_INVALID";
+    throw Object.assign(new Error(code), { code, statusCode: scope !== "kn" ? 409 : 422 });
   }
   const override = rejectCalendarOverride({
     end: (request as { end?: string }).end,
@@ -125,15 +142,25 @@ export function previewProfile(
   if ((active?.revision ?? 0) !== expectedRevisionSnapshot) {
     throw Object.assign(new Error("PROFILE_REVISION_CONFLICT"), { code: "PROFILE_REVISION_CONFLICT", statusCode: 409 });
   }
-  const sourceSnapshot = captureProfileSourceSnapshot(database, draftSnapshot);
+  const sourceSnapshot: ProfileSourceSnapshot[] | ProfileProviderSnapshot = draftSnapshot.schemaVersion === 1
+    ? captureProfileSourceSnapshot(database, draftSnapshot)
+    : captureProfileProviderSnapshot(database, draftSnapshot);
   freezeDeep(draftSnapshot);
   freezeDeep(periodSnapshot);
   freezeDeep(sourceSnapshot);
   const asOf = new Date().toISOString();
   let review: ReviewCalculation;
+  const physicalSourceSnapshot: ProfileSourceSnapshot[] = draftSnapshot.schemaVersion === 1
+    ? sourceSnapshot as ProfileSourceSnapshot[]
+    : [];
   try {
-    if (calculator) {
-      const calculatorResult = calculator(draftSnapshot, periodSnapshot, freezeDeep({ asOf, sourceSnapshot }));
+    if (draftSnapshot.schemaVersion === 2) {
+      review = calculateEngineeringReview(database, draftSnapshot, periodSnapshot, asOf, expectedRevisionSnapshot);
+    } else if (calculator) {
+      const calculatorResult = calculator(draftSnapshot, periodSnapshot, freezeDeep({
+        asOf,
+        sourceSnapshot: physicalSourceSnapshot
+      }));
       review = { calculator: calculatorResult, readiness: buildReviewReadiness({
         asOf,
         basis: calculatorResult.basis.result,
@@ -141,12 +168,17 @@ export function previewProfile(
         period: calculatorResult.period,
         periodSelection: periodSnapshot,
         profile: draftSnapshot,
-        sourceSnapshots: sourceSnapshot
+        sourceSnapshots: physicalSourceSnapshot
       }) };
     } else {
-      review = calculateReview(database, draftSnapshot, periodSnapshot, asOf, sourceSnapshot);
+      review = calculateReview(database, draftSnapshot, periodSnapshot, asOf, physicalSourceSnapshot);
     }
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error
+      && typeof (error as { code?: unknown }).code === "string"
+      && (error as { code: string }).code.startsWith("PROFILE_")) {
+      throw error;
+    }
     throw Object.assign(error instanceof Error ? error : new Error("PROFILE_CALCULATOR_FAILED"), {
       code: "PROFILE_CALCULATOR_FAILED", statusCode: 500
     });
@@ -164,7 +196,13 @@ export function previewProfile(
     canonicalJson(draftSnapshot),
     new Date(Date.now() + 600_000).toISOString(),
     canonicalJson(sourceSnapshot),
-    canonicalJson(periodSnapshot),
+    canonicalJson(draftSnapshot.schemaVersion === 2
+      ? {
+        selection: periodSnapshot,
+        revisionFingerprint: review.revisionFingerprint
+          ?? (review.calculator.period as AccountingPeriodResult).revisionFingerprint
+      }
+      : periodSnapshot),
     asOf
   );
   const response: ProfilePreviewResponse = {
@@ -177,7 +215,7 @@ export function previewProfile(
     readiness: review.readiness,
     reviewContext: "profile-draft",
     siteTimeZone: draftSnapshot.siteTimeZone,
-    sources: sourceSnapshot.map(({ channelId, epochId, meterId, sourceRevision }) => ({
+    sources: (draftSnapshot.schemaVersion === 1 ? physicalSourceSnapshot : []).map(({ channelId, epochId, meterId, sourceRevision }) => ({
       channelId,
       epochId,
       meterId,
@@ -190,7 +228,7 @@ export function previewProfile(
 export function applyProfile(
   database: Database.Database,
   scope: SiteEnergyScope,
-  input: { draft: SiteEnergyProfileV1; expectedRevision: number; previewToken: string; idempotencyKey: string }
+  input: { draft: SiteEnergyProfile; expectedRevision: number; previewToken: string; idempotencyKey: string }
 ): ProfileApplyResponse {
   if (!input.idempotencyKey?.trim()) conflict("IDEMPOTENCY_KEY_REQUIRED");
   const requestJson = canonicalJson({ input, scope });
@@ -217,58 +255,84 @@ export function applyProfile(
     if (preview.draft_json !== canonicalJson(input.draft) || preview.expected_revision !== input.expectedRevision) {
       conflict("PREVIEW_DRAFT_MISMATCH");
     }
-    if (!preview.period_selection_json || !preview.review_as_of) {
-      conflict("PROFILE_SOURCE_REVIEW_REQUIRED");
-    }
     const active = getActiveProfile(database, scope);
     if ((active?.revision ?? 0) !== input.expectedRevision) {
       throw Object.assign(new Error("PROFILE_REVISION_CONFLICT"), { code: "PROFILE_REVISION_CONFLICT", statusCode: 409 });
     }
     if (!preview.source_snapshot_json) conflict("PROFILE_SOURCE_REVIEW_REQUIRED");
-    let currentSourceSnapshot: ProfileSourceSnapshot[];
-    try {
-      currentSourceSnapshot = captureProfileSourceSnapshot(database, input.draft);
-      if (canonicalJson(currentSourceSnapshot) !== preview.source_snapshot_json) {
-        conflict("PROFILE_SOURCE_CONFLICT");
-      }
-    } catch (error) {
-      if ((error as { code?: string }).code === "PROFILE_SOURCE_UNAVAILABLE") {
-        conflict("PROFILE_SOURCE_CONFLICT");
-      }
-      throw error;
-    }
+    if (!preview.period_selection_json || !preview.review_as_of) conflict("PROFILE_SOURCE_REVIEW_REQUIRED");
+    const periodEvidence = readPreviewPeriodEvidence(preview.period_selection_json, input.draft.schemaVersion);
     const activationAsOf = new Date().toISOString();
-    const review = calculateReview(database, input.draft, JSON.parse(preview.period_selection_json) as PeriodSelection,
-      activationAsOf, currentSourceSnapshot);
-    if (review.readiness.status === "incomplete" || review.readiness.status === "conflict") {
+    const nextRevision = (active?.revision ?? 0) + 1;
+
+    let review: ReviewCalculation;
+    let readiness: ProfilePreviewResponse["readiness"];
+    if (input.draft.schemaVersion === 2) {
+      let currentProviderSnapshot: ProfileProviderSnapshot;
+      try {
+        currentProviderSnapshot = captureProfileProviderSnapshot(database, input.draft);
+      } catch (error) {
+        previewSourceConflict(error);
+      }
+      if (canonicalJson(currentProviderSnapshot) !== preview.source_snapshot_json) {
+        conflict("PROFILE_SOURCE_CONFLICT");
+      }
+      review = calculateEngineeringReview(
+        database,
+        input.draft,
+        periodEvidence.selection,
+        activationAsOf,
+        input.expectedRevision
+      );
+      const periodResult = review.calculator.period as AccountingPeriodResult;
+      if (periodEvidence.revisionFingerprint !== (review.revisionFingerprint ?? periodResult.revisionFingerprint)) {
+        conflict("PROFILE_SOURCE_CONFLICT");
+      }
+      readiness = review.readiness;
+    } else {
+      let currentSourceSnapshot: ProfileSourceSnapshot[];
+      try {
+        currentSourceSnapshot = captureProfileSourceSnapshot(database, input.draft);
+        if (canonicalJson(currentSourceSnapshot) !== preview.source_snapshot_json) {
+          conflict("PROFILE_SOURCE_CONFLICT");
+        }
+      } catch (error) {
+        previewSourceConflict(error);
+      }
+      review = calculateReview(database, input.draft, periodEvidence.selection, activationAsOf, currentSourceSnapshot);
+      readiness = review.readiness;
+    }
+    if (readiness.status === "incomplete" || readiness.status === "conflict") {
       conflict("PROFILE_NOT_READY");
     }
-    const nextRevision = (active?.revision ?? 0) + 1;
-    const next: SiteEnergyProfileV1 = {
+
+    const next: SiteEnergyProfile = {
       ...input.draft,
       metricScope: scope,
       revision: nextRevision,
-      status: "configured-awaiting-data"
+      status: readiness.status
     };
+    const serialized = serializeSiteEnergyProfile(next);
     database.prepare("UPDATE site_energy_profiles SET active = 0 WHERE metric_scope = ?").run(scope);
     database.prepare(`
       INSERT INTO site_energy_profiles (
         profile_id, metric_scope, revision, schema_version, site_time_zone, status, effective_from,
         site_total_json, departments_json, share_basis_json, active, created_at
-      ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, 1, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     `).run(
       next.profileId,
       scope,
       nextRevision,
+      serialized.schemaVersion,
       next.siteTimeZone,
       next.status,
       next.effectiveFrom,
-      JSON.stringify(next.siteTotal),
-      JSON.stringify(next.departments),
-      JSON.stringify(next.shareBasis),
+      serialized.siteTotalJson,
+      serialized.departmentsJson,
+      serialized.shareBasisJson,
       activationAsOf
     );
-    const readiness = readProfileReadiness(database, scope, activationAsOf);
+    readiness = readProfileReadiness(database, scope, activationAsOf);
     database.prepare("UPDATE site_energy_profiles SET status = ? WHERE metric_scope = ? AND revision = ?")
       .run(readiness.status, scope, nextRevision);
     const result: ProfileApplyResponse = {

@@ -5,7 +5,7 @@ import React, { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { JSDOM } from "jsdom";
-import type { ProfilePreviewResponse, SiteEnergyProfileV1 } from "@solar-display/shared";
+import type { ProfilePreviewResponse, SiteEnergyProfileV1, SiteEnergyProfileV2 } from "@solar-display/shared";
 import { SiteEnergySetupPanel } from "./SiteEnergySetupPanel";
 
 const panelSource = readFileSync(new URL("./SiteEnergySetupPanel.tsx", import.meta.url), "utf8");
@@ -138,6 +138,73 @@ test("U6 wizard starts on the site step and keeps KN copy", () => {
   assert.match(html, /data-site-energy-step="site"/);
   assert.match(html, /設定觀音用電/);
   assert.match(html, /目前廠區是 KN/);
+});
+
+test("V2 engineering profile fails closed in the V1 physical editor", async () => {
+  const profile: SiteEnergyProfileV2 = {
+    departments: [],
+    effectiveFrom: "2026-09-01T00:00:00+08:00",
+    metricScope: "kn",
+    profileId: "kn-engineering",
+    providerKind: "engineering",
+    revision: 2,
+    schemaVersion: 2,
+    shareBasis: { kind: "site-main" },
+    siteTimeZone: "Asia/Taipei",
+    siteTotal: {
+      coverageReview: "reviewed",
+      kind: "member-set",
+      label: "觀音工程總量",
+      members: [{
+        engineeringId: "stamping",
+        kind: "engineering",
+        mode: "daily-report",
+        sourceRef: "kn-eng-stamping-energy"
+      }]
+    },
+    status: "ready"
+  };
+  const dom = new JSDOM('<div id="root"></div>', { url: "http://127.0.0.1/" });
+  const globals = {
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    navigator: dom.window.navigator,
+    window: dom.window,
+    IS_REACT_ACT_ENVIRONMENT: true
+  };
+  const descriptors = new Map(Object.keys(globals).map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(globals)) {
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
+  }
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = async (input) => {
+    calls.push(String(input));
+    return new Response(JSON.stringify({ meters: [], profile, receivedTags: [] }), {
+      headers: { "content-type": "application/json" },
+      status: 200
+    });
+  };
+  const root = createRoot(dom.window.document.getElementById("root")!);
+  try {
+    await act(async () => {
+      root.render(<SiteEnergySetupPanel scope="kn" />);
+      await Promise.resolve();
+    });
+    assert.match(dom.window.document.body.textContent ?? "", /V2 engineering 設定/);
+    const next = [...dom.window.document.querySelectorAll("button")]
+      .find((button) => button.textContent === "下一步") as HTMLButtonElement | undefined;
+    assert.equal(next?.disabled, true);
+    assert.equal(calls.filter((url) => url.endsWith("/preview")).length, 0);
+  } finally {
+    await act(async () => root.unmount());
+    dom.window.close();
+    globalThis.fetch = originalFetch;
+    for (const [key, descriptor] of descriptors) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
 });
 
 test("U6 meter picker binds E1 channelId rather than MQTT metricKey", () => {
