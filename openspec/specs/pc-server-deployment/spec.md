@@ -333,7 +333,7 @@ tests:
 ---
 ### Requirement: Provide a network-free Windows x64 deployment bundle
 
-The repository SHALL build a ZIP for a Windows x64 PC with no network access. The ZIP SHALL contain the built application, a portable Windows Node runtime, pnpm, nssm, the Windows-native runtime dependency required by `better-sqlite3`, and an administrator PowerShell installer. The installer SHALL not run a package-manager install or download software on the target PC. It SHALL create a persistent `SolarPlayerServer` service, create its runtime directories, and add an inbound TCP 4000 firewall rule. Its generated `.env` SHALL bind `HOST=0.0.0.0` and `PORT=4000` unless the operator explicitly changes the port before installation.
+The repository SHALL build a ZIP for a Windows x64 PC with no network access. The ZIP SHALL contain the built application, a streamlined portable Windows Node runtime (`node.exe`), the Windows-native runtime dependency required by `better-sqlite3`, and an administrator PowerShell installer without bundled NSSM or pnpm. The installer SHALL not run a package-manager install or download software on the target PC. It SHALL create a persistent `SolarPlayerServer` task via Windows Task Scheduler running under `SYSTEM` at startup, copy the self-contained runtime into the install root, create its runtime directories, and add an inbound TCP 4000 firewall rule. Its generated `.env` SHALL bind `HOST=0.0.0.0` and `PORT=4000` unless the operator explicitly changes the port before installation.
 
 #### Scenario: Offline Win11 installation succeeds on port 4000
 

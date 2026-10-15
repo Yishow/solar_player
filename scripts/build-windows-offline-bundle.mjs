@@ -13,13 +13,9 @@ const portableArchivePath = join(outputDir, "solar-player-windows-x64-portable.z
 const nodeExecutable = join(stageDir, "runtime/node/node.exe");
 const cacheDir = process.env.SOLAR_WINDOWS_OFFLINE_CACHE || join(outputDir, ".windows-offline-cache");
 const nodeVersion = process.env.SOLAR_WINDOWS_NODE_VERSION || process.versions.node;
-const pnpmVersion = "10.33.2";
 
 const nodeArchive = `node-v${nodeVersion}-win-x64.zip`;
 const nodeUrl = `https://nodejs.org/dist/v${nodeVersion}/${nodeArchive}`;
-const nssmArchive = "nssm-2.24.zip";
-const nssmUrl = `https://nssm.cc/release/${nssmArchive}`;
-const pnpmArchive = `https://registry.npmjs.org/pnpm/-/pnpm-${pnpmVersion}.tgz`;
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: projectRoot, encoding: "utf8", stdio: "pipe", ...options });
@@ -42,12 +38,15 @@ function copyRequired(source, destination) {
 }
 
 function findBetterSqlitePackage(root) {
-  // Avoid `find -path`: platform find implementations disagree on separators.
+  const topPackage = join(root, "node_modules", "better-sqlite3");
+  if (existsSync(join(topPackage, "package.json"))) return topPackage;
   const pnpmDir = join(root, "node_modules", ".pnpm");
-  const candidates = readdirSync(pnpmDir).filter((name) => name.startsWith("better-sqlite3@"));
-  for (const candidate of candidates) {
-    const packageJson = join(pnpmDir, candidate, "node_modules", "better-sqlite3", "package.json");
-    if (existsSync(packageJson)) return dirname(packageJson);
+  if (existsSync(pnpmDir)) {
+    const candidates = readdirSync(pnpmDir).filter((name) => name.startsWith("better-sqlite3@"));
+    for (const candidate of candidates) {
+      const packageJson = join(pnpmDir, candidate, "node_modules", "better-sqlite3", "package.json");
+      if (existsSync(packageJson)) return dirname(packageJson);
+    }
   }
   throw new Error("better-sqlite3 package was not produced by pnpm deploy");
 }
@@ -91,13 +90,28 @@ function copyTreeWindows(source, destination) {
   }
 }
 
+function safeRenameSync(source, destination, retries = 10) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      renameSync(source, destination);
+      return;
+    } catch (error) {
+      if ((error.code === "EPERM" || error.code === "EBUSY") && attempt < retries - 1) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
 function materializeRuntimeDependencies(serverDir) {
   const nodeModules = join(serverDir, "node_modules");
   const portableNodeModules = join(serverDir, "node_modules.portable");
   rmSync(portableNodeModules, { recursive: true, force: true });
   copyTreeWindows(join(serverDir, "node_modules"), portableNodeModules);
   rmSync(nodeModules, { recursive: true, force: true });
-  renameSync(portableNodeModules, nodeModules);
+  safeRenameSync(portableNodeModules, nodeModules);
   const hoistedDependencies = join(nodeModules, ".pnpm", "node_modules");
   for (const dependency of readdirSync(hoistedDependencies)) {
     const source = join(hoistedDependencies, dependency);
@@ -114,6 +128,8 @@ function materializeRuntimeDependencies(serverDir) {
   }
   const symlinks = run("find", [nodeModules, "-type", "l", "-print"]).stdout.trim();
   if (symlinks) throw new Error(`Portable bundle contains symlinked dependencies:\n${symlinks}`);
+  rmSync(join(nodeModules, ".pnpm"), { recursive: true, force: true });
+  rmSync(join(nodeModules, "@solar-display", "server"), { recursive: true, force: true });
 }
 
 function sha256(filePath) {
@@ -131,11 +147,7 @@ function build() {
   mkdirSync(cacheDir, { recursive: true });
 
   const nodeZip = join(cacheDir, nodeArchive);
-  const nssmZip = join(cacheDir, nssmArchive);
-  const pnpmTgz = join(cacheDir, `pnpm-${pnpmVersion}.tgz`);
   download(nodeUrl, nodeZip);
-  download(nssmUrl, nssmZip);
-  download(pnpmArchive, pnpmTgz);
 
   const payload = join(stageDir, "payload");
   const serverDir = join(payload, "apps", "server");
@@ -176,31 +188,17 @@ function build() {
   rmSync(nodeExtract, { recursive: true, force: true });
   mkdirSync(nodeExtract, { recursive: true });
   run("unzip", ["-q", nodeZip, "-d", nodeExtract]);
-  copyRequired(join(nodeExtract, `node-v${nodeVersion}-win-x64`), join(stageDir, "runtime/node"));
+  const sourceNodeExe = join(nodeExtract, `node-v${nodeVersion}-win-x64`, "node.exe");
+  mkdirSync(join(stageDir, "runtime", "node"), { recursive: true });
+  copyRequired(sourceNodeExe, nodeExecutable);
   if (!existsSync(nodeExecutable)) throw new Error(`Portable node.exe is missing from ${nodeExecutable}`);
-
-  const nssmExtract = join(cacheDir, "nssm");
-  rmSync(nssmExtract, { recursive: true, force: true });
-  mkdirSync(nssmExtract, { recursive: true });
-  run("unzip", ["-q", nssmZip, "-d", nssmExtract]);
-  copyRequired(join(nssmExtract, "nssm-2.24/win64/nssm.exe"), join(stageDir, "runtime/nssm/nssm.exe"));
-
-  const pnpmExtract = join(cacheDir, "pnpm");
-  rmSync(pnpmExtract, { recursive: true, force: true });
-  mkdirSync(pnpmExtract, { recursive: true });
-  run("tar", ["-xzf", pnpmTgz, "-C", pnpmExtract]);
-  copyRequired(join(pnpmExtract, "package"), join(stageDir, "runtime/pnpm"));
-  run("find", [join(stageDir, "runtime/pnpm"), "-name", "*darwin*", "-delete"]);
 
   const manifest = {
     nodeVersion,
-    pnpmVersion,
     sqliteVersion,
     defaultPort: 4000,
     sha256: {
       node: sha256(nodeZip),
-      nssm: sha256(nssmZip),
-      pnpm: sha256(pnpmTgz),
       betterSqlite3: sha256(sqliteBinary)
     }
   };

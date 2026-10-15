@@ -6235,7 +6235,7 @@ test("Windows offline bundle builder and installer target x64 port 4000 without 
 
   assert.match(builder, /solar-player-windows-x64-offline\.zip/u);
   assert.match(builder, /node\.exe/u);
-  assert.match(builder, /nssm\.exe/u);
+  assert.doesNotMatch(builder, /nssm/iu);
   assert.match(builder, /win32-x64\.node/u);
   assert.match(builder, /apps\/server\/dist\/server\.js/u);
   assert.match(builder, /apps\/web\/dist/u);
@@ -6245,15 +6245,75 @@ test("Windows offline bundle builder and installer target x64 port 4000 without 
   assert.match(builder, /hoistedDependencies = join\(nodeModules, "\.pnpm", "node_modules"\)/u);
   assert.match(builder, /readdirSync\(hoistedDependencies\)/u);
   assert.match(builder, /Portable bundle contains symlinked dependencies/u);
-  assert.match(builder, /runtime\/pnpm.*\*darwin\*/su);
+  assert.doesNotMatch(builder, /runtime\/pnpm/iu);
 
   assert.match(installer, /#Requires -RunAsAdministrator/u);
   assert.match(installer, /\$Port\s*=\s*4000/u);
   assert.match(installer, /Get-NetTCPConnection/u);
   assert.match(installer, /New-NetFirewallRule/u);
   assert.match(installer, /SolarPlayerServer/u);
-  assert.match(installer, /nssm\.exe/u);
+  assert.match(installer, /Register-ScheduledTask/u);
+  assert.match(installer, /Start-ScheduledTask/u);
+  assert.match(installer, /-ExecutionTimeLimit\s+\(\[TimeSpan\]::Zero\)/u);
+  assert.doesNotMatch(installer, /nssm/iu);
   assert.doesNotMatch(installer, /pnpm\s+install|Invoke-WebRequest|Start-BitsTransfer|curl\.exe/iu);
+});
+
+test("Solar tunnel start and stop leave unrelated forwards alone", { skip: process.platform !== "win32" }, () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), "solar-tunnel-test-"));
+  const scriptPath = path.join(repoRoot, ".agents/skills/ez-solar-deploy/scripts/tunnel-s131.ps1");
+  const harness = String.raw`
+    $ErrorActionPreference = 'Stop'
+    $StateFile = Join-Path $env:SOLAR_TUNNEL_TEST_DIR 'runid.txt'
+    $Base = 'http://mock.invalid'
+    $Token = 'test-token'
+    $Mappings = 'test-mappings'
+    $source = Get-Content -Raw $env:SOLAR_TUNNEL_SCRIPT
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$null, [ref]$null)
+    $fn = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-RunningForward' }, $true)
+    Invoke-Expression $fn.Extent.Text
+    $dispatch = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.SwitchStatementAst] }, $true).Extent.Text
+    $script:stopRequests = @()
+    $script:created = 0
+    $script:runs = @([pscustomobject]@{ id = 'unrelated'; toolId = 'forward'; status = 'running' })
+    function Start-Sleep {}
+    function Invoke-RestMethod {
+      param($Uri, $Method, $Body, $ContentType)
+      switch ($Uri) {
+        "$Base/api/runs" { return $script:runs }
+        "$Base/api/run" { $script:created++; return [pscustomobject]@{ id = 'owned' } }
+        "$Base/api/stop" { $script:stopRequests += ($Body | ConvertFrom-Json).id; return }
+        default { throw "Unexpected API: $Uri" }
+      }
+    }
+    # No saved run: an unrelated forward must neither block start nor be stopped.
+    $Action = 'stop'; Invoke-Expression $dispatch | Out-Null
+    if ($script:stopRequests.Count -ne 0) { throw 'Stopped an unrelated run without state' }
+    $Action = 'start'; Invoke-Expression $dispatch | Out-Null
+    if ($script:created -ne 1) { throw 'Unrelated run blocked start' }
+    if ((Get-Content -Raw $StateFile).Trim() -ne 'owned') { throw 'Missing owned run ID' }
+    # Both exist: reuse and stop only our saved run.
+    $script:runs += [pscustomobject]@{ id = 'owned'; toolId = 'forward'; status = 'running' }
+    $Action = 'start'; Invoke-Expression $dispatch | Out-Null
+    if ($script:created -ne 1) { throw 'Duplicated our running forward' }
+    $Action = 'stop'; Invoke-Expression $dispatch | Out-Null
+    if ($script:stopRequests.Count -ne 1 -or $script:stopRequests[0] -ne 'owned') { throw 'Stop did not target only our run' }
+    if (Test-Path $StateFile) { throw 'State was not cleared' }
+    # A stale ID must not fall back to stopping other forwards.
+    Set-Content $StateFile 'expired'
+    $Action = 'stop'; Invoke-Expression $dispatch | Out-Null
+    if ($script:stopRequests.Count -ne 1) { throw 'Stale state stopped another forward' }
+  `;
+  try {
+    const result = spawnSync("pwsh", ["-NoProfile", "-NonInteractive", "-Command", harness], {
+      encoding: "utf8",
+      timeout: 15_000,
+      env: { ...process.env, SOLAR_TUNNEL_TEST_DIR: tempDir, SOLAR_TUNNEL_SCRIPT: scriptPath }
+    });
+    assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("Windows portable launcher starts on port 4000 without administrator-only operations", () => {
