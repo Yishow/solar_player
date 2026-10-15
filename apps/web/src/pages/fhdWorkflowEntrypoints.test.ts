@@ -44,14 +44,13 @@ test("workflow entrypoint index points readers to canonicals, evidence workflow,
   assert.match(workflowEntrypointsDoc, /docs\/reference-match\/display-launch-witness-matrix\.md/);
 });
 
-test("AGENTS and CLAUDE mirror the same FHD workflow vocabulary", () => {
-  for (const source of [agentsDoc, claudeDoc]) {
-    assert.match(source, /witness batch/i);
-    assert.match(source, /evidence bundle/i);
-    assert.match(source, /visual canonicals/i);
-    assert.match(source, /launch witness gates/i);
-    assert.match(source, /fhd-workflow-entrypoints\.md/);
-  }
+test("CLAUDE imports the shared AGENTS instructions with the same FHD workflow vocabulary", () => {
+  assert.equal(claudeDoc.trim(), "@AGENTS.md");
+  assert.match(agentsDoc, /witness batch/i);
+  assert.match(agentsDoc, /evidence bundle/i);
+  assert.match(agentsDoc, /visual canonicals/i);
+  assert.match(agentsDoc, /launch witness gates/i);
+  assert.match(agentsDoc, /fhd-workflow-entrypoints\.md/);
 });
 
 test("README entrypoints stay lightweight and route readers to canonical workflow docs", () => {

@@ -9,7 +9,8 @@ const configUrl = pathToFileURL(path.join(repoRoot, "scripts/fhd-witness-config.
 const captureScriptPath = path.join(repoRoot, "scripts/capture-fhd-witness.mjs");
 const evidenceTemplatePath = path.join(repoRoot, "docs/fhd-witness/evidence-template.md");
 const closeoutMatrixPath = path.join(repoRoot, "docs/fhd-witness/playback-closeout-matrix.md");
-const rootFacingDocs = ["AGENTS.md", "CLAUDE.md", "README.md"].map((fileName) =>
+// CLAUDE.md imports AGENTS.md; fhdWorkflowEntrypoints.test.ts checks that entrypoint.
+const rootFacingDocs = ["AGENTS.md", "README.md"].map((fileName) =>
   readFileSync(path.join(repoRoot, fileName), "utf8")
 );
 

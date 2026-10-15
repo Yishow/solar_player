@@ -30,6 +30,43 @@ test("root verify stages are build → bundle-budget → shared → server → w
   );
 });
 
+test("verification reuses the build stage without repeating package pretest builds", () => {
+  for (const name of ["server", "web"]) {
+    const scripts = JSON.parse(
+      readFileSync(new URL(`../apps/${name}/package.json`, import.meta.url), "utf8")
+    ).scripts;
+    const stage = VERIFY_STAGES.find((item) => item.label === name);
+
+    assert.equal(scripts.test, "node ./scripts/run-tests.mjs",
+      "update verify when the package test entrypoint changes");
+    assert.equal(scripts.pretest, "pnpm --filter @solar-display/shared build",
+      "standalone package tests must still build shared");
+    assert.equal(stage.command, "pnpm");
+    assert.deepEqual(stage.args, [
+      "--filter", `@solar-display/${name}`, "exec", "node", "./scripts/run-tests.mjs"
+    ]);
+  }
+});
+
+test("verification reports each stage duration and total elapsed time", () => {
+  const logs = [];
+  const times = [100, 100, 350, 350, 1100, 1100];
+  const result = runVerifyStages({
+    stages: [
+      { label: "build", command: "build", args: [] },
+      { label: "shared", command: "test", args: [] }
+    ],
+    runCommand: () => ({ status: 0 }),
+    now: () => times.shift(),
+    log: (line) => logs.push(line)
+  });
+
+  assert.equal(result.status, 0);
+  assert.ok(logs.includes("[verify] stage duration: build 0.25s"));
+  assert.ok(logs.includes("[verify] stage duration: shared 0.75s"));
+  assert.ok(logs.includes("[verify] total duration: 1.00s"));
+});
+
 test("bundle budget follows static imports below a lazy entry chunk", () => {
   const manifest = {
     "index.html": {

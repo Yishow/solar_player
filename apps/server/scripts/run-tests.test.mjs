@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -99,28 +100,145 @@ test("explicit argv targets skip full discovery", () => {
   assert.equal(discoverCalls, 0);
 });
 
-test("test runner wraps tsx through cmd.exe only on Windows and keeps concurrency one", () => {
-  const testTargets = ["src/config.test.ts", "src/routes/images.test.ts"];
+test("test-name-pattern accepts equals form before explicit test files", () => {
+  const resolved = resolveTestTargets({
+    argv: [
+      "node",
+      "run-tests.mjs",
+      "--test-name-pattern=^config$",
+      "src/config.test.ts"
+    ]
+  });
 
-  assert.equal(resolveTestRunnerCommand("win32"), "cmd.exe");
-  assert.deepEqual(buildTestRunnerArgs(testTargets, "win32"), [
-    "/d",
-    "/s",
-    "/c",
+  assert.deepEqual(resolved, {
+    targets: ["src/config.test.ts"],
+    source: "explicit",
+    testOptions: ["--test-name-pattern=^config$"]
+  });
+});
+
+test("spaced test-name-pattern keeps full discovery when no files are provided", () => {
+  let discoverCalls = 0;
+  const calls = [];
+  const status = runTests({
+    argv: ["node", "run-tests.mjs", "--test-name-pattern", "^config\\s+test$"],
+    platform: "linux",
+    discover() {
+      discoverCalls += 1;
+      return ["src/config.test.ts", "src/env.test.ts"];
+    },
+    runCommand(command, args) {
+      calls.push({ command, args });
+      return { status: 0 };
+    }
+  });
+
+  assert.equal(status, 0);
+  assert.equal(discoverCalls, 1);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, "tsx");
+  assert.deepEqual(calls[0].args, [
+    "--test",
+    "--test-concurrency=1",
+    "--test-force-exit",
+    "--test-name-pattern=^config\\s+test$",
+    "src/config.test.ts",
+    "src/env.test.ts"
+  ]);
+});
+
+test("missing pattern values and unknown options fail without spawning tests", () => {
+  const invalidArgs = [
+    ["node", "run-tests.mjs", "--test-name-pattern"],
+    ["node", "run-tests.mjs", "--test-name-pattern="],
+    ["node", "run-tests.mjs", "--test-name-pattern", "^config$", "--test-concurrency=8"],
+    ["node", "run-tests.mjs", "--unknown-option", "src/config.test.ts"]
+  ];
+
+  for (const argv of invalidArgs) {
+    let spawnCalls = 0;
+    assert.equal(
+      runTests({
+        argv,
+        platform: "linux",
+        runCommand() {
+          spawnCalls += 1;
+          return { status: 0 };
+        }
+      }),
+      1
+    );
+    assert.equal(spawnCalls, 0, `unexpected spawn for ${argv.slice(2).join(" ")}`);
+  }
+});
+
+test("test runner uses a direct Node process on Windows and keeps concurrency one", () => {
+  const testTargets = ["src/config.test.ts", "src/routes/images.test.ts"];
+  const testOptions = [String.raw`--test-name-pattern=^config$\s+\|\[unit\]`];
+
+  assert.equal(resolveTestRunnerCommand("win32"), process.execPath);
+  assert.deepEqual(buildTestRunnerArgs(testTargets, "win32", testOptions), [
+    "--import",
     "tsx",
     "--test",
     "--test-concurrency=1",
     "--test-force-exit",
+    ...testOptions,
     ...testTargets
   ]);
 
   assert.equal(resolveTestRunnerCommand("darwin"), "tsx");
-  assert.deepEqual(buildTestRunnerArgs(testTargets, "darwin"), [
+  assert.deepEqual(buildTestRunnerArgs(testTargets, "darwin", testOptions), [
     "--test",
     "--test-concurrency=1",
     "--test-force-exit",
+    ...testOptions,
     ...testTargets
   ]);
+});
+
+test("Windows test-name-pattern passes regex whitespace and pipe literally to Node", () => {
+  const fixtureRoot = makeTempTree({
+    "filter.test.mjs": [
+      'import test from "node:test";',
+      'test("keep   |[literal]", () => {});',
+      'test("skip this", () => { throw new Error("unselected test ran"); });'
+    ].join("\n")
+  });
+  const packageRoot = join(import.meta.dirname, "..");
+  const fixturePath = join(fixtureRoot, "filter.test.mjs");
+  const pattern = String.raw`^keep\s+\|\[literal\]$`;
+  const childEnv = { ...process.env };
+  let child;
+  delete childEnv.NODE_TEST_CONTEXT;
+
+  try {
+    const status = runTests({
+      argv: ["node", "run-tests.mjs", "--test-name-pattern", pattern, fixturePath],
+      platform: "win32",
+      cwd: packageRoot,
+      runCommand(command, args, options) {
+        assert.equal(command, process.execPath);
+        assert.ok(args.includes(`--test-name-pattern=${pattern}`));
+        assert.equal(args.at(-1), fixturePath);
+        child = spawnSync(command, ["--test-reporter=tap", ...args], {
+          ...options,
+          stdio: "pipe",
+          encoding: "utf8",
+          env: childEnv,
+          timeout: 10000
+        });
+        return child;
+      }
+    });
+
+    assert.equal(status, 0, child?.stderr || child?.stdout);
+    const output = `${child.stdout}\n${child.stderr}`;
+    assert.match(output, /keep\s+\|\[literal\]/);
+    assert.match(output, /# pass 1/);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
 });
 
 test("runTests returns the child status code", () => {

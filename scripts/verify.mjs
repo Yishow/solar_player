@@ -27,13 +27,14 @@ export const VERIFY_STAGES = [
   {
     label: "server",
     command: "pnpm",
-    args: ["--filter", "@solar-display/server", "test"],
+    // The build stage already emitted shared; exec avoids repeating pretest.
+    args: ["--filter", "@solar-display/server", "exec", "node", "./scripts/run-tests.mjs"],
     shell: false
   },
   {
     label: "web",
     command: "pnpm",
-    args: ["--filter", "@solar-display/web", "test"],
+    args: ["--filter", "@solar-display/web", "exec", "node", "./scripts/run-tests.mjs"],
     shell: false
   },
   {
@@ -59,16 +60,20 @@ export function runVerifyStages({
   stages = VERIFY_STAGES,
   runCommand = spawnSync,
   cwd = repoRoot,
-  log = console.log
+  log = console.log,
+  now = () => performance.now()
 } = {}) {
+  const startedAt = now();
   for (const stage of stages) {
     log(`[verify] stage: ${stage.label}`);
+    const stageStartedAt = now();
     const result = runCommand(stage.command, stage.args, {
       stdio: "inherit",
       cwd,
       shell: stage.shell ?? false,
       env: process.env
     });
+    log(`[verify] stage duration: ${stage.label} ${((now() - stageStartedAt) / 1000).toFixed(2)}s`);
 
     if (result.error) {
       log(`[verify] stage failed: ${stage.label} (spawn error: ${result.error.message})`);
@@ -90,6 +95,7 @@ export function runVerifyStages({
   }
 
   log("[verify] all stages passed");
+  log(`[verify] total duration: ${((now() - startedAt) / 1000).toFixed(2)}s`);
   return { status: 0, failedStage: null, reason: null };
 }
 

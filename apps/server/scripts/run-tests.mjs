@@ -56,24 +56,28 @@ export function discoverServerTests(srcRoot = defaultSrcRoot, packageRootDir = p
 }
 
 export function resolveTestRunnerCommand(platform = process.platform) {
-  return platform === "win32" ? "cmd.exe" : "tsx";
+  return platform === "win32" ? process.execPath : "tsx";
 }
 
-export function buildTestRunnerArgs(testTargets, platform = process.platform) {
+export function buildTestRunnerArgs(testTargets, platform = process.platform, testOptions = []) {
   // --test-force-exit: server-startup and similar suites leave MQTT/timers open;
   // without force-exit, Node process isolation never reaps the child after pass.
-  const tsxArgs = [
+  const testArgs = [
+    ...(platform === "win32" ? ["--import", "tsx"] : []),
     "--test",
     "--test-concurrency=1",
     "--test-force-exit",
+    ...testOptions,
     ...testTargets
   ];
-  return platform === "win32" ? ["/d", "/s", "/c", "tsx", ...tsxArgs] : tsxArgs;
+  return testArgs;
 }
+
+class InvalidTestRunnerArguments extends Error {}
 
 /**
  * Resolve test file targets: explicit argv overrides full discovery.
- * Empty discovery or discovery errors yield a nonzero status without spawning tsx.
+ * Empty discovery or discovery errors yield a nonzero status without spawning a test runner.
  */
 export function resolveTestTargets({
   argv = process.argv,
@@ -81,9 +85,46 @@ export function resolveTestTargets({
   srcRoot,
   packageRootDir
 } = {}) {
-  const explicit = argv.slice(2).filter((arg) => !arg.startsWith("-"));
+  const explicit = [];
+  const testOptions = [];
+  const args = argv.slice(2);
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--test-name-pattern") {
+      const pattern = args[index + 1];
+      if (!pattern || pattern.startsWith("-")) {
+        throw new InvalidTestRunnerArguments(
+          "--test-name-pattern requires a non-empty pattern"
+        );
+      }
+      testOptions.push(`--test-name-pattern=${pattern}`);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--test-name-pattern=")) {
+      const pattern = arg.slice("--test-name-pattern=".length);
+      if (!pattern) {
+        throw new InvalidTestRunnerArguments(
+          "--test-name-pattern requires a non-empty pattern"
+        );
+      }
+      testOptions.push(`--test-name-pattern=${pattern}`);
+      continue;
+    }
+
+    if (arg.startsWith("-")) {
+      throw new InvalidTestRunnerArguments(
+        `Unsupported server test runner option: ${arg}`
+      );
+    }
+
+    explicit.push(arg);
+  }
+
   if (explicit.length > 0) {
-    return { targets: explicit, source: "explicit" };
+    return { targets: explicit, source: "explicit", testOptions };
   }
 
   const discoverFn =
@@ -96,7 +137,7 @@ export function resolveTestTargets({
       : discover;
 
   const targets = discoverFn();
-  return { targets, source: "discovery" };
+  return { targets, source: "discovery", testOptions };
 }
 
 export function runTests({
@@ -109,6 +150,7 @@ export function runTests({
   cwd = packageRoot
 } = {}) {
   let targets;
+  let testOptions;
   try {
     const resolved = resolveTestTargets({
       argv,
@@ -117,7 +159,11 @@ export function runTests({
       packageRootDir
     });
     targets = resolved.targets;
-  } catch {
+    testOptions = resolved.testOptions;
+  } catch (error) {
+    if (error instanceof InvalidTestRunnerArguments) {
+      process.stderr.write(`${error.message}\n`);
+    }
     return 1;
   }
 
@@ -126,7 +172,7 @@ export function runTests({
   }
 
   const command = resolveTestRunnerCommand(platform);
-  const args = buildTestRunnerArgs(targets, platform);
+  const args = buildTestRunnerArgs(targets, platform, testOptions);
   const result = runCommand(command, args, {
     stdio: "inherit",
     cwd
