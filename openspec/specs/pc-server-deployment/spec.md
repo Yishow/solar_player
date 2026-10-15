@@ -333,7 +333,7 @@ tests:
 ---
 ### Requirement: Provide a network-free Windows x64 deployment bundle
 
-The repository SHALL build a ZIP for a Windows x64 PC with no network access. The ZIP SHALL contain the built application, a streamlined portable Windows Node runtime (`node.exe`), the Windows-native runtime dependency required by `better-sqlite3`, and an administrator PowerShell installer without bundled NSSM or pnpm. The installer SHALL not run a package-manager install or download software on the target PC. It SHALL create a persistent `SolarPlayerServer` task via Windows Task Scheduler running under `SYSTEM` at startup, copy the self-contained runtime into the install root, create its runtime directories, and add an inbound TCP 4000 firewall rule. Its generated `.env` SHALL bind `HOST=0.0.0.0` and `PORT=4000` unless the operator explicitly changes the port before installation.
+The repository SHALL build deployment bundles for a Windows x64 PC with no network access, producing full offline, core (excluding large static image assets for fast incremental sync), and separate asset archives. Non-runtime source files (including `better-sqlite3` C compilation dependencies, source maps, and TypeScript type declarations) SHALL be pruned from bundled `node_modules`. The administrator installer SHALL support fresh install and `-Update` mode, comparing large asset SHA-256 hashes against bundle manifests to synchronize only changed or missing assets without downloading software on the target PC. It SHALL create a persistent `SolarPlayerServer` task via Windows Task Scheduler running under `SYSTEM` at startup, copy the self-contained runtime into the install root, create its runtime directories, and add an inbound TCP 4000 firewall rule. Its generated `.env` SHALL bind `HOST=0.0.0.0` and `PORT=4000` unless the operator explicitly changes the port before installation.
 
 #### Scenario: Offline Win11 installation succeeds on port 4000
 
@@ -350,6 +350,13 @@ The repository SHALL build a ZIP for a Windows x64 PC with no network access. Th
 - **WHEN** an administrator runs `Install-SolarPlayer.ps1`
 - **THEN** the installer exits before replacing the service or firewall rule
 - **AND** reports the existing listener as the action required
+
+#### Scenario: Core bundle update preserves existing matched large assets
+
+- **GIVEN** an existing Solar Player installation has matching large assets on disk
+- **WHEN** an administrator runs `Install-SolarPlayer.ps1 -Update` from a core bundle
+- **THEN** existing matching assets are preserved without re-copying
+- **AND** the application payload and runtime are updated and the scheduled task restarts
 
 
 <!-- @trace

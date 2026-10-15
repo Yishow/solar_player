@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -8,6 +8,10 @@ const projectRoot = resolve(import.meta.dirname, "..");
 const outputDir = join(projectRoot, "dist", "deploy-bundles");
 const stageDir = join(outputDir, "solar-player-windows-x64-offline");
 const archivePath = join(outputDir, "solar-player-windows-x64-offline.zip");
+const coreStageDir = join(outputDir, "solar-player-windows-x64-core");
+const coreArchivePath = join(outputDir, "solar-player-windows-x64-core.zip");
+const assetsStageDir = join(outputDir, "solar-player-assets");
+const assetsArchivePath = join(outputDir, "solar-player-assets.zip");
 const portableStageDir = join(outputDir, "solar-player-windows-x64-portable");
 const portableArchivePath = join(outputDir, "solar-player-windows-x64-portable.zip");
 const nodeExecutable = join(stageDir, "runtime/node/node.exe");
@@ -132,6 +136,33 @@ function materializeRuntimeDependencies(serverDir) {
   rmSync(join(nodeModules, "@solar-display", "server"), { recursive: true, force: true });
 }
 
+function pruneNonRuntimeFiles(serverDir) {
+  const sqlitePackagePath = findBetterSqlitePackage(serverDir);
+  for (const sub of ["deps", "src", "build"]) {
+    const p = join(sqlitePackagePath, sub);
+    if (existsSync(p)) rmSync(p, { recursive: true, force: true });
+  }
+
+  const pruneDir = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "@types") {
+          rmSync(full, { recursive: true, force: true });
+        } else {
+          pruneDir(full);
+        }
+      } else {
+        if (entry.name.endsWith(".map") || entry.name.endsWith(".d.ts")) {
+          rmSync(full, { force: true });
+        }
+      }
+    }
+  };
+  pruneDir(join(serverDir, "node_modules"));
+  pruneDir(join(serverDir, "dist"));
+}
+
 function sha256(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
@@ -142,6 +173,10 @@ function build() {
   }
   rmSync(stageDir, { recursive: true, force: true });
   rmSync(archivePath, { force: true });
+  rmSync(coreStageDir, { recursive: true, force: true });
+  rmSync(coreArchivePath, { force: true });
+  rmSync(assetsStageDir, { recursive: true, force: true });
+  rmSync(assetsArchivePath, { force: true });
   rmSync(portableStageDir, { recursive: true, force: true });
   rmSync(portableArchivePath, { force: true });
   mkdirSync(cacheDir, { recursive: true });
@@ -162,12 +197,14 @@ function build() {
   copyRequired(join(projectRoot, "apps/server/src/db/migrations"), join(serverDir, "src/db/migrations"));
   copyRequired(join(projectRoot, "apps/web/dist"), join(payload, "apps/web/dist"));
   copyRequired(join(projectRoot, "packages/shared/dist"), join(payload, "packages/shared/dist"));
+  copyRequired(join(projectRoot, "packages/shared/dist"), join(serverDir, "node_modules", "@solar-display", "shared", "dist"));
   copyRequired(join(projectRoot, "packages/shared/package.json"), join(payload, "packages/shared/package.json"));
   copyRequired(join(projectRoot, "docs/openapi.yaml"), join(payload, "docs/openapi.yaml"));
   copyRequired(join(projectRoot, ".env.example"), join(payload, ".env.example"));
   copyRequired(join(projectRoot, "deploy/windows-offline/Install-SolarPlayer.ps1"), join(stageDir, "Install-SolarPlayer.ps1"));
   copyRequired(join(projectRoot, "deploy/windows-offline/Start-SolarPlayer.cmd"), join(portableStageDir, "Start-SolarPlayer.cmd"));
   copyRequired(join(projectRoot, "deploy/windows-offline/Manage-SolarPlayer.ps1"), join(portableStageDir, "Manage-SolarPlayer.ps1"));
+  pruneNonRuntimeFiles(serverDir);
 
   const sqlitePackagePath = findBetterSqlitePackage(serverDir);
   const sqliteVersion = JSON.parse(readFileSync(join(sqlitePackagePath, "package.json"), "utf8")).version;
@@ -184,6 +221,25 @@ function build() {
   };
   deleteOtherNodeBinaries(serverDir);
 
+  const webAssetsDir = join(payload, "apps", "web", "dist", "assets");
+  const largeAssetMinBytes = 500 * 1024;
+  const isImageExt = (name) => /\.(png|jpe?g|webp|svg)$/i.test(name);
+  const largeAssets = [];
+  if (existsSync(webAssetsDir)) {
+    for (const name of readdirSync(webAssetsDir)) {
+      const fullPath = join(webAssetsDir, name);
+      const stat = statSync(fullPath);
+      if (stat.isFile() && isImageExt(name) && stat.size >= largeAssetMinBytes) {
+        largeAssets.push({
+          name,
+          relPath: `apps/web/dist/assets/${name}`,
+          size: stat.size,
+          sha256: sha256(fullPath)
+        });
+      }
+    }
+  }
+
   const nodeExtract = join(cacheDir, "node-win-x64");
   rmSync(nodeExtract, { recursive: true, force: true });
   mkdirSync(nodeExtract, { recursive: true });
@@ -192,6 +248,7 @@ function build() {
   mkdirSync(join(stageDir, "runtime", "node"), { recursive: true });
   copyRequired(sourceNodeExe, nodeExecutable);
   if (!existsSync(nodeExecutable)) throw new Error(`Portable node.exe is missing from ${nodeExecutable}`);
+  rmSync(nodeExtract, { recursive: true, force: true });
 
   const manifest = {
     nodeVersion,
@@ -200,12 +257,26 @@ function build() {
     sha256: {
       node: sha256(nodeZip),
       betterSqlite3: sha256(sqliteBinary)
-    }
+    },
+    largeAssets
   };
   writeFileSync(join(stageDir, "bundle-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   copyRequired(payload, portableStageDir);
   copyRequired(join(stageDir, "runtime"), join(portableStageDir, "runtime"));
   writeFileSync(join(portableStageDir, "bundle-manifest.json"), `${JSON.stringify({ ...manifest, mode: "portable" }, null, 2)}\n`);
+
+  copyRequired(stageDir, coreStageDir);
+  for (const asset of largeAssets) {
+    rmSync(join(coreStageDir, "payload", asset.relPath), { force: true });
+  }
+  writeFileSync(join(coreStageDir, "bundle-manifest.json"), `${JSON.stringify({ ...manifest, mode: "core" }, null, 2)}\n`);
+
+  mkdirSync(join(assetsStageDir, "assets"), { recursive: true });
+  for (const asset of largeAssets) {
+    copyRequired(join(webAssetsDir, asset.name), join(assetsStageDir, "assets", asset.name));
+  }
+  writeFileSync(join(assetsStageDir, "assets-manifest.json"), `${JSON.stringify({ largeAssets }, null, 2)}\n`);
+
   // Info-ZIP prefers -qry; the Windows zip port lacks -y and spawnSync cannot
   // launch .cmd wrappers, so fall back to 7-Zip when Info-ZIP is unusable.
   const zipDir = (archivePath, dirName) => {
@@ -216,9 +287,15 @@ function build() {
     }
   };
   zipDir(archivePath, basename(stageDir));
+  zipDir(coreArchivePath, basename(coreStageDir));
+  zipDir(assetsArchivePath, basename(assetsStageDir));
   zipDir(portableArchivePath, basename(portableStageDir));
   console.log(`Built ${archivePath}`);
   console.log(`sha256=${sha256(archivePath)}`);
+  console.log(`Built ${coreArchivePath}`);
+  console.log(`sha256=${sha256(coreArchivePath)}`);
+  console.log(`Built ${assetsArchivePath}`);
+  console.log(`sha256=${sha256(assetsArchivePath)}`);
   console.log(`Built ${portableArchivePath}`);
   console.log(`sha256=${sha256(portableArchivePath)}`);
 }

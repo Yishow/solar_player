@@ -6234,6 +6234,8 @@ test("Windows offline bundle builder and installer target x64 port 4000 without 
   const installer = readFileSync(windowsOfflineInstallerPath, "utf8");
 
   assert.match(builder, /solar-player-windows-x64-offline\.zip/u);
+  assert.match(builder, /solar-player-windows-x64-core\.zip/u);
+  assert.match(builder, /solar-player-assets\.zip/u);
   assert.match(builder, /node\.exe/u);
   assert.doesNotMatch(builder, /nssm/iu);
   assert.match(builder, /win32-x64\.node/u);
@@ -6245,10 +6247,15 @@ test("Windows offline bundle builder and installer target x64 port 4000 without 
   assert.match(builder, /hoistedDependencies = join\(nodeModules, "\.pnpm", "node_modules"\)/u);
   assert.match(builder, /readdirSync\(hoistedDependencies\)/u);
   assert.match(builder, /Portable bundle contains symlinked dependencies/u);
+  assert.match(builder, /pruneNonRuntimeFiles/u);
+  assert.match(builder, /largeAssets/u);
   assert.doesNotMatch(builder, /runtime\/pnpm/iu);
 
   assert.match(installer, /#Requires -RunAsAdministrator/u);
   assert.match(installer, /\$Port\s*=\s*4000/u);
+  assert.match(installer, /\[switch\]\$Update/u);
+  assert.match(installer, /Sync-LargeAssets/u);
+  assert.match(installer, /Get-FileSha256/u);
   assert.match(installer, /Get-NetTCPConnection/u);
   assert.match(installer, /New-NetFirewallRule/u);
   assert.match(installer, /SolarPlayerServer/u);
@@ -6257,6 +6264,235 @@ test("Windows offline bundle builder and installer target x64 port 4000 without 
   assert.match(installer, /-ExecutionTimeLimit\s+\(\[TimeSpan\]::Zero\)/u);
   assert.doesNotMatch(installer, /nssm/iu);
   assert.doesNotMatch(installer, /pnpm\s+install|Invoke-WebRequest|Start-BitsTransfer|curl\.exe/iu);
+});
+
+const windowsOfflineInstallerTestSkip = process.platform !== "win32"
+  ? "requires Windows"
+  : (() => {
+    const result = spawnSync("pwsh", ["-NoProfile", "-NonInteractive", "-Command", "exit 0"], {
+      stdio: "ignore",
+      timeout: 10_000
+    });
+    return result.status === 0 ? false : "pwsh is unavailable";
+  })();
+
+function createWindowsOfflineInstallerFixture({ assets, installed = true }) {
+  const tempRoot = mkdtempSync(path.join(tmpdir(), "solar-windows-offline-assets-test-"));
+  const bundleRoot = path.join(tempRoot, "extract", "solar-player-windows-x64-core");
+  const programData = path.join(tempRoot, "program-data");
+  const installRoot = path.join(programData, "SolarPlayer");
+  const payloadRoot = path.join(bundleRoot, "payload");
+  const runtimeRoot = path.join(bundleRoot, "runtime", "node");
+  const eventPath = path.join(tempRoot, "installer-events.txt");
+  const installerPath = path.join(bundleRoot, "Install-SolarPlayer.ps1");
+  const assetManifest = assets.map(({ name, relPath, content }) => ({
+    name,
+    relPath,
+    size: Buffer.byteLength(content),
+    sha256: createHash("sha256").update(content).digest("hex")
+  }));
+
+  mkdirSync(payloadRoot, { recursive: true });
+  mkdirSync(runtimeRoot, { recursive: true });
+  writeFileSync(path.join(payloadRoot, ".env.example"), "PORT=4000\nHOST=127.0.0.1\n", "utf8");
+  mkdirSync(path.join(payloadRoot, "apps/server/dist"), { recursive: true });
+  writeFileSync(path.join(payloadRoot, "apps/server/dist/server.js"), "server-v2\n", "utf8");
+  writeFileSync(path.join(runtimeRoot, "node.exe"), "fixture-node-binary\n", "utf8");
+  writeFileSync(path.join(bundleRoot, "bundle-manifest.json"), JSON.stringify({ largeAssets: assetManifest }), "utf8");
+  writeFileSync(
+    installerPath,
+    readFileSync(windowsOfflineInstallerPath, "utf8").replace(/^#Requires -RunAsAdministrator\r?\n/u, ""),
+    "utf8"
+  );
+
+  if (installed) {
+    mkdirSync(path.join(installRoot, "apps/server/dist"), { recursive: true });
+    mkdirSync(path.join(installRoot, "apps/web/dist/assets"), { recursive: true });
+    writeFileSync(path.join(installRoot, "apps/server/dist/server.js"), "server-v1\n", "utf8");
+    writeFileSync(path.join(installRoot, ".env"), "PORT=4999\nHOST=10.0.0.5\n", "utf8");
+  }
+
+  for (const asset of assets) {
+    const targetPath = path.join(installRoot, asset.relPath);
+    if (asset.installedContent !== undefined) {
+      mkdirSync(path.dirname(targetPath), { recursive: true });
+      writeFileSync(targetPath, asset.installedContent, "utf8");
+    }
+
+    if (asset.source === "sibling") {
+      const siblingPath = path.join(path.dirname(bundleRoot), "solar-player-assets", "assets", asset.name);
+      mkdirSync(path.dirname(siblingPath), { recursive: true });
+      writeFileSync(siblingPath, asset.content, "utf8");
+    } else if (asset.source === "payload") {
+      const payloadAssetPath = path.join(payloadRoot, asset.relPath);
+      mkdirSync(path.dirname(payloadAssetPath), { recursive: true });
+      writeFileSync(payloadAssetPath, asset.content, "utf8");
+    }
+  }
+
+  return {
+    tempRoot,
+    installRoot,
+    eventPath,
+    run(update) {
+      const harness = String.raw`
+        $ErrorActionPreference = 'Stop'
+        $env:ProgramData = $env:SOLAR_INSTALLER_PROGRAM_DATA
+        $global:installerTestEvents = [System.Collections.Generic.List[string]]::new()
+        $global:installerTestExitCode = 0
+        function Add-InstallerTestEvent { param([string]$Name) $global:installerTestEvents.Add($Name) }
+        function Get-ScheduledTask {
+          param($TaskName, $ErrorAction)
+          Add-InstallerTestEvent 'query-task'
+          if ($env:SOLAR_INSTALLER_TASK_EXISTS -eq '1') { return [pscustomobject]@{ TaskName = $TaskName } }
+        }
+        function Stop-ScheduledTask { param($TaskName, $ErrorAction) Add-InstallerTestEvent 'stop-task' }
+        function Start-ScheduledTask { param($TaskName) Add-InstallerTestEvent 'start-task' }
+        function Start-Sleep { param($Seconds) Add-InstallerTestEvent 'sleep' }
+        function Get-NetTCPConnection { param($State, $LocalPort, $ErrorAction) Add-InstallerTestEvent 'query-port' }
+        function Get-Service { param($Name, $ErrorAction) Add-InstallerTestEvent 'query-service' }
+        function New-ScheduledTaskAction { param($Execute, $WorkingDirectory) [pscustomobject]@{ Execute = $Execute; WorkingDirectory = $WorkingDirectory } }
+        function New-ScheduledTaskTrigger { param($AtStartup) [pscustomobject]@{ AtStartup = $AtStartup } }
+        function New-ScheduledTaskPrincipal { param($UserId, $LogonType, $RunLevel) [pscustomobject]@{ UserId = $UserId } }
+        function New-ScheduledTaskSettingsSet { param($AllowStartIfOnBatteries, $DontStopIfGoingOnBatteries, $RestartCount, $RestartInterval, $ExecutionTimeLimit) [pscustomobject]@{} }
+        function Register-ScheduledTask { param($TaskName, $Action, $Trigger, $Principal, $Settings, $Force) Add-InstallerTestEvent 'register-task' }
+        function New-NetFirewallRule { param($DisplayName, $Direction, $Protocol, $LocalPort, $Action) Add-InstallerTestEvent 'firewall' }
+        try {
+          if ($env:SOLAR_INSTALLER_UPDATE -eq '1') {
+            & $env:SOLAR_INSTALLER_PATH -Update
+          } else {
+            & $env:SOLAR_INSTALLER_PATH
+          }
+        } catch {
+          [Console]::Error.WriteLine($_.Exception.Message)
+          $global:installerTestExitCode = 1
+        } finally {
+          [System.IO.File]::WriteAllLines($env:SOLAR_INSTALLER_EVENTS, $global:installerTestEvents.ToArray())
+        }
+        exit $global:installerTestExitCode
+      `;
+      const result = spawnSync("pwsh", ["-NoProfile", "-NonInteractive", "-Command", harness], {
+        encoding: "utf8",
+        timeout: 15_000,
+        env: {
+          ...process.env,
+          SOLAR_INSTALLER_PROGRAM_DATA: path.dirname(installRoot),
+          SOLAR_INSTALLER_EVENTS: eventPath,
+          SOLAR_INSTALLER_PATH: installerPath,
+          SOLAR_INSTALLER_TASK_EXISTS: update ? "1" : "0",
+          SOLAR_INSTALLER_UPDATE: update ? "1" : "0"
+        }
+      });
+      return {
+        ...result,
+        events: existsSync(eventPath) ? readFileSync(eventPath, "utf8").split(/\r?\n/u).filter(Boolean) : []
+      };
+    }
+  };
+}
+
+test("Windows offline large assets update rejects missing assets before stopping or copying", { skip: windowsOfflineInstallerTestSkip }, () => {
+  const fixture = createWindowsOfflineInstallerFixture({
+    assets: [
+      {
+        name: "overview.png",
+        relPath: "apps/web/dist/assets/overview.png",
+        content: "new-overview-image\n",
+        installedContent: "old-overview-image\n",
+        source: "payload"
+      },
+      {
+        name: "solar.png",
+        relPath: "apps/web/dist/assets/solar.png",
+        content: "new-solar-image\n",
+        installedContent: "old-solar-image\n"
+      }
+    ]
+  });
+
+  try {
+    const result = fixture.run(true);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /solar\.png requires an update but is missing from the bundle/u);
+    assert.equal(readFileSync(path.join(fixture.installRoot, "apps/server/dist/server.js"), "utf8"), "server-v1\n");
+    assert.equal(readFileSync(path.join(fixture.installRoot, ".env"), "utf8"), "PORT=4999\nHOST=10.0.0.5\n");
+    assert.equal(readFileSync(path.join(fixture.installRoot, "apps/web/dist/assets/overview.png"), "utf8"), "old-overview-image\n");
+    assert.equal(result.events.includes("stop-task"), false);
+    assert.equal(result.events.includes("start-task"), false);
+  } finally {
+    rmSync(fixture.tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("Windows offline large assets update reads sibling asset archive and preserves .env", { skip: windowsOfflineInstallerTestSkip }, () => {
+  const fixture = createWindowsOfflineInstallerFixture({
+    assets: [{
+      name: "overview.png",
+      relPath: "apps/web/dist/assets/overview.png",
+      content: "new-overview-image\n",
+      installedContent: "old-overview-image\n",
+      source: "sibling"
+    }]
+  });
+
+  try {
+    const result = fixture.run(true);
+    assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+    assert.equal(readFileSync(path.join(fixture.installRoot, "apps/server/dist/server.js"), "utf8"), "server-v2\n");
+    assert.equal(readFileSync(path.join(fixture.installRoot, ".env"), "utf8"), "PORT=4999\nHOST=10.0.0.5\n");
+    assert.equal(readFileSync(path.join(fixture.installRoot, "apps/web/dist/assets/overview.png"), "utf8"), "new-overview-image\n");
+    assert.ok(result.events.indexOf("stop-task") >= 0);
+    assert.ok(result.events.indexOf("start-task") > result.events.indexOf("stop-task"));
+  } finally {
+    rmSync(fixture.tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("Windows offline large assets update keeps installed matching assets without an asset archive", { skip: windowsOfflineInstallerTestSkip }, () => {
+  const fixture = createWindowsOfflineInstallerFixture({
+    assets: [{
+      name: "overview.png",
+      relPath: "apps/web/dist/assets/overview.png",
+      content: "matching-image-bytes\n",
+      installedContent: "matching-image-bytes\n"
+    }]
+  });
+
+  try {
+    const targetPath = path.join(fixture.installRoot, "apps/web/dist/assets/overview.png");
+    const before = statSync(targetPath);
+    const result = fixture.run(true);
+    const after = statSync(targetPath);
+    assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+    assert.equal(readFileSync(targetPath, "utf8"), "matching-image-bytes\n");
+    assert.equal(after.mtimeMs, before.mtimeMs);
+    assert.equal(readFileSync(path.join(fixture.installRoot, "apps/server/dist/server.js"), "utf8"), "server-v2\n");
+  } finally {
+    rmSync(fixture.tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("Windows offline large assets fresh install rejects missing assets before creating install state", { skip: windowsOfflineInstallerTestSkip }, () => {
+  const fixture = createWindowsOfflineInstallerFixture({
+    installed: false,
+    assets: [{
+      name: "overview.png",
+      relPath: "apps/web/dist/assets/overview.png",
+      content: "required-image-bytes\n"
+    }]
+  });
+
+  try {
+    const result = fixture.run(false);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /overview\.png requires an update but is missing from the bundle/u);
+    assert.equal(existsSync(fixture.installRoot), false);
+    assert.equal(result.events.includes("register-task"), false);
+    assert.equal(result.events.includes("firewall"), false);
+    assert.equal(result.events.includes("start-task"), false);
+  } finally {
+    rmSync(fixture.tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("Solar tunnel start and stop leave unrelated forwards alone", { skip: process.platform !== "win32" }, () => {
