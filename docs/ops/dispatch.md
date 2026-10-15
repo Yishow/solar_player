@@ -43,8 +43,8 @@ playback 頁的視覺「對不對」**不能只靠模型看 code 判斷**，任�
 
 ## 驗收指令速查（派工 prompt 直接抄）
 
-- server：`pnpm --filter @solar-display/server test`（需要聚焦時可把 explicit target 傳給 runner）
-- web：`pnpm --filter @solar-display/web test`
-- shared：`pnpm run build` + 受影響 app 測試
+- server：`pnpm --filter @solar-display/server test [test-file ...]`
+- web：`pnpm --filter @solar-display/web test [test-file ...]`
+- shared：`pnpm --filter @solar-display/shared test [test-file ...]` + 直接使用端測試
 - root deploy.sh：`node --test scripts/deploy.test.mjs`
-- 全部交付：`pnpm verify`
+- 全部交付：主代理對最終版本統一跑一次 `pnpm verify`，不為每個子任務另跑全量；細節依 `conventions.md`。

@@ -9,7 +9,7 @@
 | `pnpm dev` / `pnpm dev:fix` | 啟動完整開發環境；原生模組壞掉時先 rebuild better-sqlite3。 |
 | `pnpm dev:web` / `pnpm dev:server` | shared watch 加單邊 web 或 server 開發環境。 |
 | `pnpm build` | 依序建置 shared、web、server；也可用 `build:shared`、`build:web`、`build:server`。 |
-| `pnpm test` | 開發迴圈：依序執行 server 與 web package tests。 |
+| `pnpm test` | 依序執行 server 與 web package tests，不含 shared；開發時優先選 focused tests。 |
 | `pnpm verify` | 程式交付前的最終 repo gate；實際內容與順序以 `scripts/verify.mjs` 為準。 |
 | `pnpm db:migrate` / `pnpm db:seed` | 執行 SQLite migration 或 seed。 |
 | `pnpm run fhd:witness -- --base-url <url>` | 擷取 playback／editor 的 1920x1080 witness；route mapping 依 `scripts/fhd-witness-config.mjs`，可先用 `fhd:witness:dry-run`。 |
@@ -19,14 +19,17 @@
 
 ## 測試入口：focused 與交付 gate
 
-- 先跑受影響 package 的 focused test；需要時再跑該 package build。
-  - shared：`pnpm --filter @solar-display/shared test`
+- 開發期間依改動選受影響檔案與直接相依測試；範圍無法確定時擴到該 package，再視跨模組影響擴大。需要確認型別或產物時才另跑 build。
+  - shared：`pnpm --filter @solar-display/shared test [test-file ...]`，並測 server／web 的直接使用端。
   - server：`pnpm --filter @solar-display/server test [test-file ...]`
   - web：`pnpm --filter @solar-display/web test [test-file ...]`
-- 程式交付前跑 `pnpm verify`。它是本機 repo gate；通過不等於 runtime、browser、MQTT／PLC／LAN、deployment、FHD 或人工 acceptance 已完成。
+  - server 可加 `--test-name-pattern="<pattern>"` 篩選案例；省略檔案時仍完整探索測試檔，只有名稱符合的案例執行。
+- 程式交付前，對最終版本跑一次 `pnpm verify`；它已包含完整 build、bundle budget、shared、server、web、deploy 與 runner tests，不再機械式串跑 `pnpm test → pnpm build → pnpm verify`。同一受驗版本不為 review／archive／commit 階段重跑；後續程式、測試或建置設定變更須以新版本重新通過 gate，失敗或具體未解風險則補驗。純文件修改依下方文件檢查規則。
+- verify 的 server／web 階段直接執行既有 package runner，重用前置 build 的 shared 產物；單獨執行 package `test` 仍由 `pretest` 建置 shared。verify 會列出各階段與成功完成的總耗時，供後續依實測判斷瓶頸。
+- verify 是本機 repo gate；通過不等於 runtime、browser、MQTT／PLC／LAN、deployment、FHD 或人工 acceptance 已完成。browser、離線、負載、Go／Python 測試依受影響功能另跑，不因其他模組的小改動全部執行。
 - deploy 相關變更可單獨跑 `node --test scripts/deploy.test.mjs`；測試 runner 或 verify script 變更時，另跑其對應的 `*.test.mjs`。
 - 文件或制度檔變更以 read-back、`git diff --check` 與必要的文件檢查為主，不因純文件變更跑產品 `pnpm verify`。
-- 測試命名 `*.test.ts`，放在被測程式旁邊（如 `apps/server/src/routes/images.test.ts`）。
+- 測試命名 `*.test.ts`／web 的 `*.test.tsx`，通常放在被測程式旁邊（如 `apps/server/src/routes/images.test.ts`）。優先驗證行為；source-text guards 只守必要接線／架構契約，不把格式、區域變數命名等實作細節當成產品驗收。既有測試不因分層執行而刪除或跳過交付 gate。
 
 ## 命名、檔案風格、imports
 
@@ -61,6 +64,6 @@
 - 改部署路徑時，`deploy/deploy.sh`、service 檔、`deploy.md`、本檔四處一起檢查；勿再描述 `/opt/solar-display` 為正式 service contract（舊 /opt 安裝需 operator 自行備份後改裝 /data）。
 - Split topology（`split-server-to-pc-thin-kiosk`；Pi 不再兼任 server）另有獨立入口，**不**共用 `/data/solar-display`：
   - `deploy/install-thin-kiosk.sh`（+ `verify-thin-kiosk.sh`）：Pi thin-kiosk 安裝／驗證；**不**安裝 `solar-display.service`、不寫 `/data/solar-display`，沿用既有 `start-solar-kiosk.sh`；device-agent 裝到 `/usr/local/lib/solar-device-agent`，systemd unit 的 `User=` 由安裝器渲染成 `${KIOSK_USER}`（**非 root**；journal 透過 `sudo -n` + `solar-display-journal` sudoers drop-in；`NoNewPrivileges=false` 刻意保留以讓 sudo 生效）。
-  - `deploy/windows-offline/`：Windows PC server — `Install-SolarPlayer.ps1` 以 nssm 安裝 `SolarPlayerServer` 服務到 `ProgramData\SolarPlayer`（預設 port 4000、管理員、不下載）；`Start-SolarPlayer.cmd` 為 portable、免管理員；`scripts/build-windows-offline-bundle.mjs` 輸出 offline/portable ZIP 到 `dist/deploy-bundles/`（與 root `deploy.sh` 同角色，**只打包 runtime 必要檔，不含 repo／macOS node_modules**）。
+  - `deploy/windows-offline/`：Windows PC server — `Install-SolarPlayer.ps1` 以 Windows 排程器（SYSTEM）安裝 `SolarPlayerServer` 服務到 `ProgramData\SolarPlayer`（預設 port 4000、管理員、不下載、支援 `-Update` 與大圖 SHA-256 比對增量同步）；`Start-SolarPlayer.cmd` 為 portable、免管理員；`scripts/build-windows-offline-bundle.mjs` 輸出 offline / core / assets / portable ZIP 到 `dist/deploy-bundles/`（剪除 C 源碼、*.map、*.d.ts，只打包 runtime 必要檔）。
   - runbook：`docs/runbooks/pc-server-deploy.md`、`docs/runbooks/pi-thin-kiosk-deploy.md`；skill：`.agents/skills/split-deployment/`。
   - 改 split 路徑時，`install-thin-kiosk.sh`、`solar-device-agent.service`、`verify-thin-kiosk.sh`、`build-windows-offline-bundle.mjs`、兩份 runbook、本檔一起檢查；既有 co-located 部署（上面三入口）不在此拓樸內，勿混改。

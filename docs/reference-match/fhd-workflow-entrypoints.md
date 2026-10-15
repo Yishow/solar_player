@@ -66,7 +66,7 @@
 - `AGENTS.md`
   - 給 agent 的 repo 工作守則與 workflow 入口。
 - `CLAUDE.md`
-  - 給另一個 agent entrypoint 的 mirror 指引，應與 `AGENTS.md` 保持同樣 workflow vocabulary。
+  - 只以 `@AGENTS.md` 匯入共用指引，讓 Claude Code 沿用同一套 workflow vocabulary。
 - `README.md`
   - 給新進開發者的輕量入口，指向 canonical docs。
 - `docs/README.md`

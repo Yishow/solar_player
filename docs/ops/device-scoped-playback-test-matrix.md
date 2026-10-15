@@ -171,19 +171,24 @@ non-zero exit.
 
 ## Repository gates
 
-Run after focused fixes:
+During development, run the affected harness tests:
 
 ```bash
 node --test scripts/device-scoped-playback-load.test.mjs
 node --test scripts/deploy.test.mjs
-pnpm test
-pnpm build
+```
+
+After review and scoped fixes, run the final repository gate once:
+
+```bash
 pnpm verify
 spectra analyze phase1-multisite-playback-acceptance
 ```
 
 `pnpm test` remains the fast development suite and does not run the 10-minute
-load. `pnpm verify` is the repository delivery gate. The explicit
+load. `pnpm verify` already includes build and the shared/server/web/deploy suites;
+do not prepend full `pnpm test` and `pnpm build` on the same unchanged version.
+The explicit
 `pnpm run verify:device-scoped-playback` command is the Phase 1 capacity gate.
 
 Record command, commit, host/Node versions, start/end time, full JSON metrics,

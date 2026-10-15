@@ -19,8 +19,8 @@
 ## 連續執行與驗證
 
 1. 讀相關規格、程式、測試與 git 狀態，說明必要假設，保護既有 WIP。
-2. 在授權範圍實作；bug fix 補能重現缺陷的回歸驗證，開發期間跑受影響測試。
-3. 主代理 review 最後 diff，核對 repo 慣例與需求／規格；修完範圍內 findings，再依 `docs/ops/conventions.md` 驗證最終版本。程式交付 gate 是 `pnpm verify`；純文件修改使用相關文件檢查。
+2. 在授權範圍實作；bug fix 補能重現缺陷的回歸驗證，開發期間只跑受影響檔案與直接相依測試；影響不明時擴到 package 或跨模組測試。
+3. 主代理 review 最後 diff，核對 repo 慣例與需求／規格；修完範圍內 findings，再依 `docs/ops/conventions.md` 對最終程式版本跑一次 `pnpm verify`。不另串跑已涵蓋的全量 test／build，也不只因進入下一流程階段重跑；後續改動、失敗或未解風險才補驗。純文件修改使用相關文件檢查。
 4. 涉及 Playback／FHD 時依 `docs/ops/fhd-closeout.md` 產生 fresh witness、gap notes 與 evidence bundle；人工 acceptance 由使用者決定。
 5. Spectra tasks、驗證與必要人工 acceptance 全部完成後，接續歸檔該 change；不把待驗收 tasks 勾成完成。
 

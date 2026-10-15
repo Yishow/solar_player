@@ -7,7 +7,7 @@
 
 | 檔案 | 性質 | 誰能改 |
 |---|---|---|
-| `CLAUDE.md`、`AGENTS.md` | 每 session 載入的同源分眾路由 | 小修（更正事實、路由增減）可自行；**共用內容必同步、同 commit**；加新硬規則要先問使用者 |
+| `AGENTS.md`、`CLAUDE.md` | 共用指引與 Claude 匯入入口 | 指引只改 `AGENTS.md`，`CLAUDE.md` 固定為 `@AGENTS.md`；小修（更正事實、路由增減）可自行；加新硬規則要先問使用者 |
 | `docs/ops/conventions.md`、`fhd-closeout.md` | 事實描述 | 發現與程式碼不符即修（程式碼是真相），改完 read-back |
 | `docs/ops/workflow.md`、`dispatch.md`、`judgment.md` | 規則 | 更正事實、補正反例可自行；改規則本身先問使用者 |
 | `docs/ops/delegation.md` | 模板 | 可自行改，改完 read-back 驗證 |
@@ -15,16 +15,16 @@
 | `openspec/**` | Spectra artifacts | 只透過 spectra-* skills 操作，不手改結構 |
 | `~/.claude/projects/-Users-yishow-prj-solar-player/memory/` | Claude 專案記憶 | 自由追加與更新（Claude 專用，不進 git） |
 
-## CLAUDE.md ↔ AGENTS.md：允許的分眾差異（除此之外的分歧 = 漂移缺陷，發現即修）
+## 單一指引來源與工具路由
 
-- 標題、互相指向對方入口的名稱可以不同。
-- CLAUDE.md 路由到 Claude Code 專用的 `dispatch.md`／`delegation.md`；AGENTS.md 只提醒其他工具遵循自身能力與上位規則。
-- Repo 快覽、共用路由與四條硬規則必須逐條語意一致；工具命令盡量留在 `workflow.md`，避免兩個入口只因前綴不同而漂移。
+- `AGENTS.md` 是唯一的根指引內容；`CLAUDE.md` 只保留一行 `@AGENTS.md`（不可放在反引號或程式碼區塊內），由 Claude Code 匯入。
+- Claude Code 專用的 `dispatch.md`／`delegation.md` 路由放在 `AGENTS.md`，明標僅 Claude Code 適用；其他工具遵循自身能力與上位規則。
+- 不在 `CLAUDE.md` 重建 Spectra 區塊或複製共用規則；根入口的工具前綴差異在 `AGENTS.md` 說明，細部指令留在 `docs/ops/`。
 
 ## 修改程序（每次都做）
 
 1. **備份**：git 已追蹤的檔案，確認 working tree 乾淨版已在 git 歷史即可（`git log --oneline -1 -- <檔案>`）；有未提交改動或未追蹤檔，先 `cp` 到 `~/.claude/backups/$(date +%Y-%m-%d)-<簡述>/`。
-2. 改動（CLAUDE.md 與 AGENTS.md 記得成對改）。
+2. 改動實際來源；根指引修改 `AGENTS.md`，確認 `CLAUDE.md` 仍只匯入它。
 3. **read-back 驗證**：派 fresh agent 只讀新檔回答「照這份檔你會怎麼做 X」，答錯處 = 你寫模糊了，修到能答對。
 4. 教訓記錄（見下節）。制度檔改動 commit 訊息用 `docs: <改了什麼>`，且只含制度檔。
 
@@ -36,7 +36,7 @@
 
 ## 精簡門檻（任一超標，先合併刪除再新增）
 
-- `CLAUDE.md`、`AGENTS.md` 各 > 80 行。
+- `AGENTS.md` > 80 行，或 `CLAUDE.md` 出現匯入以外的內容。
 - `docs/ops/` 單檔 > 200 行。
 - 判準過時即刪的觸發器：**照文件做卻失敗的瞬間 = 修文件**；引用的指令/路徑消失 = 刪該條或更新。
 - 精簡方法是合併與刪除，不是壓縮句子；新增一條核心規則時優先找一條可刪的。

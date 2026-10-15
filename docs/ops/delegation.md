@@ -38,7 +38,7 @@
 做法約束：server 用 ESM .js 副檔名 import、web 用 extensionless；API 改動跟隨該 route 既有回應形狀；測試放被測檔旁邊命名 *.test.ts。
 驗收條件：
 - [行為條件，例：GET /api/x 缺參數回 400 與 { success:false, error, timestamp }]
-- [測試指令：server 改動跑 pnpm --filter @solar-display/server test；改到 apps/server/src/ 頂層檔另跑 pnpm --filter @solar-display/server exec tsx --test src/<檔名>.test.ts；web 改動跑 pnpm --filter @solar-display/web test；shared 改動跑 pnpm run build + 受影響 app 測試]
+- [測試指令：依 conventions.md 跑受影響檔案與直接相依測試；server/web 可傳明確 test-file，server runner 已包含頂層檔；shared 跑對應測試及使用端。最終主代理跑一次 pnpm verify，不要求每個子任務另跑全量 test/build/verify]
 - 無未使用 import/變數；範圍外零 diff。
 回報格式：改了哪些檔（檔案:行號）、每條驗證指令的實際輸出結論、未盡事項。
 ```
@@ -54,7 +54,7 @@
 邊界規則：遇到不符範例的變體不要硬改，列入「跳過清單」回報。注意 server（.js import）與 web（extensionless）風格不同，不要跨界統一。
 驗收條件：
 - 全量 grep [pattern A] 為 0（跳過清單除外）。
-- 依 docs/ops/conventions.md 跑受影響測試；交付驗收時跑 pnpm verify。
+- 依 docs/ops/conventions.md 跑受影響測試；主代理最終交付驗收時統一跑一次 pnpm verify。
 回報格式：改動檔數、跳過清單（檔案:行號 + 原因）、檢查指令結果。
 ```
 
@@ -80,7 +80,7 @@
 - [條件 1]
 - [條件 2]
 檢查方式：
-- 程式碼：實際跑 [conventions.md 對照表的受影響測試]，引用真實輸出；交付驗收使用 pnpm verify。
+- 程式碼：實際跑 [conventions.md 對照表的受影響測試]，引用真實輸出；pnpm verify 由主代理最終交付驗收時統一執行。
 - 文件：只根據文件內容回答「照這份文件你會怎麼做 [X]」，答不出來處即缺陷。
 - playback 頁視覺：比對 witness 截圖與 docs/reference/FHD/ 對應 PNG，只回報可觀察差異清單（位置/元素/差在哪），不下「可接受」結論——那是使用者的判定。
 特別注意：[已知風險點]。
